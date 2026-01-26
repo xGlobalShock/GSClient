@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import Loader from './components/Loader';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import Dashboard from './pages/Dashboard';
@@ -10,6 +11,7 @@ import { ToastContainer } from './components/ToastContainer';
 import './App.css';
 
 function App() {
+    const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [systemStats, setSystemStats] = useState({
     cpu: 0,
@@ -19,6 +21,9 @@ function App() {
   });
 
   useEffect(() => {
+    // Loader timeout (simulate app/data loading)
+    const timer = setTimeout(() => setIsLoading(false), 5000);
+
     // Get real system stats
     const fetchSystemStats = async () => {
       if (window.electron?.ipcRenderer) {
@@ -37,7 +42,10 @@ function App() {
     // Update every 2 seconds
     const interval = setInterval(fetchSystemStats, 2000);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(timer);
+      clearInterval(interval);
+    };
   }, []);
 
   const renderPage = () => {
@@ -61,16 +69,26 @@ function App() {
 
   return (
     <ToastProvider>
-      <div className="app-container">
-        <Sidebar currentPage={currentPage} setCurrentPage={setCurrentPage} />
-        <div className="main-content">
-          <Header />
-          <div className="page-content">
-            {renderPage()}
+      {isLoading ? (
+        <div className="app-container">
+          <Sidebar currentPage={currentPage} setCurrentPage={setCurrentPage} />
+          <div className="main-content">
+            <Header />
+            <Loader />
           </div>
         </div>
-        <ToastContainer />
-      </div>
+      ) : (
+        <div className="app-container">
+          <Sidebar currentPage={currentPage} setCurrentPage={setCurrentPage} />
+          <div className="main-content">
+            <Header />
+            <div className="page-content">
+              {renderPage()}
+            </div>
+          </div>
+          <ToastContainer />
+        </div>
+      )}
     </ToastProvider>
   );
 }
