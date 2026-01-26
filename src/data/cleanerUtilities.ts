@@ -1,4 +1,12 @@
+import PrefetchLogo from '../assets/Prefetch.png';
 import { Cpu, Warning, Trash, ArrowCounterClockwise, Question, Monitor, Cloud } from 'phosphor-react';
+import ForzaLogo from '../assets/Forza.png';
+import ApexLogo from '../assets/Apex legends.png';
+import NvidiaLogo from '../assets/nvidia.png';
+import DNSLogo from '../assets/DNS.png';
+import TempFilesLogo from '../assets/TempFiles.png';
+import WinUpdatesLogo from '../assets/WinUpdates.png';
+import MemoryDumpLogo from '../assets/MemoryDump.png';
 
 export interface CleanerUtility {
   id: string;
@@ -15,7 +23,7 @@ export const cleanerUtilities: CleanerUtility[] = [
     {
       id: 'forza-shaders',
       title: 'Clear Forza Horizon 5 Shaders',
-      icon: Warning, // Use warning icon for shader issues
+      icon: ForzaLogo, // Use Forza logo asset
       cacheType: 'Forza Shader Cache',
       description: 'Clears Forza Horizon 5 shader cache to fix stuttering and graphics issues.',
       buttonText: 'Clear Cache',
@@ -25,7 +33,7 @@ export const cleanerUtilities: CleanerUtility[] = [
   {
     id: 'nvidia-cache',
     title: 'Clear NVIDIA Cache',
-    icon: Cpu, // NVIDIA Cache: CPU icon is fine
+    icon: NvidiaLogo, // NVIDIA Cache: Nvidia logo (local)
     cacheType: 'DXCache/GLCache',
     description: 'Clears shader cache to fix stuttering after game updates.',
     buttonText: 'Clear Cache',
@@ -35,7 +43,7 @@ export const cleanerUtilities: CleanerUtility[] = [
   {
     id: 'apex-shaders',
     title: 'Clear Apex Shaders',
-    icon: Warning, // Apex Shaders: Warning icon for shader issues
+    icon: ApexLogo, // Use Apex logo asset
     cacheType: 'Shader Cache',
     description: 'Clears psCache.pso to fix stuttering and improve performance.',
     buttonText: 'Clear Cache',
@@ -45,7 +53,7 @@ export const cleanerUtilities: CleanerUtility[] = [
   {
     id: 'temp-files',
     title: 'Clear Temp Files',
-    icon: Trash, // Temp Files: Trash icon
+    icon: TempFilesLogo, // Temp Files: new icon
     cacheType: 'Temporary Files',
     description: 'Clears %temp% folder to free up disk space instantly.',
     buttonText: 'Clear Files',
@@ -55,7 +63,7 @@ export const cleanerUtilities: CleanerUtility[] = [
   {
     id: 'prefetch',
     title: 'Clear Prefetch',
-    icon: ArrowCounterClockwise, // Prefetch: ArrowCounterClockwise for refresh
+    icon: PrefetchLogo, // Prefetch: new icon
     cacheType: 'Startup Cache',
     description: 'Clears prefetch cache to optimize system startup performance.',
     buttonText: 'Clear Cache',
@@ -65,7 +73,7 @@ export const cleanerUtilities: CleanerUtility[] = [
   {
     id: 'memory-dumps',
     title: 'Clear Memory Dumps',
-    icon: Question, // Memory Dumps: Question icon for crash dumps
+    icon: MemoryDumpLogo, // Memory Dumps: new icon
     cacheType: 'Crash Dumps',
     description: 'Removes crash dump files to free up significant disk space.',
     buttonText: 'Clear Files',
@@ -75,7 +83,7 @@ export const cleanerUtilities: CleanerUtility[] = [
   {
     id: 'update-cache',
     title: 'Clear Update Cache',
-    icon: Monitor, // Update Cache: Monitor icon
+    icon: WinUpdatesLogo, // Update Cache: new icon
     cacheType: 'Windows Updates',
     description: 'Removes cached Windows update files to save disk space.',
     buttonText: 'Clear Cache',
@@ -85,7 +93,7 @@ export const cleanerUtilities: CleanerUtility[] = [
   {
     id: 'dns-cache',
     title: 'Clear DNS Cache',
-    icon: Cloud, // DNS Cache: Cloud icon
+    icon: DNSLogo, // DNS Cache: new icon
     cacheType: 'Network Resolver',
     description: 'Clears cached DNS records to refresh network connectivity.',
     buttonText: 'Clear Cache',

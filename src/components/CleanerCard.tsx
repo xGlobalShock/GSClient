@@ -33,18 +33,25 @@ const CleanerCard: React.FC<CleanerCardProps> = ({
     }
   };
 
-  // Select fitting icon from phosphor-react
-  let FittingIcon: any = null;
-  switch (id) {
-    case 'nvidia-cache': FittingIcon = Cpu; break;
-    case 'apex-shaders': FittingIcon = Warning; break;
-    case 'temp-files': FittingIcon = Trash; break;
-    case 'prefetch': FittingIcon = ArrowCounterClockwise; break;
-    case 'memory-dumps': FittingIcon = Question; break;
-    case 'update-cache': FittingIcon = Monitor; break;
-    case 'dns-cache': FittingIcon = Cloud; break;
-    default: FittingIcon = Cpu;
-  }
+  // Render image if icon is a string (image path), else render as React component
+  const renderIcon = () => {
+    if (typeof Icon === 'string') {
+      // Standardize all image icon sizes to 40x40px
+      return (
+        <img
+          src={Icon}
+          alt={title + ' icon'}
+          className="card-icon"
+          style={{ width: 40, height: 40, objectFit: 'contain' }}
+        />
+      );
+    }
+    if (Icon) {
+      // Standardize all React icon sizes to 40px
+      return <Icon size={40} color={color} className="card-icon" />;
+    }
+    return null;
+  };
 
   return (
     <div className="cleaner-card" style={{ borderColor: color }}>
@@ -53,7 +60,7 @@ const CleanerCard: React.FC<CleanerCardProps> = ({
           <h3 className="card-title">{title}</h3>
           <p className="card-cache-type">{cacheType}</p>
         </div>
-        <FittingIcon size={28} color={color} className="card-icon" />
+        {renderIcon()}
       </div>
 
       <p className="card-description">{description}</p>
