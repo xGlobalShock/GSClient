@@ -1,0 +1,101 @@
+{
+  "name": "pc-optimizer-elite",
+  "version": "1.0.0",
+  "description": "Advanced PC Optimization Tool with LoL-inspired Client UI",
+  "author": "PC Optimizer Elite Team",
+  "main": "main.js",
+  "homepage": "./",
+  "private": true,
+  "scripts": {
+    "react-start": "cross-env NODE_OPTIONS=--no-deprecation react-scripts start",
+    "react-build": "react-scripts build",
+    "react-test": "react-scripts test",
+    "electron-dev": "cross-env NODE_OPTIONS=--no-deprecation concurrently --names \"REACT,ELECTRON\" --prefix-colors \"cyan.bold,magenta.bold\" --kill-others-on-fail \"npm run react-start\" \"wait-on http://localhost:3000 && electron .\"",
+    "electron-only": "cross-env NODE_OPTIONS=--no-deprecation concurrently --names \"REACT,ELECTRON\" --prefix-colors \"cyan.bold,magenta.bold\" --kill-others-on-fail \"cross-env BROWSER=none npm run react-start\" \"wait-on http://localhost:3000 && electron .\"",
+    "electron-build": "npm run react-build && electron-builder --win --x64",
+    "start": "npm run electron-dev",
+    "build": "npm run electron-build",
+    "dev": "npm run electron-dev",
+    "client": "npm run electron-only"
+  },
+  "dependencies": {
+    "electron-is-dev": "^3.0.1",
+    "framer-motion": "^10.16.4",
+    "is-admin": "^4.0.0",
+    "lucide-react": "^0.292.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "recharts": "^2.10.3",
+    "sudo-prompt": "^9.2.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "autoprefixer": "^10.4.16",
+    "concurrently": "^8.2.1",
+    "cross-env": "^10.1.0",
+    "electron": "^27.0.0",
+    "electron-builder": "^24.6.4",
+    "postcss": "^8.4.31",
+    "react-scripts": "5.0.1",
+    "tailwindcss": "^3.3.5",
+    "typescript": "^4.9.5",
+    "wait-on": "^7.0.1"
+  },
+  "build": {
+    "appId": "com.pcoptimizer.elite",
+    "productName": "PC Optimizer Elite",
+    "files": [
+      "build/**/*",
+      "!build/electron.js",
+      "main.js",
+      "node_modules/**/*"
+    ],
+    "extraFiles": [
+      {
+        "from": "public/preload.js",
+        "to": "preload.js"
+      },
+      {
+        "from": "public/app.manifest",
+        "to": "app.manifest"
+      }
+    ],
+    "extraResources": [
+      {
+        "from": "src/assets",
+        "to": "assets",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "directories": {
+      "buildResources": "public"
+    },
+    "extends": null,
+    "win": {
+      "target": "dir",
+      "executableName": "PC Optimizer Elite"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "PC Optimizer Elite"
+    }
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  }
+}
