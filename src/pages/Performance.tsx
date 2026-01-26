@@ -18,7 +18,29 @@ declare global {
 const Performance: React.FC = () => {
   const [applyingId, setApplyingId] = useState<string | null>(null);
   const [enabledTweaks, setEnabledTweaks] = useState<{ [key: string]: boolean }>({});
+  const [creatingRestore, setCreatingRestore] = useState(false);
+  const [lastRestoreInfo, setLastRestoreInfo] = useState<any | null>(null);
   const { addToast } = useToast();
+
+  const handleCreateRestorePoint = async () => {
+    setCreatingRestore(true);
+    try {
+      if (window.electron?.ipcRenderer) {
+        const restoreDesc = `PC Optimizer - Before Tweak Application`;
+        const restoreResult: any = await window.electron.ipcRenderer.invoke('system:create-restore-point', restoreDesc);
+        if (restoreResult && restoreResult.success) {
+          setLastRestoreInfo(restoreResult.verify || null);
+          addToast(restoreResult.message || 'System restore point created', 'info');
+        } else {
+          addToast(restoreResult?.message || 'Failed to create system restore point', 'error');
+        }
+      }
+    } catch (error) {
+      addToast(`Error creating restore point: ${error instanceof Error ? error.message : 'Unknown'}`, 'error');
+    } finally {
+      setCreatingRestore(false);
+    }
+  };
 
   const tweakMap: { [key: string]: string } = {
     'irq-priority': 'tweak:apply-irq-priority',
@@ -75,16 +97,6 @@ const Performance: React.FC = () => {
   const handleApplyTweak = async (id: string) => {
     setApplyingId(id);
     try {
-      // Create restore point first
-      if (window.electron?.ipcRenderer) {
-        const tweak = performanceTweaks.find(t => t.id === id);
-        const restoreDesc = `PC Optimizer - Before ${tweak?.title || 'Tweak'}`;
-        const restoreResult: any = await window.electron.ipcRenderer.invoke('system:create-restore-point', restoreDesc);
-        if (restoreResult.success) {
-          addToast('✓ System restore point created', 'info');
-        }
-      }
-
       // Apply tweak
       const channel = tweakMap[id];
       if (window.electron?.ipcRenderer && channel) {
@@ -157,6 +169,18 @@ const Performance: React.FC = () => {
       <p className="section-subtitle">
         Kernel and registry optimizations for minimal latency and maximum performance
       </p>
+      <div className="restore-controls">
+        <button
+          className="restore-button"
+          onClick={handleCreateRestorePoint}
+          disabled={creatingRestore}
+        >
+          {creatingRestore ? 'Creating...' : 'Create Restore Point'}
+        </button>
+        {lastRestoreInfo && (
+          <div className="restore-info">Last: {lastRestoreInfo.postObj?.CreationTime || lastRestoreInfo.postObj?.CreationTimeUtc || ''}</div>
+        )}
+      </div>
 
       <div className="tweaks-grid">
         {performanceTweaks.map((tweak, index) => (

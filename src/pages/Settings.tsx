@@ -1,21 +1,37 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import '../styles/Settings.css';
+import { loadSettings, saveSettings } from '../utils/settings';
 
 const Settings: React.FC = () => {
-  const [settings, setSettings] = useState({
+  const [settings, setSettings] = useState(() => ({
     autoClean: true,
     notifications: true,
     autoOptimize: false,
     theme: 'dark',
     startupLaunch: true,
-  });
+  }));
+
+  useEffect(() => {
+    const s = loadSettings();
+    setSettings(prev => ({ ...prev, ...s }));
+
+    const onUpdated = (e: Event) => {
+      try {
+        // @ts-ignore
+        const detail = (e as CustomEvent)?.detail || {};
+        setSettings(prev => ({ ...prev, ...detail }));
+      } catch {}
+    };
+
+    window.addEventListener('settings:updated', onUpdated as EventListener);
+    return () => window.removeEventListener('settings:updated', onUpdated as EventListener);
+  }, []);
 
   const handleToggle = (key: keyof typeof settings) => {
-    setSettings(prev => ({
-      ...prev,
-      [key]: !prev[key],
-    }));
+    const updated = { ...settings, [key]: !settings[key] };
+    setSettings(updated);
+    saveSettings(updated as any);
   };
 
   return (
@@ -90,6 +106,8 @@ const Settings: React.FC = () => {
               <span className="slider"></span>
             </label>
           </div>
+
+
         </div>
 
         <div className="settings-section">

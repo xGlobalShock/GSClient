@@ -117,3 +117,124 @@
   background: linear-gradient(90deg, var(--color-primary), var(--color-secondary));
   border-radius: 2px;
 }
+
+/* Dashboard - New layout styles */
+.dashboard-page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.hero-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px 20px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(6,10,24,0.6), rgba(16,24,48,0.4));
+  border: 1px solid rgba(255,255,255,0.03);
+  backdrop-filter: blur(6px);
+}
+
+.hero-title {
+  margin: 0;
+  color: #fff;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.hero-sub {
+  margin: 4px 0 0 0;
+  color: rgba(255,255,255,0.6);
+  font-size: 13px;
+}
+
+.status-badge {
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: linear-gradient(90deg,#06b6d4,#10b981);
+  color: #002;
+  font-weight: 800;
+}
+
+.stat-grid {
+  display: grid;
+  /* Fixed card columns with centered grid so cards stay centered in the page */
+  grid-template-columns: repeat(4, 220px);
+  gap: 28px;
+  justify-content: center; /* center the whole grid */
+  justify-items: center; /* center each item in its cell */
+}
+
+@media (max-width: 1100px) {
+  .stat-grid { grid-template-columns: repeat(2, 220px); }
+}
+
+@media (max-width: 700px) {
+  .stat-grid { grid-template-columns: 1fr; gap: 16px; }
+}
+
+.actions-bar {
+  display: flex;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.btn {
+  padding: 12px 18px;
+  border-radius: 10px;
+  font-weight: 800;
+  cursor: pointer;
+  border: none;
+}
+
+.btn-primary {
+  background: linear-gradient(90deg,#f6ad55,#fbd38d);
+  box-shadow: 0 8px 30px rgba(246,173,85,0.12);
+  color: #012;
+}
+
+.btn-secondary {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.04);
+  color: #fff;
+}
+
+.system-health-card {
+  margin-top: 16px;
+  padding: 14px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+  border: 1px solid rgba(255,255,255,0.04);
+  backdrop-filter: blur(6px);
+}
+
+.health-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.health-bar {
+  flex: 1;
+  height: 12px;
+  background: rgba(255,255,255,0.03);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.health-fill {
+  height: 100%;
+  background: linear-gradient(90deg,#10b981,#06b6d4);
+}
+
+.health-score {
+  font-weight: 800;
+  color: #fff;
+  min-width: 56px;
+  text-align: right;
+}
+
+.health-title { color: #fff; font-weight: 800; margin-top: 10px; }
+.health-desc { color: rgba(255,255,255,0.65); font-size: 13px; margin-top: 6px; }
+

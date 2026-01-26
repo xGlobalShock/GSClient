@@ -125,13 +125,66 @@ app.on('activate', () => {
 // Restore Point IPC Handler
 ipcMain.handle('system:create-restore-point', async (event, description) => {
   try {
-    const desc = description || 'PC Optimizer - Before Tweak Application';
-    const cmd = `powershell -NoProfile -ExecutionPolicy Bypass -Command "Checkpoint-Computer -Description '${desc}' -RestorePointType 'MODIFY_SETTINGS'"`;
+    // Default description (kept as requested) and allow override via the description argument
+    const descBase = description || 'PC Optimizer - Before Tweak Application';
+
+    // Require admin privileges to create restore points
+    if (!isElevated) {
+      console.log('[Restore Point] Attempted without elevation');
+      return { success: false, message: 'Admin privileges required to create a system restore point. Please run the app as administrator.' };
+    }
+
+    // Append timestamp to ensure uniqueness and avoid matching older restore points
+    const timestamp = new Date().toISOString();
+    const descWithTs = `${descBase} - ${timestamp}`;
+    const safeDesc = descWithTs.replace(/'/g, "''");
+
+    // Query the latest restore point before creating a new one
+    const preCmd = `powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-ComputerRestorePoint | Sort-Object -Property SequenceNumber -Descending | Select-Object -First 1 | ConvertTo-Json -Compress"`;
+    let preSeq = 0;
+    let preObj = null;
+    try {
+      const preRes = await execAsync(preCmd, { shell: true, timeout: 10000 });
+      const pstdout = preRes.stdout.trim();
+      if (pstdout) {
+        try { preObj = JSON.parse(pstdout); } catch (e) { preObj = pstdout; }
+        preSeq = preObj && preObj.SequenceNumber ? Number(preObj.SequenceNumber) : 0;
+      }
+    } catch (preErr) {
+      // If pre-query fails, log and continue (we'll still attempt checkpoint)
+      console.log('[Restore Point] Pre-check error:', preErr.message || preErr);
+      preSeq = 0;
+    }
+
+    // Create the restore point (checkpoint)
+    const cmd = `powershell -NoProfile -ExecutionPolicy Bypass -Command "Checkpoint-Computer -Description '${safeDesc}' -RestorePointType 'MODIFY_SETTINGS' -ErrorAction Stop"`;
     await execAsync(cmd, { shell: true });
-    return { success: true, message: 'System restore point created successfully' };
+
+    // Query the latest restore point after checkpoint
+    const postCmd = `powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-ComputerRestorePoint | Sort-Object -Property SequenceNumber -Descending | Select-Object -First 1 | ConvertTo-Json -Compress"`;
+    try {
+      const postRes = await execAsync(postCmd, { shell: true, timeout: 10000 });
+      const pstdout = postRes.stdout.trim();
+      let postObj = null;
+      let postSeq = 0;
+      if (pstdout) {
+        try { postObj = JSON.parse(pstdout); } catch (e) { postObj = pstdout; }
+        postSeq = postObj && postObj.SequenceNumber ? Number(postObj.SequenceNumber) : 0;
+      }
+
+      if (postSeq > preSeq) {
+        return { success: true, message: 'System restore point created successfully', verify: { preSeq, postSeq, description: descWithTs, postObj } };
+      } else {
+        console.log('[Restore Point] No new restore point detected. preSeq:', preSeq, 'postSeq:', postSeq);
+        return { success: false, message: 'Checkpoint executed but no new restore point detected. System may throttle restore creation or it may be disabled.', debug: { preObj, postObj } };
+      }
+    } catch (postErr) {
+      console.log('[Restore Point] Post-check error:', postErr.message || postErr);
+      return { success: false, message: 'Restore point created but verification failed. Check System Restore settings.', debug: { preObj, postError: postErr.message || postErr } };
+    }
   } catch (error) {
-    console.log('[Restore Point] Error creating restore point:', error.message);
-    return { success: false, message: 'Could not create restore point. You may need admin privileges.' };
+    console.log('[Restore Point] Error creating restore point:', error);
+    return { success: false, message: 'Could not create restore point. You may need admin privileges. ' + (error.message || '') };
   }
 });
 

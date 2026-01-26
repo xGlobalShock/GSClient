@@ -38,47 +38,41 @@ const StatCard: React.FC<StatCardProps> = ({
   return (
     <motion.div
       className={`stat-card stat-${status}`}
-      whileHover={{ scale: 1.03, y: -5 }}
-      initial={{ opacity: 0, scale: 0.9 }}
+      initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.3 }}
+      transition={{ duration: 0.28 }}
     >
-      <div className="stat-card-inner stat-card-vertical">
-        <div className="stat-icon-badge" style={{ boxShadow: `0 0 16px ${getStatusColor()}40` }}>
-          {icon}
+      <div className="stat-card-inner">
+        <div className="stat-center">
+          <div className="gauge-wrap">
+            <div className="stat-gauge">
+              <svg viewBox="0 0 120 120" className="gauge-svg" aria-hidden>
+                <circle cx="60" cy="60" r="48" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="12" />
+                <motion.circle
+                  cx="60"
+                  cy="60"
+                  r="48"
+                  fill="none"
+                  stroke={getStatusColor()}
+                  strokeWidth="12"
+                  strokeLinecap="round"
+                  strokeDasharray={2 * Math.PI * 48}
+                  strokeDashoffset={2 * Math.PI * 48}
+                  animate={{ strokeDashoffset: 2 * Math.PI * 48 - (normalizedValue / 100) * 2 * Math.PI * 48 }}
+                  transition={{ duration: 1.2, ease: 'easeInOut' }}
+                  style={{ transform: 'rotate(-90deg)', transformOrigin: '50% 50%', filter: `drop-shadow(0 0 6px ${getStatusColor()}66)` }}
+                />
+              </svg>
+              <div className="stat-value">
+                <div className="stat-number">{normalizedValue.toFixed(0)}<span className="stat-unit">{unit}</span></div>
+                <div className="stat-title"><span className="stat-inline-icon">{icon}</span><span className="stat-title-text">{title}</span></div>
+              </div>
+            </div>
+            <div className={`stat-badge stat-${status} stat-badge-below`}>{status.toUpperCase()}</div>
+          </div>
         </div>
-        <div className="stat-circle-container">
-          <svg className="stat-circle-svg" width="110" height="110">
-            <circle
-              cx="55"
-              cy="55"
-              r="45"
-              fill="none"
-              stroke="rgba(255, 255, 255, 0.07)"
-              strokeWidth="8"
-            />
-            <motion.circle
-              cx="55"
-              cy="55"
-              r="45"
-              fill="none"
-              stroke={getStatusColor()}
-              strokeWidth="8"
-              strokeLinecap="round"
-              strokeDasharray={circumference}
-              strokeDashoffset={circumference}
-              animate={{ strokeDashoffset }}
-              transition={{ duration: 1.5, ease: "easeInOut" }}
-              style={{
-                transform: 'rotate(-90deg)',
-                transformOrigin: '50% 50%',
-                filter: `drop-shadow(0 0 8px ${getStatusColor()}80)`
-              }}
-            />
-          </svg>
-          <div className="stat-circle-text stat-circle-text-large">{normalizedValue.toFixed(1)}<span className="stat-unit-text">{unit}</span></div>
-        </div>
-        <h4 className="stat-label stat-label-center">{title}</h4>
+
+        {/* Status moved inside the stat card value area */}
       </div>
     </motion.div>
   );

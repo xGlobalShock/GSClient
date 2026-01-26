@@ -11,9 +11,27 @@ import '../styles/Sidebar.css';
 interface SidebarProps {
   currentPage: string;
   setCurrentPage: (page: string) => void;
+  online?: boolean;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage }) => {
+const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage, online: onlineProp }) => {
+  const [online, setOnline] = React.useState<boolean>(() => (typeof navigator !== 'undefined' ? navigator.onLine : true));
+
+  React.useEffect(() => {
+    // If a prop is provided, use it; otherwise listen to browser events
+    if (typeof onlineProp === 'boolean') {
+      setOnline(onlineProp);
+      return;
+    }
+    const handleOnline = () => setOnline(true);
+    const handleOffline = () => setOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [onlineProp]);
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Home },
     { id: 'performance', label: 'Performance', icon: Activity },
@@ -46,9 +64,9 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage }) => {
       </nav>
 
       <div className="sidebar-footer">
-        <div className="status-indicator">
-          <div className="status-dot active"></div>
-          <span className="status-text">ONLINE</span>
+        <div className="status-indicator" aria-hidden>
+          <div className={`status-dot ${online ? 'active' : ''}`}></div>
+          <span className="status-text">{online ? 'ONLINE' : 'OFFLINE'}</span>
         </div>
       </div>
     </aside>

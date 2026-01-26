@@ -10,14 +10,8 @@ const Header: React.FC = () => {
         <p className="header-subtitle">System Performance Control Center</p>
       </div>
 
-      <div className="header-right">
-        <button className="header-button notification-btn">
-          <Bell size={20} />
-          <span className="notification-badge">2</span>
-        </button>
-        <button className="header-button profile-btn">
-          <User size={20} />
-        </button>
+      <div className="header-right" aria-hidden>
+        {/* Notifications and profile removed per request */}
       </div>
     </header>
   );
