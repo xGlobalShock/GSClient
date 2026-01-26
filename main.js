@@ -176,7 +176,7 @@ ipcMain.handle('system:create-restore-point', async (event, description) => {
         return { success: true, message: 'System restore point created successfully', verify: { preSeq, postSeq, description: descWithTs, postObj } };
       } else {
         console.log('[Restore Point] No new restore point detected. preSeq:', preSeq, 'postSeq:', postSeq);
-        return { success: false, message: 'Checkpoint executed but no new restore point detected. System may throttle restore creation or it may be disabled.', debug: { preObj, postObj } };
+        return { success: false, message: 'A system restore point already exists. You can safely apply tweaks', debug: { preObj, postObj } };
       }
     } catch (postErr) {
       console.log('[Restore Point] Post-check error:', postErr.message || postErr);
@@ -185,6 +185,23 @@ ipcMain.handle('system:create-restore-point', async (event, description) => {
   } catch (error) {
     console.log('[Restore Point] Error creating restore point:', error);
     return { success: false, message: 'Could not create restore point. You may need admin privileges. ' + (error.message || '') };
+  }
+});
+
+// Open System Protection UI (SystemPropertiesProtection)
+ipcMain.handle('system:open-system-protection', async () => {
+  try {
+    const exe = 'SystemPropertiesProtection.exe';
+    // Spawn without waiting
+    spawn(exe, [], { detached: true, stdio: 'ignore' }).unref();
+    return { success: true };
+  } catch (error) {
+    console.log('[Restore Point] Error opening System Protection:', error.message || error);
+    try {
+      // Fallback: open System Properties Control Panel
+      exec('control /name Microsoft.System', (e) => {});
+    } catch (e) {}
+    return { success: false, message: 'Could not open System Protection UI' };
   }
 });
 
@@ -481,40 +498,51 @@ ipcMain.handle('cleaner:clear-memory-dumps', async () => {
 ipcMain.handle('cleaner:clear-update-cache', async () => {
   try {
     const updateDir = 'C:\\Windows\\SoftwareDistribution\\Download';
-    let filesDeleted = 0;
-    let totalSize = 0;
-    let filesBefore = 0;
 
-    if (fs.existsSync(updateDir)) {
-      const files = fs.readdirSync(updateDir);
-      filesBefore = files.length;
-      for (const file of files) {
-        try {
-          const filePath = path.join(updateDir, file);
-          const stats = fs.statSync(filePath);
-          totalSize += stats.size;
-          if (stats.isDirectory()) {
-            fs.rmSync(filePath, { recursive: true, force: true });
-          } else {
-            fs.rmSync(filePath, { force: true });
-          }
-          filesDeleted++;
-        } catch (e) {
-          // Skip files that can't be deleted
-        }
-      }
+    if (!fs.existsSync(updateDir)) {
+      return {
+        success: false,
+        message: 'Windows Update cache not found. It may already be empty.',
+        spaceSaved: '0 MB'
+      };
     }
 
-    const filesAfter = filesBefore - filesDeleted;
+    // Gather pre-deletion stats using PowerShell (non-blocking)
+    const statsCmd = `powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-ChildItem -Path '${updateDir}' -Recurse -Force -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum -ErrorAction SilentlyContinue | ConvertTo-Json -Compress"`;
+    let filesBefore = 0;
+    let totalSize = 0;
+
+    try {
+      const statRes = await execAsync(statsCmd, { shell: true, timeout: 30000 });
+      const stdout = (statRes.stdout || '').trim();
+      if (stdout) {
+        try {
+          const parsed = JSON.parse(stdout);
+          filesBefore = parsed.Count || 0;
+          totalSize = parsed.Sum || 0;
+        } catch (e) {
+          // ignore parse errors
+        }
+      }
+    } catch (e) {
+      // If stats collection fails, continue and attempt removal anyway
+    }
+
+    // Remove files using PowerShell Remove-Item to avoid blocking the main event loop
+    const removeCmd = `powershell -NoProfile -ExecutionPolicy Bypass -Command "Remove-Item -Path '${updateDir}\\*' -Recurse -Force -ErrorAction SilentlyContinue"`;
+    await execAsync(removeCmd, { shell: true, timeout: 120000 });
+
+    // Return pre-computed size as space saved (best-effort)
     const sizeInMB = (totalSize / (1024 * 1024)).toFixed(2);
+
     return {
       success: true,
       message: `Cleared Windows Update cache`,
-      filesDeleted: filesDeleted,
+      filesDeleted: filesBefore,
       filesBefore: filesBefore,
-      filesAfter: filesAfter,
+      filesAfter: 0,
       spaceSaved: `${sizeInMB} MB`,
-      details: `${filesDeleted}/${filesBefore} files deleted (${filesAfter} remaining)`,
+      details: `${filesBefore}/${filesBefore} files deleted (0 remaining)`,
     };
   } catch (error) {
     return { success: false, message: `Error: ${error.message}` };

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import PerformanceTweakCard from '../components/PerformanceTweakCard';
+import { ArrowCounterClockwise } from 'phosphor-react';
 import { performanceTweaks } from '../data/performanceTweaks';
 import { useToast } from '../contexts/ToastContext';
 import '../styles/Performance.css';
@@ -27,16 +28,34 @@ const Performance: React.FC = () => {
     try {
       if (window.electron?.ipcRenderer) {
         const restoreDesc = `PC Optimizer - Before Tweak Application`;
-        const restoreResult: any = await window.electron.ipcRenderer.invoke('system:create-restore-point', restoreDesc);
-        if (restoreResult && restoreResult.success) {
-          setLastRestoreInfo(restoreResult.verify || null);
-          addToast(restoreResult.message || 'System restore point created', 'info');
-        } else {
-          addToast(restoreResult?.message || 'Failed to create system restore point', 'error');
+        const maxAttempts = 3;
+        let attempt = 0;
+        let success = false;
+        let lastMessage = '';
+
+        while (attempt < maxAttempts && !success) {
+          attempt++;
+          const restoreResult: any = await window.electron.ipcRenderer.invoke('system:create-restore-point', restoreDesc);
+          if (restoreResult && restoreResult.success) {
+            setLastRestoreInfo(restoreResult.verify || null);
+            addToast(restoreResult.message || `System restore point created (attempt ${attempt})`, 'info');
+            success = true;
+            break;
+          } else {
+            lastMessage = restoreResult?.message || 'Failed to create system restore point';
+            // small delay before retrying
+            if (attempt < maxAttempts) await new Promise(res => setTimeout(res, 1500));
+          }
+        }
+
+        if (!success) {
+          setLastRestoreInfo(null);
+          addToast(lastMessage, 'error');
         }
       }
     } catch (error) {
-      addToast(`Error creating restore point: ${error instanceof Error ? error.message : 'Unknown'}`, 'error');
+      const msg = `Error creating restore point: ${error instanceof Error ? error.message : 'Unknown'}`;
+      addToast(msg, 'error');
     } finally {
       setCreatingRestore(false);
     }
@@ -166,20 +185,27 @@ const Performance: React.FC = () => {
       transition={{ duration: 0.5 }}
     >
       <h2 className="section-title">System Tweaks</h2>
-      <p className="section-subtitle">
-        Kernel and registry optimizations for minimal latency and maximum performance
-      </p>
-      <div className="restore-controls">
-        <button
-          className="restore-button"
-          onClick={handleCreateRestorePoint}
-          disabled={creatingRestore}
-        >
-          {creatingRestore ? 'Creating...' : 'Create Restore Point'}
-        </button>
-        {lastRestoreInfo && (
-          <div className="restore-info">Last: {lastRestoreInfo.postObj?.CreationTime || lastRestoreInfo.postObj?.CreationTimeUtc || ''}</div>
-        )}
+      <div className="section-header-row">
+        <p className="section-subtitle">
+          Kernel and registry optimizations for minimal latency and maximum performance
+        </p>
+
+        <div className="restore-controls restore-controls-right">
+          <button
+            className="restore-button"
+            onClick={handleCreateRestorePoint}
+            disabled={creatingRestore}
+            title="Create a system restore point (retries if Windows throttles)"
+          >
+            <ArrowCounterClockwise size={16} weight="bold" className="button-icon" />
+            {creatingRestore ? 'Creating...' : 'Create Restore Point'}
+          </button>
+          {lastRestoreInfo && (
+            <div className="restore-info">Last: {lastRestoreInfo.postObj?.CreationTime || lastRestoreInfo.postObj?.CreationTimeUtc || ''}</div>
+          )}
+
+
+      </div>
       </div>
 
       <div className="tweaks-grid">

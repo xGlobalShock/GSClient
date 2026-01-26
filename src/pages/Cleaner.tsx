@@ -45,6 +45,11 @@ const Cleaner: React.FC = () => {
     try {
       const channel = cleanerMap[id];
       if (window.electron?.ipcRenderer && channel) {
+        // If clearing the Windows Update cache, warn user it may take a while
+        if (id === 'update-cache') {
+          addToast('Clearing update cache — this can take a minute or more', 'info');
+        }
+
         const result: CleanResult = await window.electron.ipcRenderer.invoke(channel);
         let message = result.message;
         
