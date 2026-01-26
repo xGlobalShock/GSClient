@@ -59,12 +59,7 @@ const Performance: React.FC = () => {
         try {
           if (window.electron?.ipcRenderer) {
             const result = await window.electron.ipcRenderer.invoke(channel);
-            // For Win32 Priority, treat value 2 (default) as not applied
-            if (tweakId === 'win32-priority') {
-              results[tweakId] = false;
-            } else {
-              results[tweakId] = result.applied || false;
-            }
+            results[tweakId] = result.applied || false;
           }
         } catch (error) {
           results[tweakId] = false;
