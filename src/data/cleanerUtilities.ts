@@ -12,6 +12,16 @@ export interface CleanerUtility {
 }
 
 export const cleanerUtilities: CleanerUtility[] = [
+    {
+      id: 'forza-shaders',
+      title: 'Clear Forza Horizon 5 Shaders',
+      icon: Warning, // Use warning icon for shader issues
+      cacheType: 'Forza Shader Cache',
+      description: 'Clears Forza Horizon 5 shader cache to fix stuttering and graphics issues.',
+      buttonText: 'Clear Cache',
+      color: '#0074D9',
+      buttonColor: '#27ae60',
+    },
   {
     id: 'nvidia-cache',
     title: 'Clear NVIDIA Cache',

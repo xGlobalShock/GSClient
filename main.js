@@ -7,6 +7,49 @@ const os = require('os');
 
 const execAsync = promisify(exec);
 
+// Forza Horizon 5 Shader Cache Cleaner
+ipcMain.handle('cleaner:clear-forza-shaders', async () => {
+  try {
+    const localAppData = process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local');
+    const forzaCachePath = path.join(localAppData, 'Temp', 'Turn10Temp.scratch', 'GraphicsCache');
+
+    if (!fs.existsSync(forzaCachePath)) {
+      return { success: false, message: 'Forza Horizon 5 shader cache not found. Game may not be installed.' };
+    }
+
+    let filesBefore = 0;
+    let filesDeleted = 0;
+    let sizeFreed = 0;
+
+    const files = fs.readdirSync(forzaCachePath);
+    filesBefore = files.length;
+    for (const file of files) {
+      const filePath = path.join(forzaCachePath, file);
+      try {
+        const stats = fs.statSync(filePath);
+        sizeFreed += stats.size;
+        fs.rmSync(filePath, { force: true });
+        filesDeleted++;
+      } catch (e) {
+        // Ignore errors for individual files
+      }
+    }
+
+    const sizeInMB = (sizeFreed / (1024 * 1024)).toFixed(2);
+    return {
+      success: true,
+      message: `Cleared Forza Horizon 5 shader cache`,
+      filesDeleted,
+      filesBefore,
+      filesAfter: filesBefore - filesDeleted,
+      spaceSaved: `${sizeInMB} MB`,
+      details: `${filesDeleted}/${filesBefore} files deleted (${filesBefore - filesDeleted} remaining)`
+    };
+  } catch (error) {
+    return { success: false, message: `Error: ${error.message}` };
+  }
+});
+
 // Disable GPU acceleration to prevent GPU process crashes
 app.disableHardwareAcceleration();
 
@@ -37,7 +80,7 @@ function createWindow() {
     minHeight: 700,
     autoHideMenuBar: true,
     webPreferences: {
-      preload: isDev 
+      preload: isDev
         ? path.join(__dirname, 'public/preload.js')
         : path.join(process.resourcesPath, '../preload.js'),
       nodeIntegration: false,
@@ -51,7 +94,7 @@ function createWindow() {
 
   const startUrl = isDev
     ? 'http://localhost:3000'
-    : `file://${path.join(__dirname, 'build/index.html')}`;
+    : `file://${path.join(process.resourcesPath, 'app.asar', 'build', 'index.html')}`;
 
   mainWindow.loadURL(startUrl);
 
@@ -135,9 +178,11 @@ ipcMain.handle('cleaner:clear-nvidia-cache', async () => {
     let totalSize = 0;
     let totalRemaining = 0;
 
+    let anyCacheExists = false;
     // Count before cleaning
     for (const cachePath of caches) {
       if (fs.existsSync(cachePath)) {
+        anyCacheExists = true;
         try {
           const items = fs.readdirSync(cachePath);
           totalBefore += items.length;
@@ -145,6 +190,9 @@ ipcMain.handle('cleaner:clear-nvidia-cache', async () => {
           // Continue if one folder fails
         }
       }
+    }
+    if (!anyCacheExists) {
+      return { success: false, message: 'NVIDIA shader cache not found. Driver or game may not be installed.' };
     }
 
     // Delete files
@@ -209,16 +257,17 @@ ipcMain.handle('cleaner:clear-apex-shaders', async () => {
     let sizeFreed = 0;
     let filesBefore = 0;
 
-    if (fs.existsSync(apexCachePath)) {
-      try {
-        const stats = fs.statSync(apexCachePath);
-        sizeFreed = stats.size;
-        filesBefore = 1;
-        fs.rmSync(apexCachePath, { force: true });
-        cleared = 1;
-      } catch (e) {
-        // File might be in use
-      }
+    if (!fs.existsSync(apexCachePath)) {
+      return { success: false, message: 'Apex Legends shader cache not found. Game may not be installed.' };
+    }
+    try {
+      const stats = fs.statSync(apexCachePath);
+      sizeFreed = stats.size;
+      filesBefore = 1;
+      fs.rmSync(apexCachePath, { force: true });
+      cleared = 1;
+    } catch (e) {
+      // File might be in use
     }
 
     const sizeInMB = (sizeFreed / (1024 * 1024)).toFixed(2);
@@ -331,24 +380,36 @@ ipcMain.handle('cleaner:clear-memory-dumps', async () => {
     let filesDeleted = 0;
     let totalSize = 0;
     let filesBefore = 0;
+    let filesAfter = 0;
 
-    if (fs.existsSync(dumpDir)) {
-      const files = fs.readdirSync(dumpDir);
-      filesBefore = files.length;
-      for (const file of files) {
-        try {
-          const filePath = path.join(dumpDir, file);
-          const stats = fs.statSync(filePath);
-          totalSize += stats.size;
+    // Diagnostic logging
+    console.log(`[Clear Memory Dumps] Checking path: ${dumpDir}`);
+    console.log(`[Clear Memory Dumps] Exists: ${fs.existsSync(dumpDir)}`);
+
+      if (!fs.existsSync(dumpDir)) {
+        return { success: false, message: 'Minidump folder not found.' };
+    }
+    const files = fs.readdirSync(dumpDir);
+    filesBefore = files.length;
+    if (filesBefore === 0) {
+      return { success: true, message: 'Minidump folder found, but no dump files to delete.', filesDeleted: 0, filesBefore: 0, filesAfter: 0, spaceSaved: '0 MB', details: 'No files to delete.' };
+    }
+    for (const file of files) {
+      try {
+        const filePath = path.join(dumpDir, file);
+        const stats = fs.statSync(filePath);
+        totalSize += stats.size;
+        if (stats.isDirectory()) {
+          fs.rmSync(filePath, { recursive: true, force: true });
+        } else {
           fs.rmSync(filePath, { force: true });
-          filesDeleted++;
-        } catch (e) {
-          // Skip files that can't be deleted
         }
+        filesDeleted++;
+      } catch (e) {
+        // Continue if one file fails
       }
     }
-
-    const filesAfter = filesBefore - filesDeleted;
+    filesAfter = filesBefore - filesDeleted;
     const sizeInMB = (totalSize / (1024 * 1024)).toFixed(2);
     return {
       success: true,

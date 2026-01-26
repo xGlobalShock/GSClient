@@ -48,8 +48,8 @@
     "productName": "PC Optimizer Elite",
     "files": [
       "build/**/*",
-      "!build/electron.js",
       "main.js",
+      "preload.js",
       "node_modules/**/*"
     ],
     "extraFiles": [
@@ -77,7 +77,8 @@
     "extends": null,
     "win": {
       "target": "dir",
-      "executableName": "PC Optimizer Elite"
+      "executableName": "PC Optimizer Elite",
+      "requestedExecutionLevel": "requireAdministrator"
     },
     "nsis": {
       "oneClick": false,

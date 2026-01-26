@@ -32,6 +32,7 @@ const Cleaner: React.FC = () => {
   const cleanerMap: { [key: string]: string } = {
     'nvidia-cache': 'cleaner:clear-nvidia-cache',
     'apex-shaders': 'cleaner:clear-apex-shaders',
+    'forza-shaders': 'cleaner:clear-forza-shaders',
     'temp-files': 'cleaner:clear-temp-files',
     'prefetch': 'cleaner:clear-prefetch',
     'memory-dumps': 'cleaner:clear-memory-dumps',
