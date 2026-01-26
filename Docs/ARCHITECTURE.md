@@ -1,4 +1,4 @@
-# PC Optimizer Elite - Architecture Overview
+# GS Optimizer - Architecture Overview
 
 ## System Architecture
 

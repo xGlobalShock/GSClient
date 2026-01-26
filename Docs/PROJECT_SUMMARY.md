@@ -1,4 +1,4 @@
-# 🎉 PC Optimizer Elite - FINAL SUMMARY
+# 🎉 GS Optimizer - FINAL SUMMARY
 
 ## 🏆 PROJECT COMPLETE ✅
 

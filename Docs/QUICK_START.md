@@ -1,4 +1,4 @@
-# PC Optimizer Elite - Quick Start Guide
+# GS Optimizer - Quick Start Guide
 
 ## 🚀 Launch Instructions
 

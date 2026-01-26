@@ -1,8 +1,8 @@
-# PC Optimizer Elite - Complete Feature Documentation
+# GS Optimizer - Complete Feature Documentation
 
 ## 🎯 Project Overview
 
-PC Optimizer Elite is a professional League of Legends-inspired desktop client for Windows PC optimization. It provides gaming tweaks, game profiles, system cleanup, and performance monitoring with a modern, animated UI.
+GS Optimizer is a professional League of Legends-inspired desktop client for Windows PC optimization. It provides gaming tweaks, game profiles, system cleanup, and performance monitoring with a modern, animated UI.
 
 **Tech Stack:**
 - Frontend: React 18.2.0 + TypeScript 4.9.5

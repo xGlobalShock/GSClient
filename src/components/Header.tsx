@@ -6,7 +6,7 @@ const Header: React.FC = () => {
   return (
     <header className="header">
       <div className="header-left">
-        <h1 className="header-title">PC Optimizer Elite</h1>
+        <h1 className="header-title">GS Optimizer</h1>
         <p className="header-subtitle">System Performance Control Center</p>
       </div>
 

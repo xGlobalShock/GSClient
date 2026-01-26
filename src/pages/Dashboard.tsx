@@ -24,7 +24,7 @@ const getStatus = (value: number): StatStatus => {
 const HeroHeader: React.FC = () => (
   <motion.header className="hero-header" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}>
     <div>
-      <h2 className="hero-title">PC Optimizer Elite</h2>
+      <h2 className="hero-title">GS Optimizer</h2>
       <p className="hero-sub">System Performance Control Center</p>
     </div>
     <div className="hero-actions">

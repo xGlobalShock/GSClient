@@ -1,4 +1,4 @@
-# PC Optimizer Elite - Quick Start Guide
+# GS Optimizer - Quick Start Guide
 
 ## Project Complete! ✨
 
@@ -183,4 +183,4 @@ For issues or questions about the project structure, refer to:
 
 ---
 
-**PC Optimizer Elite v1.0.0** - Advanced System Optimization Tool with LoL-Inspired UI
+**GS Optimizer v1.0.0** - Advanced System Optimization Tool with LoL-Inspired UI

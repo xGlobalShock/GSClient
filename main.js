@@ -126,7 +126,7 @@ app.on('activate', () => {
 ipcMain.handle('system:create-restore-point', async (event, description) => {
   try {
     // Default description (kept as requested) and allow override via the description argument
-    const descBase = description || 'PC Optimizer - Before Tweak Application';
+    const descBase = description || 'GS Optimizer - Before Tweak Application';
 
     // Require admin privileges to create restore points
     if (!isElevated) {

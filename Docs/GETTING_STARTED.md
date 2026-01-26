@@ -1,4 +1,4 @@
-# PC Optimizer Elite - Getting Started Checklist
+# GS Optimizer - Getting Started Checklist
 
 ## 🎯 Initial Setup (Do First)
 
@@ -30,7 +30,7 @@ npm run dev
 
 ### Visual Elements
 - [ ] Sidebar visible with 5 icons
-- [ ] Header shows "PC Optimizer Elite"
+- [ ] Header shows "GS Optimizer"
 - [ ] Dashboard displays 4 stat cards
 - [ ] Stats update every second (animation)
 - [ ] Colors match design (Gold/Cyan/Red)

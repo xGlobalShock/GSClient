@@ -1,8 +1,8 @@
 {
-  "name": "pc-optimizer-elite",
+  "name": "gs-optimizer",
   "version": "1.0.0",
-  "description": "Advanced PC Optimization Tool with LoL-inspired Client UI",
-  "author": "PC Optimizer Elite Team",
+  "description": "GS Optimizer - Advanced System Optimization Tool",
+  "author": "GS Optimizer Team",
   "main": "main.js",
   "homepage": "./",
   "private": true,
@@ -13,6 +13,7 @@
     "electron-dev": "cross-env NODE_OPTIONS=--no-deprecation concurrently --names \"REACT,ELECTRON\" --prefix-colors \"cyan.bold,magenta.bold\" --kill-others-on-fail \"npm run react-start\" \"wait-on http://localhost:3000 && electron .\"",
     "electron-only": "cross-env NODE_OPTIONS=--no-deprecation concurrently --names \"REACT,ELECTRON\" --prefix-colors \"cyan.bold,magenta.bold\" --kill-others-on-fail \"cross-env BROWSER=none npm run react-start\" \"wait-on http://localhost:3000 && electron .\"",
     "electron-build": "npm run react-build && electron-builder --win --x64",
+    "postelectron-build": "node scripts/rename-output.js",
     "start": "npm run electron-dev",
     "build": "npm run electron-build",
     "dev": "npm run electron-dev",
@@ -44,8 +45,8 @@
     "wait-on": "^7.0.1"
   },
   "build": {
-    "appId": "com.pcoptimizer.elite",
-    "productName": "PC Optimizer Elite",
+    "appId": "com.gsoptimizer.app",
+    "productName": "GS Optimizer",
     "files": [
       "build/**/*",
       "main.js",
@@ -77,7 +78,7 @@
     "extends": null,
     "win": {
       "target": "dir",
-      "executableName": "PC Optimizer Elite",
+      "executableName": "GS Optimizer",
       "requestedExecutionLevel": "requireAdministrator"
     },
     "nsis": {
@@ -85,7 +86,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "PC Optimizer Elite"
+      "shortcutName": "GS Optimizer"
     }
   },
   "browserslist": {

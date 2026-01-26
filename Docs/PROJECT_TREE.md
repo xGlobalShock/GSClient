@@ -1,4 +1,4 @@
-# PC Optimizer Elite - Complete Project Tree
+# GS Optimizer - Complete Project Tree
 
 ## 📁 Directory Structure
 
@@ -348,7 +348,7 @@ Electron Builder
   ↓
 release/ folder
   ↓
-PC Optimizer Elite Setup.exe (Installer)
+GS Optimizer Setup.exe (Installer)
 ```
 
 ---

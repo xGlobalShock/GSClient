@@ -95,7 +95,7 @@ const Settings: React.FC = () => {
           <div className="setting-item">
             <div className="setting-label">
               <span className="label-title">Launch on Startup</span>
-              <span className="label-description">Start PC Optimizer Elite when Windows boots</span>
+              <span className="label-description">Start GS Optimizer when Windows boots</span>
             </div>
             <label className="toggle-switch">
               <input
@@ -131,7 +131,7 @@ const Settings: React.FC = () => {
         <div className="settings-section">
           <h3 className="section-header">About</h3>
           <div className="about-info">
-            <p><strong>PC Optimizer Elite</strong></p>
+            <p><strong>GS Optimizer</strong></p>
             <p>Version 1.0.0</p>
             <p>Advanced system optimization tool with gaming focus</p>
           </div>

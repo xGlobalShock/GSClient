@@ -1,5 +1,5 @@
 @echo off
-REM PC Optimizer Elite - Launch with Admin Privileges
+REM GS Optimizer - Launch with Admin Privileges
 REM Get the directory where this batch file is located
 for /f "delims=" %%i in ("%~dp0.") do set "PROJECT_DIR=%%~fi"
 cd /d "%PROJECT_DIR%"

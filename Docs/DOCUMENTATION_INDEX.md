@@ -1,4 +1,4 @@
-# 📖 PC Optimizer Elite - Documentation Index
+# 📖 GS Optimizer - Documentation Index
 
 ## 🎯 START HERE
 
@@ -247,7 +247,7 @@ npm run client
 ## 📊 DOCUMENTATION STRUCTURE
 
 ```
-PC Optimizer Elite/
+GS Optimizer/
 ├── README.md                      ← Start here for overview
 ├── QUICK_START.md                 ← Start here to use the app
 ├── FEATURE_DOCUMENTATION.md       ← Detailed technical info
@@ -357,7 +357,7 @@ PC Optimizer Elite/
 ## 🎯 TL;DR (Too Long; Didn't Read)
 
 ### One-Sentence Summary
-PC Optimizer Elite is a professional Electron/React desktop app that provides one-click gaming optimizations with registry tweaks, game profiles, and system cleanup for Windows.
+GS Optimizer is a professional Electron/React desktop app that provides one-click gaming optimizations with registry tweaks, game profiles, and system cleanup for Windows.
 
 ### 30-Second Summary
 1. **What**: Gaming optimization app inspired by League of Legends

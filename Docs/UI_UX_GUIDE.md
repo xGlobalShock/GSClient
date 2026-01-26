@@ -1,4 +1,4 @@
-# PC Optimizer Elite - UI/UX Guide
+# GS Optimizer - UI/UX Guide
 
 ## Visual Style Reference
 

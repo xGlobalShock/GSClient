@@ -1,4 +1,4 @@
-# PC Optimizer Elite ⚡
+# GS Optimizer ⚡
 
 A professional League of Legends-inspired PC optimization desktop client for Windows, featuring gaming tweaks, game profiles, system cleanup, and real-time performance monitoring.
 
@@ -339,7 +339,7 @@ See [QUICK_START.md](QUICK_START.md) > Support section
 
 ## 📄 License
 
-PC Optimizer Elite is provided as-is for gaming optimization purposes.
+GS Optimizer is provided as-is for gaming optimization purposes.
 Built with React, Electron, and TypeScript.
 
 ---

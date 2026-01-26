@@ -1,4 +1,4 @@
-# PC Optimizer Elite - Complete File Map
+# GS Optimizer - Complete File Map
 
 ```
 c:\Users\xSGCo\Desktop\Client\

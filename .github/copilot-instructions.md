@@ -1,4 +1,4 @@
-# 🧑‍💻 Copilot Instructions for PC Optimizer Elite
+# 🧑‍💻 Copilot Instructions for GS Optimizer
 
 ## Big Picture Architecture
 - **Frontend:** React + TypeScript (src/) with modular components and pages.

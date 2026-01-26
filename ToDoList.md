@@ -1,2 +1,4 @@
 - Add a new tab on the nav bar and name it ( OBS Presets )
 - Add ' Set services to manual ' to the system tweaks ( using the old project path )
+- Rename the folder " win-unpacked " to " GS Optimizer "
+- Rename to App / client from ' PC Optimizer Elite ' to ' GS Optimizer '
