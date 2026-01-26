@@ -1,11 +1,11 @@
 import React from 'react';
-import { LucideIcon } from 'lucide-react';
+import { CheckCircle, ArrowCounterClockwise } from 'phosphor-react';
 import '../styles/PerformanceTweakCard.css';
 
 interface PerformanceTweakCardProps {
   id: string;
   title: string;
-  icon: LucideIcon | string;
+  icon: any;
   category: string;
   description: string;
   buttonText: string;
@@ -69,21 +69,22 @@ const PerformanceTweakCard: React.FC<PerformanceTweakCardProps> = ({
       <div className="tweak-footer">
         {showApplyButton ? (
           <button
-            className="tweak-button"
-            style={{ backgroundColor: color }}
+            className="tweak-button tweak-button-apply"
+            style={{ backgroundColor: '#27ae60', color: '#fff' }}
             onClick={handleClick}
             disabled={isLoading}
           >
-            <span className="button-icon">⚡</span>
+            <CheckCircle size={16} weight="bold" className="button-icon" />
             {isLoading ? 'Applying...' : buttonText}
           </button>
         ) : (
           <button
             className="tweak-button tweak-button-reset"
+            style={{ backgroundColor: '#FFD600', color: '#222' }}
             onClick={handleReset}
             disabled={isLoading}
           >
-            <span className="button-icon">↩️</span>
+            <ArrowCounterClockwise size={16} weight="bold" className="button-icon" />
             {isLoading ? 'Resetting...' : 'Reset to Default'}
           </button>
         )}
