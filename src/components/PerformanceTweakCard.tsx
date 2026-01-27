@@ -14,6 +14,7 @@ interface PerformanceTweakCardProps {
   onReset?: (id: string) => Promise<void>;
   isLoading?: boolean;
   isEnabled?: boolean;
+  isChecking?: boolean;
 }
 
 const PerformanceTweakCard: React.FC<PerformanceTweakCardProps> = ({
@@ -28,6 +29,7 @@ const PerformanceTweakCard: React.FC<PerformanceTweakCardProps> = ({
   onReset,
   isLoading = false,
   isEnabled = false,
+  isChecking = false,
 }) => {
   const handleClick = async () => {
     try {
@@ -57,11 +59,17 @@ const PerformanceTweakCard: React.FC<PerformanceTweakCardProps> = ({
           <h3 className="tweak-title">{title}</h3>
           <p className="tweak-category">{category}</p>
         </div>
-        {typeof icon === 'string' ? (
-          <img src={icon} alt={title} className="tweak-icon" style={{ width: 28, height: 28, color }} />
-        ) : (
-          React.createElement(icon, { size: 28, color, className: 'tweak-icon' })
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {typeof icon === 'string' ? (
+            <img src={icon} alt={title} className="tweak-icon" style={{ width: 28, height: 28, color }} />
+          ) : (
+            React.createElement(icon, { size: 28, color, className: 'tweak-icon' })
+          )}
+          {/* small checking spinner */}
+          {typeof (window as any) !== 'undefined' && (typeof (window as any).document !== 'undefined') && (
+            <div className={`check-spinner ${isChecking ? 'visible' : ''}`} title={isChecking ? 'Checking status...' : ''}></div>
+          )}
+        </div>
       </div>
 
       <p className="tweak-description">{description}</p>

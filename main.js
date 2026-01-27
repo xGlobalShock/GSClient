@@ -636,78 +636,106 @@ ipcMain.handle('tweak:apply-win32-priority', async () => {
 // Check Tweak Status IPC Handlers
 ipcMain.handle('tweak:check-irq-priority', async () => {
   try {
-    const cmd = `If ((Get-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\PriorityControl' -Name 'IRQ8Priority').IRQ8Priority -eq 1) { Write-Host 'APPLIED' } Else { Write-Host 'NOT_APPLIED' }`;
-    const result = await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${cmd}"`, { shell: true });
-    const output = result.stdout.trim();
-    return { applied: output.trim() === 'APPLIED' };
+    const cmd = `powershell -NoProfile -ExecutionPolicy Bypass -Command "$p = Get-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\PriorityControl' -Name 'IRQ8Priority' -ErrorAction SilentlyContinue; if ($p) { @{ exists = $true; value = $p.IRQ8Priority } | ConvertTo-Json -Compress } else { @{ exists = $false; value = $null } | ConvertTo-Json -Compress }"`;
+    const result = await execAsync(cmd, { shell: true });
+    const out = (result.stdout || '').trim();
+    if (!out) return { applied: false };
+    const parsed = JSON.parse(out);
+    const applied = parsed.exists && Number(parsed.value) === 1;
+    return { applied, value: parsed.value };
   } catch (error) {
-    return { applied: false };
+    console.log('[Tweak Check] IRQ Priority check error:', error.message || error);
+    return { applied: false, exists: false, value: null, error: error.message || String(error) };
   }
 });
 
 ipcMain.handle('tweak:check-network-interrupts', async () => {
   try {
-    const cmd = `If ((Get-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\NDIS\\Parameters' -Name 'ProcessorThrottleMode').ProcessorThrottleMode -eq 1) { Write-Host 'APPLIED' } Else { Write-Host 'NOT_APPLIED' }`;
-    const result = await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${cmd}"`, { shell: true });
-    const output = result.stdout.trim();
-    return { applied: output.trim() === 'APPLIED' };
+    const cmd = `powershell -NoProfile -ExecutionPolicy Bypass -Command "$p = Get-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\NDIS\\Parameters' -Name 'ProcessorThrottleMode' -ErrorAction SilentlyContinue; if ($p) { @{ exists = $true; value = $p.ProcessorThrottleMode } | ConvertTo-Json -Compress } else { @{ exists = $false; value = $null } | ConvertTo-Json -Compress }"`;
+    const result = await execAsync(cmd, { shell: true });
+    const out = (result.stdout || '').trim();
+    if (!out) return { applied: false };
+    const parsed = JSON.parse(out);
+    const applied = parsed.exists && Number(parsed.value) === 1;
+    return { applied, value: parsed.value };
   } catch (error) {
-    return { applied: false };
+    console.log('[Tweak Check] Network Interrupts check error:', error.message || error);
+    return { applied: false, exists: false, value: null, error: error.message || String(error) };
   }
 });
 
 ipcMain.handle('tweak:check-gpu-scheduling', async () => {
   try {
-    const cmd = `If ((Get-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\GraphicsDrivers' -Name 'HwSchMode').HwSchMode -eq 2) { Write-Host 'APPLIED' } Else { Write-Host 'NOT_APPLIED' }`;
-    const result = await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${cmd}"`, { shell: true });
-    const output = result.stdout.trim();
-    return { applied: output.trim() === 'APPLIED' };
+    const cmd = `powershell -NoProfile -ExecutionPolicy Bypass -Command "$p = Get-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\GraphicsDrivers' -Name 'HwSchMode' -ErrorAction SilentlyContinue; if ($p) { @{ exists = $true; value = $p.HwSchMode } | ConvertTo-Json -Compress } else { @{ exists = $false; value = $null } | ConvertTo-Json -Compress }"`;
+    const result = await execAsync(cmd, { shell: true });
+    const out = (result.stdout || '').trim();
+    if (!out) return { applied: false };
+    const parsed = JSON.parse(out);
+    const applied = parsed.exists && Number(parsed.value) === 2;
+    return { applied, value: parsed.value };
   } catch (error) {
-    return { applied: false };
+    console.log('[Tweak Check] GPU Scheduling check error:', error.message || error);
+    return { applied: false, exists: false, value: null, error: error.message || String(error) };
   }
 });
 
 ipcMain.handle('tweak:check-fullscreen-optimization', async () => {
   try {
-    const cmd = `If ((Get-ItemProperty -Path 'HKCU:\\System\\GameConfigStore' -Name 'GameDVR_FSEBehaviorMonitorEnabled').GameDVR_FSEBehaviorMonitorEnabled -eq 0) { Write-Host 'APPLIED' } Else { Write-Host 'NOT_APPLIED' }`;
-    const result = await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${cmd}"`, { shell: true });
-    const output = result.stdout.trim();
-    return { applied: output.trim() === 'APPLIED' };
+    const cmd = `powershell -NoProfile -ExecutionPolicy Bypass -Command "$p = Get-ItemProperty -Path 'HKCU:\\System\\GameConfigStore' -Name 'GameDVR_FSEBehaviorMonitorEnabled' -ErrorAction SilentlyContinue; if ($p) { @{ exists = $true; value = $p.GameDVR_FSEBehaviorMonitorEnabled } | ConvertTo-Json -Compress } else { @{ exists = $false; value = $null } | ConvertTo-Json -Compress }"`;
+    const result = await execAsync(cmd, { shell: true });
+    const out = (result.stdout || '').trim();
+    if (!out) return { applied: false };
+    const parsed = JSON.parse(out);
+    const applied = parsed.exists && Number(parsed.value) === 0;
+    return { applied, value: parsed.value };
   } catch (error) {
-    return { applied: false };
+    console.log('[Tweak Check] Fullscreen Optimization check error:', error.message || error);
+    return { applied: false, exists: false, value: null, error: error.message || String(error) };
   }
 });
 
 ipcMain.handle('tweak:check-usb-suspend', async () => {
   try {
-    const cmd = `If ((Get-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\USB' -Name 'DisableSelectiveSuspend').DisableSelectiveSuspend -eq 1) { Write-Host 'APPLIED' } Else { Write-Host 'NOT_APPLIED' }`;
-    const result = await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${cmd}"`, { shell: true });
-    const output = result.stdout.trim();
-    return { applied: output.trim() === 'APPLIED' };
+    const cmd = `powershell -NoProfile -ExecutionPolicy Bypass -Command "$p = Get-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\USB' -Name 'DisableSelectiveSuspend' -ErrorAction SilentlyContinue; if ($p) { @{ exists = $true; value = $p.DisableSelectiveSuspend } | ConvertTo-Json -Compress } else { @{ exists = $false; value = $null } | ConvertTo-Json -Compress }"`;
+    const result = await execAsync(cmd, { shell: true });
+    const out = (result.stdout || '').trim();
+    if (!out) return { applied: false };
+    const parsed = JSON.parse(out);
+    const applied = parsed.exists && Number(parsed.value) === 1;
+    return { applied, value: parsed.value };
   } catch (error) {
-    return { applied: false };
+    console.log('[Tweak Check] USB Suspend check error:', error.message || error);
+    return { applied: false, exists: false, value: null, error: error.message || String(error) };
   }
 });
 
 ipcMain.handle('tweak:check-game-dvr', async () => {
   try {
-    const cmd = `If ((Get-ItemProperty -Path 'HKCU:\\System\\GameConfigStore' -Name 'GameDVR_Enabled').GameDVR_Enabled -eq 0) { Write-Host 'APPLIED' } Else { Write-Host 'NOT_APPLIED' }`;
-    const result = await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${cmd}"`, { shell: true });
-    const output = result.stdout.trim();
-    return { applied: output.includes('APPLIED') };
+    const cmd = `powershell -NoProfile -ExecutionPolicy Bypass -Command "$p = Get-ItemProperty -Path 'HKCU:\\System\\GameConfigStore' -Name 'GameDVR_Enabled' -ErrorAction SilentlyContinue; if ($p) { @{ exists = $true; value = $p.GameDVR_Enabled } | ConvertTo-Json -Compress } else { @{ exists = $false; value = $null } | ConvertTo-Json -Compress }"`;
+    const result = await execAsync(cmd, { shell: true });
+    const out = (result.stdout || '').trim();
+    if (!out) return { applied: false };
+    const parsed = JSON.parse(out);
+    const applied = parsed.exists && Number(parsed.value) === 0;
+    return { applied, value: parsed.value };
   } catch (error) {
-    return { applied: false };
+    console.log('[Tweak Check] Game DVR check error:', error.message || error);
+    return { applied: false, exists: false, value: null, error: error.message || String(error) };
   }
 });
 
 ipcMain.handle('tweak:check-win32-priority', async () => {
   try {
-    const cmd = `If ((Get-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\PriorityControl' -Name 'Win32PrioritySeparation').Win32PrioritySeparation -eq 38) { Write-Host 'APPLIED' } Else { Write-Host 'NOT_APPLIED' }`;
-    const result = await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${cmd}"`, { shell: true });
-    const output = result.stdout.trim();
-    return { applied: output.includes('APPLIED') };
+    const cmd = `powershell -NoProfile -ExecutionPolicy Bypass -Command "$p = Get-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\PriorityControl' -Name 'Win32PrioritySeparation' -ErrorAction SilentlyContinue; if ($p) { @{ exists = $true; value = $p.Win32PrioritySeparation } | ConvertTo-Json -Compress } else { @{ exists = $false; value = $null } | ConvertTo-Json -Compress }"`;
+    const result = await execAsync(cmd, { shell: true });
+    const out = (result.stdout || '').trim();
+    if (!out) return { applied: false };
+    const parsed = JSON.parse(out);
+    const applied = parsed.exists && Number(parsed.value) === 38;
+    return { applied, value: parsed.value };
   } catch (error) {
-    return { applied: false };
+    console.log('[Tweak Check] Win32 Priority check error:', error.message || error);
+    return { applied: false, exists: false, value: null, error: error.message || String(error) };
   }
 });
 

@@ -19,9 +19,39 @@ declare global {
 const Performance: React.FC = () => {
   const [applyingId, setApplyingId] = useState<string | null>(null);
   const [enabledTweaks, setEnabledTweaks] = useState<{ [key: string]: boolean }>({});
+  const [tweakChecks, setTweakChecks] = useState<Record<string, any>>({});
   const [creatingRestore, setCreatingRestore] = useState(false);
   const [lastRestoreInfo, setLastRestoreInfo] = useState<any | null>(null);
   const { addToast } = useToast();
+
+  const runChecksOnDemand = async () => {
+    // expose to refresh button
+    if (typeof window !== 'undefined') {
+      // run the checks by triggering focus handler approach
+      try {
+        // reuse the effect's runChecks by programmatically focusing window, but better to call same logic inline
+        const entries = Object.entries(checkMap);
+        const initial: any = {};
+        for (const [tweakId] of entries) initial[tweakId] = { loading: true };
+        setTweakChecks(prev => ({ ...prev, ...initial }));
+
+        const promises = entries.map(async ([tweakId, channel]) => {
+          try {
+            const result = await window.electron!.ipcRenderer.invoke(channel);
+            setTweakChecks(prev => ({ ...prev, [tweakId]: { loading: false, applied: !!result.applied, exists: !!result.exists, value: result.value ?? null } }));
+            setEnabledTweaks(prev => ({ ...prev, [tweakId]: !!result.applied }));
+          } catch (err) {
+            setTweakChecks(prev => ({ ...prev, [tweakId]: { loading: false, applied: false, exists: false, error: err instanceof Error ? err.message : String(err) } }));
+            setEnabledTweaks(prev => ({ ...prev, [tweakId]: false }));
+          }
+        });
+
+        await Promise.all(promises);
+      } catch (e) {
+        // ignore
+      }
+    }
+  };
 
   const handleCreateRestorePoint = async () => {
     setCreatingRestore(true);
@@ -91,26 +121,48 @@ const Performance: React.FC = () => {
     'win32-priority': 'tweak:check-win32-priority',
   };
 
-  // Check tweak status on mount
+  // Check tweak status on mount and when window gains focus
   useEffect(() => {
-    const checkAllTweaks = async () => {
-      const results: { [key: string]: boolean } = {};
+    let mounted = true;
 
-      for (const [tweakId, channel] of Object.entries(checkMap)) {
-        try {
-          if (window.electron?.ipcRenderer) {
-            const result = await window.electron.ipcRenderer.invoke(channel);
-            results[tweakId] = result.applied || false;
-          }
-        } catch (error) {
-          results[tweakId] = false;
-        }
-      }
-
-      setEnabledTweaks(results);
+    const setChecking = (id: string, loading: boolean) => {
+      setTweakChecks(prev => ({ ...prev, [id]: { ...(prev[id] || {}), loading } }));
     };
 
-    checkAllTweaks();
+    const runChecks = async () => {
+      const entries = Object.entries(checkMap);
+      // mark all as loading
+      const initial: any = {};
+      for (const [tweakId] of entries) initial[tweakId] = { loading: true };
+      setTweakChecks(prev => ({ ...prev, ...initial }));
+
+      // run checks in parallel
+      const promises = entries.map(async ([tweakId, channel]) => {
+        try {
+          const result = await window.electron!.ipcRenderer.invoke(channel);
+          if (!mounted) return;
+          setTweakChecks(prev => ({ ...prev, [tweakId]: { loading: false, applied: !!result.applied, exists: !!result.exists, value: result.value ?? null } }));
+          setEnabledTweaks(prev => ({ ...prev, [tweakId]: !!result.applied }));
+        } catch (err) {
+          if (!mounted) return;
+          setTweakChecks(prev => ({ ...prev, [tweakId]: { loading: false, applied: false, exists: false, error: err instanceof Error ? err.message : String(err) } }));
+          setEnabledTweaks(prev => ({ ...prev, [tweakId]: false }));
+        }
+      });
+
+      await Promise.all(promises);
+    };
+
+    // initial run
+    runChecks();
+
+    const onFocus = () => runChecks();
+    window.addEventListener('focus', onFocus);
+
+    return () => {
+      mounted = false;
+      window.removeEventListener('focus', onFocus);
+    };
   }, []);
 
   const handleApplyTweak = async (id: string) => {
@@ -200,6 +252,9 @@ const Performance: React.FC = () => {
             <ArrowCounterClockwise size={16} weight="bold" className="button-icon" />
             {creatingRestore ? 'Creating...' : 'Create Restore Point'}
           </button>
+          <button className="restore-button" style={{ background: 'linear-gradient(135deg,#3498db,#2eccf7)' }} onClick={() => { addToast('Checking tweak status...', 'info'); runChecksOnDemand(); }}>
+            Refresh Checks
+          </button>
           {lastRestoreInfo && (
             <div className="restore-info">Last: {lastRestoreInfo.postObj?.CreationTime || lastRestoreInfo.postObj?.CreationTimeUtc || ''}</div>
           )}
@@ -228,6 +283,7 @@ const Performance: React.FC = () => {
               onReset={handleResetTweak}
               isLoading={applyingId === tweak.id}
               isEnabled={enabledTweaks[tweak.id] || false}
+              isChecking={!!tweakChecks[tweak.id]?.loading}
             />
           </motion.div>
         ))}
