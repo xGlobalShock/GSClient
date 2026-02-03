@@ -80,7 +80,9 @@
   transition: all 0.3s ease;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  flex: 1;
+  flex: 0 0 auto;
+  min-width: fit-content;
+  white-space: nowrap;
 }
 
 .tweak-button:hover:not(:disabled) {

@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard';
 import Performance from './pages/Performance';
 import Cleaner from './pages/Cleaner';
 import Settings from './pages/Settings';
+import GameLibrary from './pages/GameLibrary';
 import { ToastProvider } from './contexts/ToastContext';
 import { ToastContainer } from './components/ToastContainer';
 import './App.css';
@@ -59,6 +60,9 @@ function App() {
         </div>
         <div style={{ display: currentPage === 'cleaner' ? 'block' : 'none' }}>
           <Cleaner />
+        </div>
+        <div style={{ display: currentPage === 'gameLibrary' ? 'block' : 'none' }}>
+          <GameLibrary />
         </div>
         <div style={{ display: currentPage === 'settings' ? 'block' : 'none' }}>
           <Settings />

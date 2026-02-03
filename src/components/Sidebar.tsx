@@ -4,6 +4,7 @@ import {
   Activity,
   Trash2,
   Settings,
+  Gamepad2,
   Zap,
 } from 'lucide-react';
 import '../styles/Sidebar.css';
@@ -35,6 +36,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage, online: 
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Home },
     { id: 'performance', label: 'Performance', icon: Activity },
+    { id: 'gameLibrary', label: 'Game Library', icon: Gamepad2 },
     { id: 'cleaner', label: 'Cleaner', icon: Trash2 },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
