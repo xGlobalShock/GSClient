@@ -36,6 +36,25 @@ interface Game {
   recommended: OptimizationSettings;
 }
 
+// Comprehensive Apex Legends command list for "Show Commands" modal
+const apexAllCommands = [
+  { flag: '-novid', description: 'Disables EA/Apex intro videos for faster startup', impact: 'High' },
+  { flag: '+fps_max 0', description: 'Uncaps FPS for unlimited frame rates (may stutter above 200 FPS)', impact: 'High' },
+  { flag: '+fps_max 144', description: 'Caps FPS to 144 to reduce GPU load and prevent stuttering', impact: 'High' },
+  { flag: '+fps_max 200', description: 'Caps FPS to 200 for optimal balance of performance and smoothness', impact: 'High' },
+  { flag: '-high', description: 'Starts game with high CPU priority (may cause issues on some systems)', impact: 'High' },
+  { flag: '+cl_showpos 1', description: 'Displays position and velocity in top-left corner', impact: 'Low' },
+  { flag: '+cl_showfps 4', description: 'Shows FPS and frame timing/latency information', impact: 'Low' },
+  { flag: '-fullscreen', description: 'Forces exclusive fullscreen mode for better performance', impact: 'Medium' },
+  { flag: '-no_render_on_input_thread', description: 'Essential for high-polling mice (2K/4K/8K Hz) to prevent stuttering', impact: 'High' },
+  { flag: '+exec autoexec', description: 'Executes custom autoexec.cfg file from cfg folder', impact: 'Medium' },
+  { flag: '-dxlevel 95', description: 'Forces DirectX 9 rendering (better for older hardware)', impact: 'Medium' },
+  { flag: '+mat_letterbox_aspect_goal 0', description: 'Prevents black bars with custom resolutions (use with threshold)', impact: 'Low' },
+  { flag: '+mat_letterbox_aspect_threshold 0', description: 'Prevents black bars with custom/stretched resolutions', impact: 'Low' },
+  { flag: '+mat_minimize_on_alt_tab 1', description: 'Allows game to minimize when Alt-Tabbing', impact: 'Low' },
+  { flag: '+cl_is_softened_locale 1', description: 'Reduces visual clutter for cleaner gameplay', impact: 'Low' }
+];
+
 const gameOptimizations: { [key: string]: OptimizationSettings } = {
   'valorant': {
     graphics: {
@@ -135,10 +154,10 @@ const gameOptimizations: { [key: string]: OptimizationSettings } = {
     launch: {
       title: 'Launch Options',
       options: [
-        { flag: '+lobby_max_fps 0', description: 'Uncapped lobby framerate', impact: 'High' },
-        { flag: '+fps_max 0', description: 'Uncapped framerate', impact: 'High' },
-        { flag: '-dev', description: 'Skips intro videos and enables developer startup mode.', impact: 'Low' },
-        { flag: '-render_on_input_thread', description: 'Render on input thread', impact: 'High' }
+        { flag: '+lobby_max_fps 0', description: 'Uncaps FPS in lobby for smoother experience', impact: 'High' },
+        { flag: '+fps_max 0', description: 'Uncaps FPS for unlimited frame rates', impact: 'High' },
+        { flag: '-dev', description: 'Skips intro videos and enables developer startup mode', impact: 'High' },
+        { flag: '-no_render_on_input_thread', description: 'Essential for high-polling mice to prevent stuttering', impact: 'High' }
       ]
     },
     performance: {
@@ -471,7 +490,7 @@ const GameLibrary: React.FC = () => {
                   These are all the working launch options for Apex Legends. Copy individual commands or use the "Copy All" button for optimal performance.
                 </p>
                 <div className="commands-list">
-                  {selectedGame.recommended.launch.options.map((option, index) => (
+                  {(selectedGame.id === 'apex-legends' ? apexAllCommands : selectedGame.recommended.launch.options).map((option, index) => (
                     <div
                       key={`${option.flag}-${index}`}
                       className="command-item"

@@ -82,7 +82,7 @@ function createWindow() {
     webPreferences: {
       preload: isDev
         ? path.join(__dirname, 'public/preload.js')
-        : path.join(process.resourcesPath, '../preload.js'),
+        : path.join(process.resourcesPath, 'app', 'build', 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
       enableRemoteModule: false,
@@ -94,7 +94,7 @@ function createWindow() {
 
   const startUrl = isDev
     ? 'http://localhost:3000'
-    : `file://${path.join(process.resourcesPath, 'app.asar', 'build', 'index.html')}`;
+    : `file://${path.join(process.resourcesPath, 'app', 'build', 'index.html')}`;
 
   mainWindow.loadURL(startUrl);
 
