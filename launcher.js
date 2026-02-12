@@ -27,6 +27,4 @@ if (process.platform === 'win32' && !isAdmin()) {
   process.exit();
 }
 
-// If we get here, we have admin privileges (or not on Windows)
-// Now start the actual Electron app
 require('./main.js');
