@@ -6,7 +6,6 @@ import NvidiaLogo from '../assets/nvidia.png';
 import DNSLogo from '../assets/DNS.png';
 import TempFilesLogo from '../assets/TempFiles.png';
 import WinUpdatesLogo from '../assets/WinUpdates.png';
-import MemoryDumpLogo from '../assets/MemoryDump.png';
 
 export interface CleanerUtility {
   id: string;
@@ -71,16 +70,6 @@ export const cleanerUtilities: CleanerUtility[] = [
     buttonColor: '#00A3FF',
   },
   {
-    id: 'memory-dumps',
-    title: 'Clear Memory Dumps',
-    icon: MemoryDumpLogo, // Memory Dumps: new icon
-    cacheType: 'Crash Dumps',
-    description: 'Removes crash dump files to free up significant disk space.',
-    buttonText: 'Clear Files',
-    color: '#0074D9',
-    buttonColor: '#FF9500',
-  },
-  {
     id: 'update-cache',
     title: 'Clear Update Cache',
     icon: WinUpdatesLogo, // Update Cache: new icon
@@ -99,5 +88,15 @@ export const cleanerUtilities: CleanerUtility[] = [
     buttonText: 'Clear Cache',
     color: '#0074D9',
     buttonColor: '#00A3FF',
+  },
+  {
+    id: 'ram-cache',
+    title: 'Clear RAM Cache',
+    icon: Cpu, // RAM Cache: CPU/memory icon
+    cacheType: 'Memory Cache',
+    description: 'Clears cached RAM to free up memory and improve performance.',
+    buttonText: 'Clear Cache',
+    color: '#0074D9',
+    buttonColor: '#FF00FF',
   },
 ];

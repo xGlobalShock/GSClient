@@ -7,6 +7,20 @@ const os = require('os');
 
 const execAsync = promisify(exec);
 
+// Helper function to detect permission errors
+function isPermissionError(error) {
+  if (!error || !error.message) return false;
+  const msg = error.message.toLowerCase();
+  return msg.includes('access is denied') || 
+         msg.includes('permission denied') || 
+         msg.includes('requires elevation') ||
+         msg.includes('administrator') ||
+         msg.includes('privilege') ||
+         msg.includes('command failed') ||
+         msg.includes('cannot remove item') ||
+         msg.includes('unauthorized');
+}
+
 // Forza Horizon 5 Shader Cache Cleaner
 ipcMain.handle('cleaner:clear-forza-shaders', async () => {
   try {
@@ -46,6 +60,9 @@ ipcMain.handle('cleaner:clear-forza-shaders', async () => {
       details: `${filesDeleted}/${filesBefore} files deleted (${filesBefore - filesDeleted} remaining)`
     };
   } catch (error) {
+    if (isPermissionError(error)) {
+      return { success: false, message: 'Run the app as administrator' };
+    }
     return { success: false, message: `Error: ${error.message}` };
   }
 });
@@ -97,11 +114,6 @@ function createWindow() {
     : `file://${path.join(process.resourcesPath, 'app', 'build', 'index.html')}`;
 
   mainWindow.loadURL(startUrl);
-
-  // Uncomment to debug
-  // if (isDev) {
-  //   mainWindow.webContents.openDevTools();
-  // }
 
   mainWindow.on('closed', () => {
     mainWindow = null;
@@ -314,6 +326,9 @@ ipcMain.handle('cleaner:clear-nvidia-cache', async () => {
       details: `${totalDeleted}/${totalBefore} files deleted (${totalRemaining} remaining)`,
     };
   } catch (error) {
+    if (isPermissionError(error)) {
+      return { success: false, message: 'Run the app as administrator' };
+    }
     return { success: false, message: `Error: ${error.message}` };
   }
 });
@@ -353,6 +368,9 @@ ipcMain.handle('cleaner:clear-apex-shaders', async () => {
       details: cleared > 0 ? '1/1 file deleted (0 remaining)' : 'No files to delete',
     };
   } catch (error) {
+    if (isPermissionError(error)) {
+      return { success: false, message: 'Run the app as administrator' };
+    }
     return { success: false, message: `Error: ${error.message}` };
   }
 });
@@ -440,7 +458,8 @@ ipcMain.handle('cleaner:clear-prefetch', async () => {
       details: `${filesDeleted}/${filesBefore} files deleted (${filesAfter} remaining)`,
     };
   } catch (error) {
-    return { success: false, message: `Error: ${error.message}` };
+    // Prefetch folder ALWAYS needs admin rights
+    return { success: false, message: 'Run the app as administrator' };
   }
 });
 
@@ -491,6 +510,9 @@ ipcMain.handle('cleaner:clear-memory-dumps', async () => {
       details: `${filesDeleted}/${filesBefore} files deleted (${filesAfter} remaining)`,
     };
   } catch (error) {
+    if (isPermissionError(error)) {
+      return { success: false, message: 'Run the app as administrator' };
+    }
     return { success: false, message: `Error: ${error.message}` };
   }
 });
@@ -525,12 +547,22 @@ ipcMain.handle('cleaner:clear-update-cache', async () => {
         }
       }
     } catch (e) {
-      // If stats collection fails, continue and attempt removal anyway
+      // If stats collection fails, may need admin - check before attempting deletion
+      return {
+        success: false,
+        message: 'Run the app as administrator'
+      };
     }
 
     // Remove files using PowerShell Remove-Item to avoid blocking the main event loop
     const removeCmd = `powershell -NoProfile -ExecutionPolicy Bypass -Command "Remove-Item -Path '${updateDir}\\*' -Recurse -Force -ErrorAction SilentlyContinue"`;
-    await execAsync(removeCmd, { shell: true, timeout: 120000 });
+    
+    try {
+      await execAsync(removeCmd, { shell: true, timeout: 120000 });
+    } catch (removeError) {
+      // Removal failed - always needs admin for Windows Update cache
+      return { success: false, message: 'Run the app as administrator' };
+    }
 
     // Return pre-computed size as space saved (best-effort)
     const sizeInMB = (totalSize / (1024 * 1024)).toFixed(2);
@@ -545,20 +577,204 @@ ipcMain.handle('cleaner:clear-update-cache', async () => {
       details: `${filesBefore}/${filesBefore} files deleted (0 remaining)`,
     };
   } catch (error) {
-    return { success: false, message: `Error: ${error.message}` };
+    // Windows Update cache ALWAYS needs admin rights - never show detailed error
+    return { success: false, message: 'Run the app as administrator' };
   }
 });
 
 ipcMain.handle('cleaner:clear-dns-cache', async () => {
   try {
+    // Get DNS cache entry count before clearing
+    let entriesBefore = 0;
+    try {
+      const displayResult = await execAsync('ipconfig /displaydns', { shell: true });
+      const entries = displayResult.stdout.match(/Record Name/g);
+      entriesBefore = entries ? entries.length : 0;
+      console.log(`DNS cache entries before: ${entriesBefore}`);
+    } catch {}
+    
+    // Clear DNS cache
     const result = await execAsync('ipconfig /flushdns', { shell: true });
-    return {
-      success: true,
-      message: 'DNS cache flushed successfully',
-      spaceSaved: '~10 MB',
-    };
+    const output = result.stdout + result.stderr;
+    
+    console.log('DNS Flush output:', output);
+    
+    // Check if successful
+    if (output.includes('Successfully flushed') || output.includes('The DNS Resolver Cache')) {
+      return {
+        success: true,
+        message: 'DNS cache flushed successfully',
+        spaceSaved: entriesBefore > 0 ? `${entriesBefore} entries cleared` : 'Cache cleared',
+      };
+    } else if (output.includes('access') || output.includes('denied') || output.includes('privilege')) {
+      return {
+        success: false,
+        message: 'Administrator privileges required. Please run the app as Administrator.',
+      };
+    } else {
+      return {
+        success: false,
+        message: 'DNS flush may have failed. Check console logs.',
+      };
+    }
   } catch (error) {
+    console.error('DNS Flush error:', error);
+    if (isPermissionError(error)) {
+      return { success: false, message: 'Run the app as administrator' };
+    }
     return { success: false, message: `Error: ${error.message}` };
+  }
+});
+
+ipcMain.handle('cleaner:clear-ram-cache', async () => {
+  try {
+    // Use PowerShell with RtlAdjustPrivilege - bypasses Device Guard
+    const tempScript = path.join(app.getPath('temp'), 'ram-purge.ps1');
+    const scriptContent = `
+# Standby list purge using RtlAdjustPrivilege
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+
+public class MemoryAPI {
+    [DllImport("ntdll.dll")]
+    public static extern uint NtSetSystemInformation(int InfoClass, IntPtr Info, int Length);
+    
+    [DllImport("ntdll.dll")]
+    public static extern uint RtlAdjustPrivilege(int Privilege, bool Enable, bool CurrentThread, out bool Enabled);
+    
+    public const int SE_PROF_SINGLE_PROCESS_PRIVILEGE = 13;
+    public const int SystemMemoryListInformation = 80;
+    public const int MemoryPurgeStandbyList = 4;
+    
+    public static string PurgeStandbyList() {
+        // Enable privilege using RtlAdjustPrivilege
+        bool wasEnabled;
+        uint privStatus = RtlAdjustPrivilege(SE_PROF_SINGLE_PROCESS_PRIVILEGE, true, false, out wasEnabled);
+        
+        if (privStatus != 0) {
+            return "PRIV_FAIL:0x" + privStatus.ToString("X8");
+        }
+        
+        // Try command 4 (MemoryPurgeStandbyList)
+        int command = MemoryPurgeStandbyList;
+        IntPtr commandPtr = Marshal.AllocHGlobal(4);
+        Marshal.WriteInt32(commandPtr, command);
+        
+        uint status = NtSetSystemInformation(SystemMemoryListInformation, commandPtr, 4);
+        Marshal.FreeHGlobal(commandPtr);
+        
+        if (status == 0) {
+            return "SUCCESS:4";
+        }
+        
+        // Try command 2 as fallback
+        command = 2;
+        commandPtr = Marshal.AllocHGlobal(4);
+        Marshal.WriteInt32(commandPtr, command);
+        
+        uint status2 = NtSetSystemInformation(SystemMemoryListInformation, commandPtr, 4);
+        Marshal.FreeHGlobal(commandPtr);
+        
+        if (status2 == 0) {
+            return "SUCCESS:2";
+        }
+        
+        return "FAILED:CMD4=0x" + status.ToString("X8") + ";CMD2=0x" + status2.ToString("X8");
+    }
+}
+"@
+
+# Get standby cache before (this is what Task Manager shows as "Cached")
+try {
+    $standbyBefore = (Get-Counter '\Memory\Standby Cache Core Bytes','\Memory\Standby Cache Normal Priority Bytes','\Memory\Standby Cache Reserve Bytes' -ErrorAction SilentlyContinue).CounterSamples | Measure-Object -Property CookedValue -Sum
+    $cachedBeforeMB = [math]::Round($standbyBefore.Sum / 1MB, 0)
+} catch {
+    $cachedBeforeMB = 0
+}
+
+# Execute purge
+$result = [MemoryAPI]::PurgeStandbyList()
+
+# Wait for counters to update
+Start-Sleep -Milliseconds 2000
+
+# Get standby cache after
+try {
+    $standbyAfter = (Get-Counter '\Memory\Standby Cache Core Bytes','\Memory\Standby Cache Normal Priority Bytes','\Memory\Standby Cache Reserve Bytes' -ErrorAction SilentlyContinue).CounterSamples | Measure-Object -Property CookedValue -Sum
+    $cachedAfterMB = [math]::Round($standbyAfter.Sum / 1MB, 0)
+} catch {
+    $cachedAfterMB = 0
+}
+
+# Calculate freed (use absolute value)
+if ($cachedBeforeMB -gt 0 -and $cachedAfterMB -ge 0) {
+    $freedMB = [math]::Abs($cachedBeforeMB - $cachedAfterMB)
+} else {
+    $freedMB = -1
+}
+
+Write-Output "$result|FreedMB=$freedMB"
+`;
+
+    fs.writeFileSync(tempScript, scriptContent, 'utf8');
+    
+    // Execute the script
+    const result = await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -File "${tempScript}"`, { shell: true });
+    
+    // Clean up
+    try {
+      fs.unlinkSync(tempScript);
+    } catch {}
+    
+    const output = result.stdout.trim();
+    
+    const lines = output.split('\n');
+    const statusLine = lines[lines.length - 1].trim();
+    
+    if (statusLine.includes('SUCCESS:4') || statusLine.includes('SUCCESS:2')) {
+      const freedMatch = statusLine.match(/FreedMB=(-?\d+)/);
+      const freedMB = freedMatch ? parseInt(freedMatch[1]) : -1;
+      
+      if (freedMB > 0) {
+        return {
+          success: true,
+          message: 'Standby list cleared successfully',
+          spaceSaved: freedMB + ' MB',
+        };
+      } else {
+        return {
+          success: true,
+          message: 'Standby list cleared successfully',
+          spaceSaved: 'Check Task Manager to see freed memory',
+        };
+      }
+    } else if (statusLine.includes('PRIV_FAIL')) {
+      return {
+        success: false,
+        message: 'Run the app as administrator',
+      };
+    } else if (statusLine.includes('FAILED:')) {
+      return {
+        success: false,
+        message: 'Run the app as administrator',
+      };
+    } else {
+      return {
+        success: false,
+        message: 'Unexpected result. Check console logs.',
+      };
+    }
+    
+  } catch (error) {
+    console.error('RAM Cache Clear Error:', error);
+    if (isPermissionError(error)) {
+      return { success: false, message: 'Run the app as administrator' };
+    }
+    return { 
+      success: false, 
+      message: `Failed: ${error.message}`,
+    };
   }
 });
 

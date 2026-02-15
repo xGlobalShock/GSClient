@@ -252,6 +252,8 @@ const GameLibrary: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
   const [showCommandsModal, setShowCommandsModal] = useState(false);
+  const [selectedResPreset, setSelectedResPreset] = useState('Native');
+  const [selectedAspectRatio, setSelectedAspectRatio] = useState('16:9');
 
   const categories = useMemo(() => ['All', ...Array.from(new Set(games.map(game => game.category)))], []);
 
@@ -263,6 +265,55 @@ const GameLibrary: React.FC = () => {
       return matchesSearch && matchesCategory;
     });
   }, [searchTerm, selectedCategory]);
+
+  const getResolutionForAspectRatio = useCallback((aspectRatio: string, preset: string) => {
+    const resolutions: { [key: string]: { [key: string]: string } } = {
+      '16:9': {
+        'Native': '1920x1080',
+        '2K': '2560x1440',
+        '3K': '3200x1800',
+        '4K': '3840x2160'
+      },
+      '16:10': {
+        'Native': '1728x1080',
+        '2K': '2304x1440',
+        '3K': '2592x1620',
+        '4K': '3456x2160'
+      },
+      '4:3': {
+        'Native': '1920x1440',
+        '2K': '2560x1920',
+        '3K': '2880x2160',
+        '4K': '3840x2880'
+      }
+    };
+    
+    const resolution = resolutions[aspectRatio]?.[preset] || '1920x1080';
+    return aspectRatio === '16:10' || aspectRatio === '4:3' ? `${resolution} (Stretched)` : resolution;
+  }, []);
+
+  const displayedGraphicsSettings = useMemo(() => {
+    if (selectedGame?.id === 'apex-legends') {
+      return selectedGame.recommended.graphics.settings.map(setting => {
+        if (setting.name === 'Resolution') {
+          return {
+            ...setting,
+            value: getResolutionForAspectRatio(selectedAspectRatio, selectedResPreset),
+            description: selectedResPreset === 'Native' ? 'Optimal competitive resolution' : `${selectedResPreset} resolution`
+          };
+        }
+        if (setting.name === 'Aspect Ratio') {
+          return {
+            ...setting,
+            value: selectedAspectRatio,
+            description: selectedAspectRatio === '16:10' ? 'Optimal visibility (stretched)' : selectedAspectRatio === '4:3' ? 'Maximum vertical FOV (stretched)' : 'Standard aspect ratio'
+          };
+        }
+        return setting;
+      });
+    }
+    return selectedGame?.recommended.graphics.settings || [];
+  }, [selectedGame, selectedAspectRatio, selectedResPreset, getResolutionForAspectRatio]);
 
   const handleGameClick = useCallback((game: Game) => {
     setSelectedGame(game);
@@ -340,8 +391,6 @@ const GameLibrary: React.FC = () => {
                   <div className="game-card-image-container">
                     <img src={game.image} alt={game.title} className="game-card-image" />
                     <div className="image-overlay">
-                      <Play className="play-icon" size={48} />
-                      <span className="overlay-text">OPTIMIZE</span>
                     </div>
                   </div>
                   <div className="game-card-content">
@@ -349,7 +398,6 @@ const GameLibrary: React.FC = () => {
                     <p className="game-card-description">{game.description}</p>
                     <div className="game-card-footer">
                       <span className="game-category">{game.category}</span>
-                      <Zap className="optimize-indicator" size={16} />
                     </div>
                   </div>
                   <div className="card-border"></div>
@@ -367,11 +415,10 @@ const GameLibrary: React.FC = () => {
             transition={{ duration: 0.2 }}
           >
             <div className="dashboard-header">
-              <button className="back-button" onClick={() => setSelectedGame(null)}>
-                <ArrowLeft size={20} />
-                <span>Back to Library</span>
-              </button>
               <div className="game-header-info">
+                <button className="back-button" onClick={() => setSelectedGame(null)}>
+                  <ArrowLeft size={20} />
+                </button>
                 <img src={selectedGame.image} alt={selectedGame.title} className="header-game-image" />
                 <div className="header-text">
                   <h2 className="dashboard-title">{selectedGame.title}</h2>
@@ -391,9 +438,37 @@ const GameLibrary: React.FC = () => {
                 <div className="module-header">
                   <Monitor className="module-icon" size={24} />
                   <h3>{selectedGame.recommended.graphics.title}</h3>
+                  {selectedGame.id === 'apex-legends' && (
+                    <div className="presets-wrapper">
+                      <div className="resolution-presets">
+                        <span className="presets-label">Aspect Ratio:</span>
+                        {['16:9', '16:10', '4:3'].map((ratio) => (
+                          <button
+                            key={ratio}
+                            className={`preset-btn ${selectedAspectRatio === ratio ? 'active' : ''}`}
+                            onClick={() => setSelectedAspectRatio(ratio)}
+                          >
+                            {ratio}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="resolution-presets">
+                        <span className="presets-label">Resolutions:</span>
+                        {['Native', '2K', '3K', '4K'].map((preset) => (
+                          <button
+                            key={preset}
+                            className={`preset-btn ${selectedResPreset === preset ? 'active' : ''}`}
+                            onClick={() => setSelectedResPreset(preset)}
+                          >
+                            {preset}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div className="settings-grid">
-                  {selectedGame.recommended.graphics.settings.map((setting, index) => (
+                  {displayedGraphicsSettings.map((setting, index) => (
                     <div
                       key={`${setting.name}-${index}`}
                       className="setting-card"
