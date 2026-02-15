@@ -1,0 +1,235 @@
+.obs-presets-container {
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+  padding: 0;
+}
+
+.obs-presets-header {
+  margin-bottom: 2rem;
+  position: relative;
+  z-index: 1;
+}
+
+.obs-presets-header h1 {
+  font-size: 3rem;
+  font-weight: 700;
+  color: #00ffff;
+  margin-bottom: 0.5rem;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.obs-presets-header .subtitle {
+  font-size: 1.1rem;
+  color: rgba(0, 255, 255, 0.7);
+  margin: 0;
+  font-weight: 300;
+  letter-spacing: 1px;
+}
+
+.obs-presets-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 18px;
+  padding: 0;
+}
+
+.preset-card {
+  background: rgba(5, 15, 35, 0.7);
+  border: 2px solid rgba(0, 255, 255, 0.3);
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+
+.preset-card:hover {
+  border-color: rgba(0, 255, 255, 0.7);
+  box-shadow: 0 0 20px rgba(0, 255, 255, 0.25);
+  transform: translateY(-6px);
+}
+
+.preset-icon {
+  font-size: 2.4rem;
+  text-align: center;
+  transition: transform 0.3s ease;
+}
+
+.preset-card:hover .preset-icon {
+  transform: scale(1.1);
+}
+
+.preset-name {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #00ffff;
+  margin: 0;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.preset-description {
+  font-size: 0.75rem;
+  color: rgba(0, 255, 255, 0.65);
+  margin: 0;
+  line-height: 1.4;
+  font-weight: 300;
+}
+
+.preset-difficulty {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.difficulty-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 18px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  border: 1px solid;
+}
+
+.difficulty-badge.beginner {
+  background: rgba(0, 255, 136, 0.1);
+  color: #00ff88;
+  border-color: rgba(0, 255, 136, 0.5);
+}
+
+.difficulty-badge.intermediate {
+  background: rgba(200, 155, 60, 0.1);
+  color: #ffc864;
+  border-color: rgba(255, 200, 100, 0.5);
+}
+
+.difficulty-badge.advanced {
+  background: rgba(255, 0, 255, 0.1);
+  color: #ff00ff;
+  border-color: rgba(255, 0, 255, 0.5);
+}
+
+.preset-features {
+  flex-grow: 1;
+}
+
+.preset-features h3 {
+  font-size: 0.7rem;
+  color: rgba(0, 255, 200, 0.8);
+  margin: 0 0 8px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+
+.preset-features ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.preset-features li {
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.6);
+  margin: 0;
+  padding: 2px 0 2px 14px;
+  position: relative;
+  font-weight: 400;
+}
+
+.preset-features li::before {
+  content: '▸';
+  position: absolute;
+  left: 0;
+  color: #00ffff;
+}
+
+.apply-preset-btn {
+  width: 100%;
+  padding: 8px 16px;
+  border: 1px solid #00ffff;
+  border-radius: 6px;
+  background: rgba(0, 255, 255, 0.08);
+  color: #00ffff;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-top: 10px;
+}
+
+.apply-preset-btn:hover:not(.disabled):not(.loading) {
+  background: rgba(0, 255, 255, 0.15);
+  border-color: #00ffff;
+  box-shadow: 0 0 12px rgba(0, 255, 255, 0.3);
+  transform: translateY(-2px);
+}
+
+.apply-preset-btn.loading,
+.apply-preset-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.apply-preset-btn .spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(0, 255, 255, 0.3);
+  border-top: 2px solid #00ffff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .obs-presets-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .obs-presets-header h1 {
+    font-size: 1.8rem;
+  }
+
+  .preset-card {
+    padding: 12px;
+    gap: 10px;
+  }
+
+  .preset-icon {
+    font-size: 2rem;
+  }
+
+  .preset-name {
+    font-size: 0.95rem;
+  }
+}
+

@@ -1,3 +1,0 @@
-Features:
-- Add a new tab on the nav bar and name it ( OBS Presets )
-- Add ' Set services to manual ' to the system tweaks ( using the old project path )

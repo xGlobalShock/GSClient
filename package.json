@@ -71,6 +71,13 @@
         "filter": [
           "**/*"
         ]
+      },
+      {
+        "from": "src/data/obsPresetConfigs",
+        "to": "data/obsPresetConfigs",
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "directories": {

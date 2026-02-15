@@ -1,0 +1,58 @@
+{
+  "uuid": "{12345678-1234-1234-1234-123456789001}",
+  "name": "Main Stream",
+  "desktopVideoX": 0,
+  "desktopVideoY": 0,
+  "desktopVideoWidth": 1920,
+  "desktopVideoHeight": 1080,
+  "canvasWidth": 1920,
+  "canvasHeight": 1080,
+  "backgroundColor": "#000000",
+  "itemCount": 4,
+  "items": [
+    {
+      "name": "Game Capture",
+      "sourceType": "game_capture",
+      "x": 0,
+      "y": 0,
+      "cx": 1920,
+      "cy": 1080,
+      "rot": 0,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "name": "Microphone",
+      "sourceType": "wasapi_input_capture",
+      "x": 0,
+      "y": 0,
+      "cx": 0,
+      "cy": 0,
+      "rot": 0,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "name": "Desktop Audio",
+      "sourceType": "wasapi_output_capture",
+      "x": 0,
+      "y": 0,
+      "cx": 0,
+      "cy": 0,
+      "rot": 0,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "name": "StreamElements Overlay",
+      "sourceType": "browser_source",
+      "x": 0,
+      "y": 0,
+      "cx": 1920,
+      "cy": 1080,
+      "rot": 0,
+      "visible": true,
+      "locked": false
+    }
+  ]
+}

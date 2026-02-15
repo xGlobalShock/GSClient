@@ -6,6 +6,7 @@ import {
   Settings,
   Gamepad2,
   Zap,
+  Video,
 } from 'lucide-react';
 import '../styles/Sidebar.css';
 
@@ -37,6 +38,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage, online: 
     { id: 'dashboard', label: 'Dashboard', icon: Home },
     { id: 'performance', label: 'Performance', icon: Activity },
     { id: 'gameLibrary', label: 'Game Library', icon: Gamepad2 },
+    { id: 'obsPresets', label: 'OBS Presets', icon: Video },
     { id: 'cleaner', label: 'Cleaner', icon: Trash2 },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
@@ -56,7 +58,6 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage, online: 
               key={item.id}
               className={`nav-item ${currentPage === item.id ? 'active' : ''}`}
               onClick={() => setCurrentPage(item.id)}
-              title={item.label}
             >
               <Icon size={24} />
               <span className="nav-label">{item.label}</span>
