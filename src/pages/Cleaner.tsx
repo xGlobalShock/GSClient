@@ -27,18 +27,41 @@ interface CleanResult {
 
 const Cleaner: React.FC = () => {
   const [cleaningId, setCleaningId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'windows' | 'games' | 'nvidia'>('windows');
   const { addToast } = useToast();
 
   const cleanerMap: { [key: string]: string } = {
     'nvidia-cache': 'cleaner:clear-nvidia-cache',
     'apex-shaders': 'cleaner:clear-apex-shaders',
     'forza-shaders': 'cleaner:clear-forza-shaders',
+    'cod-shaders': 'cleaner:clear-cod-shaders',
+    'cs2-shaders': 'cleaner:clear-cs2-shaders',
+    'fortnite-shaders': 'cleaner:clear-fortnite-shaders',
+    'lol-shaders': 'cleaner:clear-lol-shaders',
+    'overwatch-shaders': 'cleaner:clear-overwatch-shaders',
+    'r6-shaders': 'cleaner:clear-r6-shaders',
+    'rocket-league-shaders': 'cleaner:clear-rocket-league-shaders',
+    'valorant-shaders': 'cleaner:clear-valorant-shaders',
     'temp-files': 'cleaner:clear-temp-files',
     'prefetch': 'cleaner:clear-prefetch',
     'update-cache': 'cleaner:clear-update-cache',
     'dns-cache': 'cleaner:clear-dns-cache',
     'ram-cache': 'cleaner:clear-ram-cache',
+    'recycle-bin': 'cleaner:empty-recycle-bin',
   };
+
+  // Categorize utilities by tab
+  const utilityTabs = {
+    windows: cleanerUtilities.filter(u => ['temp-files', 'prefetch', 'update-cache', 'dns-cache', 'ram-cache', 'recycle-bin'].includes(u.id)),
+    games: cleanerUtilities.filter(u => ['forza-shaders', 'apex-shaders', 'cod-shaders', 'cs2-shaders', 'fortnite-shaders', 'lol-shaders', 'overwatch-shaders', 'r6-shaders', 'rocket-league-shaders', 'valorant-shaders'].includes(u.id)),
+    nvidia: cleanerUtilities.filter(u => ['nvidia-cache'].includes(u.id)),
+  };
+
+  const tabs = [
+    { id: 'windows', label: 'Windows Cache', count: utilityTabs.windows.length },
+    { id: 'games', label: 'Games Cache', count: utilityTabs.games.length },
+    { id: 'nvidia', label: 'NVIDIA Cache', count: utilityTabs.nvidia.length },
+  ];
 
   const handleClean = async (id: string) => {
     setCleaningId(id);
@@ -83,8 +106,22 @@ const Cleaner: React.FC = () => {
         Optimize your system by clearing unnecessary cache and temporary files
       </p>
 
+      {/* Tab Navigation */}
+      <div className="cleaner-tabs">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            className={`tab-button ${activeTab === tab.id ? 'active' : ''}`}
+            onClick={() => setActiveTab(tab.id as any)}
+          >
+            <span className="tab-label">{tab.label}</span>
+            <span className="tab-count">{tab.count}</span>
+          </button>
+        ))}
+      </div>
+
       <div className="cleaner-grid">
-        {cleanerUtilities.map((utility, index) => (
+        {utilityTabs[activeTab].map((utility, index) => (
           <motion.div
             key={utility.id}
             initial={{ y: 20, opacity: 0 }}

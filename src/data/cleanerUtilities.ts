@@ -6,6 +6,14 @@ import NvidiaLogo from '../assets/nvidia.png';
 import DNSLogo from '../assets/DNS.png';
 import TempFilesLogo from '../assets/TempFiles.png';
 import WinUpdatesLogo from '../assets/WinUpdates.png';
+import CODLogo from '../assets/COD Banner.jpg';
+import CS2Logo from '../assets/CS2 Banner.jpg';
+import FortniteLogo from '../assets/Fortnite Banner.jpg';
+import LoLLogo from '../assets/LoL Banner.jpg';
+import OverwatchLogo from '../assets/Overwatch Banner.jpg';
+import R6Logo from '../assets/R6 Banner.jpg';
+import RocketLeagueLogo from '../assets/Rocket League Banner.jpg';
+import ValorantLogo from '../assets/Valorant.jpg';
 
 export interface CleanerUtility {
   id: string;
@@ -48,6 +56,86 @@ export const cleanerUtilities: CleanerUtility[] = [
     buttonText: 'Clear Cache',
     color: '#0074D9',
     buttonColor: '#FF6B35',
+  },
+  {
+    id: 'cod-shaders',
+    title: 'Clear Call of Duty Shaders',
+    icon: CODLogo,
+    cacheType: 'Shader Cache',
+    description: 'Clears Call of Duty shader cache to fix stuttering and graphics glitches.',
+    buttonText: 'Clear Cache',
+    color: '#000000',
+    buttonColor: '#27ae60',
+  },
+  {
+    id: 'cs2-shaders',
+    title: 'Clear CS2 Shaders',
+    icon: CS2Logo,
+    cacheType: 'Shader Cache',
+    description: 'Clears Counter-Strike 2 shader cache for optimal performance.',
+    buttonText: 'Clear Cache',
+    color: '#1B1B1B',
+    buttonColor: '#27ae60',
+  },
+  {
+    id: 'fortnite-shaders',
+    title: 'Clear Fortnite Shaders',
+    icon: FortniteLogo,
+    cacheType: 'Shader Cache',
+    description: 'Clears Fortnite shader cache to improve FPS and reduce stuttering.',
+    buttonText: 'Clear Cache',
+    color: '#3B82F6',
+    buttonColor: '#27ae60',
+  },
+  {
+    id: 'lol-shaders',
+    title: 'Clear LoL Shaders',
+    icon: LoLLogo,
+    cacheType: 'Shader Cache',
+    description: 'Clears League of Legends shader cache for better in-game performance.',
+    buttonText: 'Clear Cache',
+    color: '#0A7EBB',
+    buttonColor: '#27ae60',
+  },
+  {
+    id: 'overwatch-shaders',
+    title: 'Clear Overwatch 2 Shaders',
+    icon: OverwatchLogo,
+    cacheType: 'Shader Cache',
+    description: 'Clears Overwatch 2 shader cache to fix performance issues.',
+    buttonText: 'Clear Cache',
+    color: '#F4A300',
+    buttonColor: '#27ae60',
+  },
+  {
+    id: 'r6-shaders',
+    title: 'Clear Rainbow Six Siege Shaders',
+    icon: R6Logo,
+    cacheType: 'Shader Cache',
+    description: 'Clears Rainbow Six Siege shader cache to improve stability.',
+    buttonText: 'Clear Cache',
+    color: '#FFA500',
+    buttonColor: '#27ae60',
+  },
+  {
+    id: 'rocket-league-shaders',
+    title: 'Clear Rocket League Shaders',
+    icon: RocketLeagueLogo,
+    cacheType: 'Shader Cache',
+    description: 'Clears Rocket League shader cache for smoother gameplay.',
+    buttonText: 'Clear Cache',
+    color: '#4169E1',
+    buttonColor: '#27ae60',
+  },
+  {
+    id: 'valorant-shaders',
+    title: 'Clear Valorant Shaders',
+    icon: ValorantLogo,
+    cacheType: 'Shader Cache',
+    description: 'Clears Valorant shader cache for consistent FPS and reduced lag.',
+    buttonText: 'Clear Cache',
+    color: '#FF4655',
+    buttonColor: '#27ae60',
   },
   {
     id: 'temp-files',
@@ -98,5 +186,15 @@ export const cleanerUtilities: CleanerUtility[] = [
     buttonText: 'Clear Cache',
     color: '#0074D9',
     buttonColor: '#FF00FF',
+  },
+  {
+    id: 'recycle-bin',
+    title: 'Empty Recycle Bin',
+    icon: Trash, // Trash icon for recycle bin
+    cacheType: 'Recycle Bin',
+    description: 'Permanently empties the recycle bin to free up disk space.',
+    buttonText: 'Empty Bin',
+    color: '#0074D9',
+    buttonColor: '#E74C3C',
   },
 ];
