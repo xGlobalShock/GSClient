@@ -30,9 +30,11 @@
 
 .obs-presets-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(2, 350px);
   gap: 18px;
   padding: 0;
+  max-width: 750px;
+  margin: 0 auto;
 }
 
 .preset-card {

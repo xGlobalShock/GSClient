@@ -10,21 +10,6 @@ export interface ObsPreset {
 
 export const OBS_PRESETS: ObsPreset[] = [
   {
-    id: 'basic',
-    name: 'Basic OBS',
-    description: 'Perfect for beginners. A simple, clean setup with one main scene and essential sources.',
-    features: [
-      '1 Main Scene',
-      'Display/Game Capture',
-      'Microphone Input',
-      'Desktop Audio',
-      'Basic Scene Transitions',
-    ],
-    icon: '📺',
-    color: '#00D4FF',
-    difficulty: 'Beginner',
-  },
-  {
     id: 'multiStreaming',
     name: 'Multi Streaming OBS',
     description: 'Integrated with StreamElements. Perfect for streaming to multiple platforms simultaneously.',
@@ -39,23 +24,6 @@ export const OBS_PRESETS: ObsPreset[] = [
     icon: '🌐',
     color: '#FF00FF',
     difficulty: 'Intermediate',
-  },
-  {
-    id: 'full',
-    name: 'Full OBS',
-    description: 'Complete professional setup with advanced features, plugins, and optimizations.',
-    features: [
-      'Advanced Scene Management',
-      'Multi-Source Setup',
-      'Professional Overlays',
-      'Advanced Filters',
-      'Hotkeys Configuration',
-      'Recording Profiles',
-      'Stream Deck Integration',
-    ],
-    icon: '⭐',
-    color: '#C89B3C',
-    difficulty: 'Advanced',
   },
   {
     id: 'gaming',
