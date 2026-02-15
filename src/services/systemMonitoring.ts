@@ -8,9 +8,16 @@ const execAsync = promisify(exec);
 export async function getCPUUsage(): Promise<number> {
   try {
     const { stdout } = await execAsync(
-      'wmic os get totalvisiblememorybytes,freephysicalmemory /format:list'
+      'wmic cpu get loadpercentage /format:list'
     );
-    return parseFloat((Math.random() * 100).toFixed(2));
+    const lines = stdout.split('\n');
+    for (const line of lines) {
+      if (line.includes('LoadPercentage')) {
+        const value = parseInt(line.split('=')[1]);
+        return isNaN(value) ? 0 : value;
+      }
+    }
+    return 0;
   } catch {
     return 0;
   }
@@ -46,7 +53,7 @@ export async function getRAMUsage(): Promise<number> {
 export async function getDiskUsage(): Promise<number> {
   try {
     const { stdout } = await execAsync(
-      'wmic logicaldisk get name,size,freespace /format:list | find "C:"'
+      'wmic logicaldisk where name="C:" get size,freespace /format:list'
     );
     const lines = stdout.split('\n');
     let totalDisk = 0;
@@ -61,6 +68,7 @@ export async function getDiskUsage(): Promise<number> {
       }
     });
 
+    if (totalDisk === 0) return 0;
     const usedDisk = totalDisk - freeDisk;
     return parseFloat(((usedDisk / totalDisk) * 100).toFixed(2));
   } catch {
@@ -72,10 +80,12 @@ export async function getDiskUsage(): Promise<number> {
 export async function getSystemTemperature(): Promise<number> {
   try {
     const { stdout } = await execAsync(
-      'wmic /namespace:\\\\root\\wmi path win32_perfformatteddata_ohdictsensors_systemtemperature get sensorname,currentreading /format:list'
+      'wmic /namespace:\\\\root\\wmi path win32_perfformatteddata_ohdictsensors_systemtemperature get currentreading /format:list'
     );
-    const temp = parseInt(stdout.match(/\\d+/)?.[0] || '0');
-    return Math.round((temp / 1000) * 100) / 100;
+    const match = stdout.match(/\d+/);
+    if (!match) return 45; // Default temp if not available
+    const temp = parseInt(match[0]);
+    return isNaN(temp) ? 45 : Math.round((temp / 1000) * 100) / 100;
   } catch {
     return 45;
   }
@@ -84,15 +94,20 @@ export async function getSystemTemperature(): Promise<number> {
 // Get running processes
 export async function getRunningProcesses(): Promise<any[]> {
   try {
-    const { stdout } = await execAsync('tasklist /v /format:list');
+    const { stdout } = await execAsync('tasklist /v');
     const processes = stdout
       .split('\n')
-      .filter(line => line.includes('Executable Name='))
-      .slice(0, 10);
-    return processes.map(p => ({
-      name: p.split('=')[1],
-      timestamp: new Date(),
-    }));
+      .filter(line => line.trim().length > 0)
+      .slice(1) // Skip header
+      .slice(0, 10)
+      .map(line => {
+        const parts = line.trim().split(/\s+/);
+        return {
+          name: parts[0],
+          timestamp: new Date(),
+        };
+      });
+    return processes.filter(p => p.name && p.name !== '=' && p.name.length > 0);
   } catch {
     return [];
   }

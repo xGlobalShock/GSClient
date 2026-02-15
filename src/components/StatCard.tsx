@@ -9,6 +9,7 @@ interface StatCardProps {
   unit: string;
   icon: React.ReactNode;
   status: 'good' | 'warning' | 'critical';
+  isUnavailable?: boolean;
 }
 
 const StatCard: React.FC<StatCardProps> = ({
@@ -17,6 +18,7 @@ const StatCard: React.FC<StatCardProps> = ({
   unit,
   icon,
   status,
+  isUnavailable = false,
 }) => {
   const getStatusColor = () => {
     switch (status) {
@@ -64,11 +66,17 @@ const StatCard: React.FC<StatCardProps> = ({
                 />
               </svg>
               <div className="stat-value">
-                <div className="stat-number">{normalizedValue.toFixed(0)}<span className="stat-unit">{unit}</span></div>
+                <div className="stat-number">
+                  {isUnavailable ? (
+                    <>—<span className="stat-unit">N/A</span></>
+                  ) : (
+                    <>{normalizedValue.toFixed(0)}<span className="stat-unit">{unit}</span></>
+                  )}
+                </div>
                 <div className="stat-title"><span className="stat-inline-icon">{icon}</span><span className="stat-title-text">{title}</span></div>
               </div>
             </div>
-            <div className={`stat-badge stat-${status} stat-badge-below`}>{status.toUpperCase()}</div>
+            <div className={`stat-badge stat-${isUnavailable ? 'unavailable' : status} stat-badge-below`}>{isUnavailable ? 'UNAVAILABLE' : status.toUpperCase()}</div>
           </div>
         </div>
 

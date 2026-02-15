@@ -73,10 +73,38 @@ const Dashboard: React.FC<DashboardProps> = ({ systemStats }) => {
   };
 
   const stats = [
-    { title: 'CPU', value: systemStats.cpu, unit: '%', icon: <Cpu size={36} />, status: getStatus(systemStats.cpu) },
-    { title: 'RAM', value: systemStats.ram, unit: '%', icon: <MemoryStick size={36} />, status: getStatus(systemStats.ram) },
-    { title: 'Disk', value: systemStats.disk, unit: '%', icon: <HardDrive size={36} />, status: getStatus(systemStats.disk) },
-    { title: 'Temp', value: systemStats.temperature, unit: '°C', icon: <Thermometer size={36} />, status: getStatus(systemStats.temperature) },
+    { 
+      title: 'CPU', 
+      value: systemStats.cpu, 
+      unit: '%', 
+      icon: <Cpu size={36} />, 
+      status: getStatus(systemStats.cpu),
+      isUnavailable: systemStats.cpu === 0 && systemStats.ram > 0 // If CPU is 0 but RAM isn't, CPU monitoring failed
+    },
+    { 
+      title: 'RAM', 
+      value: systemStats.ram, 
+      unit: '%', 
+      icon: <MemoryStick size={36} />, 
+      status: getStatus(systemStats.ram),
+      isUnavailable: false // RAM has fallback, rarely fails
+    },
+    { 
+      title: 'Disk', 
+      value: systemStats.disk, 
+      unit: '%', 
+      icon: <HardDrive size={36} />, 
+      status: getStatus(systemStats.disk),
+      isUnavailable: systemStats.disk === 0 && systemStats.ram > 0 // If Disk is 0 but RAM isn't, Disk monitoring failed
+    },
+    { 
+      title: 'Temp', 
+      value: systemStats.temperature, 
+      unit: '°C', 
+      icon: <Thermometer size={36} />, 
+      status: getStatus(systemStats.temperature),
+      isUnavailable: false // Temperature has fallback, never actually unavailable
+    },
   ];
 
   // Exponential moving average for smoothing fluctuations
@@ -92,7 +120,15 @@ const Dashboard: React.FC<DashboardProps> = ({ systemStats }) => {
 
       <section className="stat-grid" aria-label="System Stats">
         {stats.map((s) => (
-          <StatCard key={s.title} title={s.title} value={s.value} unit={s.unit} icon={s.icon} status={s.status} />
+          <StatCard 
+            key={s.title} 
+            title={s.title} 
+            value={s.value} 
+            unit={s.unit} 
+            icon={s.icon} 
+            status={s.status}
+            isUnavailable={s.isUnavailable}
+          />
         ))}
       </section>
 
