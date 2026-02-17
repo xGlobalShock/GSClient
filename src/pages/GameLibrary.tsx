@@ -1,6 +1,6 @@
-import React, { useState, useMemo, useCallback, memo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Filter, X, Settings, Zap, Monitor, Cpu, HardDrive, ArrowLeft, Copy, Download, Play, Sparkles, Info } from 'lucide-react';
+import { Search, X, Monitor, Cpu, ArrowLeft, Copy, Info, Shield } from 'lucide-react';
 import '../styles/GameLibrary.css';
 import valorantImg from '../assets/Valorant.jpg';
 import rocketLeagueImg from '../assets/Rocket League Banner.jpg';
@@ -254,6 +254,7 @@ const GameLibrary: React.FC = () => {
   const [showCommandsModal, setShowCommandsModal] = useState(false);
   const [selectedResPreset, setSelectedResPreset] = useState('Native');
   const [selectedAspectRatio, setSelectedAspectRatio] = useState('16:9');
+  const [activeTab, setActiveTab] = useState<'graphics' | 'launch' | 'system'>('graphics');
 
   const categories = useMemo(() => ['All', ...Array.from(new Set(games.map(game => game.category)))], []);
 
@@ -268,26 +269,10 @@ const GameLibrary: React.FC = () => {
 
   const getResolutionForAspectRatio = useCallback((aspectRatio: string, preset: string) => {
     const resolutions: { [key: string]: { [key: string]: string } } = {
-      '16:9': {
-        'Native': '1920x1080',
-        '2K': '2560x1440',
-        '3K': '3200x1800',
-        '4K': '3840x2160'
-      },
-      '16:10': {
-        'Native': '1728x1080',
-        '2K': '2304x1440',
-        '3K': '2592x1620',
-        '4K': '3456x2160'
-      },
-      '4:3': {
-        'Native': '1920x1440',
-        '2K': '2560x1920',
-        '3K': '2880x2160',
-        '4K': '3840x2880'
-      }
+      '16:9': { 'Native': '1920x1080', '2K': '2560x1440', '3K': '3200x1800', '4K': '3840x2160' },
+      '16:10': { 'Native': '1728x1080', '2K': '2304x1440', '3K': '2592x1620', '4K': '3456x2160' },
+      '4:3': { 'Native': '1920x1440', '2K': '2560x1920', '3K': '2880x2160', '4K': '3840x2880' }
     };
-    
     const resolution = resolutions[aspectRatio]?.[preset] || '1920x1080';
     return aspectRatio === '16:10' || aspectRatio === '4:3' ? `${resolution} (Stretched)` : resolution;
   }, []);
@@ -296,18 +281,10 @@ const GameLibrary: React.FC = () => {
     if (selectedGame?.id === 'apex-legends') {
       return selectedGame.recommended.graphics.settings.map(setting => {
         if (setting.name === 'Resolution') {
-          return {
-            ...setting,
-            value: getResolutionForAspectRatio(selectedAspectRatio, selectedResPreset),
-            description: selectedResPreset === 'Native' ? 'Optimal competitive resolution' : `${selectedResPreset} resolution`
-          };
+          return { ...setting, value: getResolutionForAspectRatio(selectedAspectRatio, selectedResPreset), description: selectedResPreset === 'Native' ? 'Optimal competitive resolution' : `${selectedResPreset} resolution` };
         }
         if (setting.name === 'Aspect Ratio') {
-          return {
-            ...setting,
-            value: selectedAspectRatio,
-            description: selectedAspectRatio === '16:10' ? 'Optimal visibility (stretched)' : selectedAspectRatio === '4:3' ? 'Maximum vertical FOV (stretched)' : 'Standard aspect ratio'
-          };
+          return { ...setting, value: selectedAspectRatio, description: selectedAspectRatio === '16:10' ? 'Optimal visibility (stretched)' : selectedAspectRatio === '4:3' ? 'Maximum vertical FOV (stretched)' : 'Standard aspect ratio' };
         }
         return setting;
       });
@@ -317,215 +294,254 @@ const GameLibrary: React.FC = () => {
 
   const handleGameClick = useCallback((game: Game) => {
     setSelectedGame(game);
+    setActiveTab('graphics');
   }, []);
 
   const handleCopySettings = useCallback((text: string) => {
     navigator.clipboard.writeText(text);
   }, []);
 
+  // Count settings for the selected game
+  const settingsCounts = useMemo(() => {
+    if (!selectedGame) return { graphics: 0, launch: 0, system: 0 };
+    return {
+      graphics: selectedGame.recommended.graphics.settings.length,
+      launch: selectedGame.recommended.launch.options.length,
+      system: selectedGame.recommended.performance.tweaks.length,
+    };
+  }, [selectedGame]);
+
   return (
-    <div className="game-library-container">
+    <div className="gl-container">
       <AnimatePresence mode="wait">
         {!selectedGame ? (
           <motion.div
             key="library"
-            className="library-view"
+            className="gl-view"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
+            transition={{ duration: 0.25 }}
           >
-            <div className="library-header">
-              <div className="header-content">
-                <Sparkles className="header-icon" size={32} />
-                <div>
-                  <h1 className="library-title">
-                    <span className="title-gradient">Games Optimization Hub</span>
-                  </h1>
-                  <p className="library-description">
-                    Optimization Hub - Select a game to unlock peak performance
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="library-controls">
-              <div className="search-box">
-                <Search className="search-icon" size={20} />
+            {/* ── Controls ── */}
+            <div className="gl-controls">
+              <div className="gl-search">
+                <Search className="gl-search__icon" size={16} />
                 <input
                   type="text"
-                  className="search-input"
-                  placeholder="Search your arsenal..."
+                  className="gl-search__input"
+                  placeholder="Search games..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
+                {searchTerm && (
+                  <button className="gl-search__clear" onClick={() => setSearchTerm('')}>
+                    <X size={14} />
+                  </button>
+                )}
               </div>
-
-              <div className="category-filters">
-                {categories.map(category => (
-                  <motion.button
-                    key={category}
-                    className={`filter-button ${selectedCategory === category ? 'active' : ''}`}
-                    onClick={() => setSelectedCategory(category)}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
+              <div className="gl-filters">
+                {categories.map(cat => (
+                  <button
+                    key={cat}
+                    className={`gl-filter ${selectedCategory === cat ? 'gl-filter--active' : ''}`}
+                    onClick={() => setSelectedCategory(cat)}
                   >
-                    <span className="filter-glow"></span>
-                    {category}
-                  </motion.button>
+                    {cat}
+                  </button>
                 ))}
               </div>
             </div>
 
-            <div className="games-grid">
+            {/* ── Game Grid ── */}
+            <div className="gl-grid">
               {filteredGames.map((game, index) => (
                 <motion.div
                   key={game.id}
-                  className="game-card"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 0.15 }}
+                  className="gl-card"
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.2, delay: index * 0.04 }}
                   onClick={() => handleGameClick(game)}
                 >
-                  <div className="card-glow"></div>
-                  <div className="game-card-image-container">
-                    <img src={game.image} alt={game.title} className="game-card-image" />
-                    <div className="image-overlay">
+                  <div className="gl-card__img-wrap">
+                    <img src={game.image} alt={game.title} className="gl-card__img" loading="lazy" />
+                    <div className="gl-card__hover-overlay" />
+                    <div className="gl-card__corner gl-card__corner--tl" />
+                    <div className="gl-card__corner gl-card__corner--tr" />
+                    <div className="gl-card__corner gl-card__corner--bl" />
+                    <div className="gl-card__corner gl-card__corner--br" />
+                  </div>
+
+                  <div className="gl-card__body">
+                    <h3 className="gl-card__title">{game.title}</h3>
+                    <p className="gl-card__desc">{game.description}</p>
+                    <div className="gl-card__meta">
+                      <span className="gl-card__badge">{game.category}</span>
+                      <span className="gl-card__count">{game.recommended.graphics.settings.length} tweaks</span>
                     </div>
                   </div>
-                  <div className="game-card-content">
-                    <h3 className="game-card-title">{game.title}</h3>
-                    <p className="game-card-description">{game.description}</p>
-                    <div className="game-card-footer">
-                      <span className="game-category">{game.category}</span>
-                    </div>
-                  </div>
-                  <div className="card-border"></div>
+                  <div className="gl-card__glow" />
                 </motion.div>
               ))}
             </div>
+
+            {filteredGames.length === 0 && (
+              <div className="gl-empty">
+                <Search size={40} />
+                <p>No games matched your search</p>
+              </div>
+            )}
           </motion.div>
         ) : (
+          /* ── Game Detail Dashboard ── */
           <motion.div
             key="dashboard"
-            className="game-dashboard"
+            className="gl-dash"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
+            transition={{ duration: 0.25 }}
           >
-            <div className="dashboard-header">
-              <div className="game-header-info">
-                <button className="back-button" onClick={() => setSelectedGame(null)}>
-                  <ArrowLeft size={20} />
-                </button>
-                <img src={selectedGame.image} alt={selectedGame.title} className="header-game-image" />
-                <div className="header-text">
-                  <h2 className="dashboard-title">{selectedGame.title}</h2>
-                  <p className="dashboard-subtitle">{selectedGame.description}</p>
+            {/* Dash Header */}
+            <div className="gl-dash__header">
+              <button className="gl-dash__back" onClick={() => setSelectedGame(null)}>
+                <ArrowLeft size={18} />
+              </button>
+              <div className="gl-dash__hero-img-wrap">
+                <img src={selectedGame.image} alt={selectedGame.title} className="gl-dash__hero-img" />
+              </div>
+              <div className="gl-dash__info">
+                <span className="gl-dash__category">{selectedGame.category}</span>
+                <h2 className="gl-dash__title">{selectedGame.title}</h2>
+                <p className="gl-dash__desc">{selectedGame.description}</p>
+              </div>
+              <div className="gl-dash__stats">
+                <div className="gl-dash__stat">
+                  <span className="gl-dash__stat-val">{settingsCounts.graphics}</span>
+                  <span className="gl-dash__stat-label">Graphics</span>
+                </div>
+                <div className="gl-dash__stat">
+                  <span className="gl-dash__stat-val">{settingsCounts.launch}</span>
+                  <span className="gl-dash__stat-label">Launch</span>
+                </div>
+                <div className="gl-dash__stat">
+                  <span className="gl-dash__stat-val">{settingsCounts.system}</span>
+                  <span className="gl-dash__stat-label">System</span>
                 </div>
               </div>
             </div>
 
-            <div className="dashboard-content">
-              {/* Graphics Settings Module */}
-              <motion.div
-                className="optimization-module"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.2 }}
-              >
-                <div className="module-header">
-                  <Monitor className="module-icon" size={24} />
-                  <h3>{selectedGame.recommended.graphics.title}</h3>
-                  {selectedGame.id === 'apex-legends' && (
-                    <div className="presets-wrapper">
-                      <div className="resolution-presets">
-                        <span className="presets-label">Aspect Ratio:</span>
-                        {['16:9', '16:10', '4:3'].map((ratio) => (
-                          <button
-                            key={ratio}
-                            className={`preset-btn ${selectedAspectRatio === ratio ? 'active' : ''}`}
-                            onClick={() => setSelectedAspectRatio(ratio)}
-                          >
-                            {ratio}
-                          </button>
-                        ))}
-                      </div>
-                      <div className="resolution-presets">
-                        <span className="presets-label">Resolutions:</span>
-                        {['Native', '2K', '3K', '4K'].map((preset) => (
-                          <button
-                            key={preset}
-                            className={`preset-btn ${selectedResPreset === preset ? 'active' : ''}`}
-                            onClick={() => setSelectedResPreset(preset)}
-                          >
-                            {preset}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-                <div className="settings-grid">
-                  {displayedGraphicsSettings.map((setting, index) => (
-                    <div
-                      key={`${setting.name}-${index}`}
-                      className="setting-card"
-                    >
-                      <div className="setting-header">
-                        <span className="setting-name">{setting.name}</span>
-                        <span className="setting-value">{setting.value}</span>
-                      </div>
-                      <p className="setting-description">{setting.description}</p>
-                      <div className="setting-indicator"></div>
-                    </div>
-                  ))}
-                </div>
-              </motion.div>
+            {/* Tab Navigation */}
+            <div className="gl-tabs">
+              <button className={`gl-tab ${activeTab === 'graphics' ? 'gl-tab--active' : ''}`} onClick={() => setActiveTab('graphics')}>
+                <Monitor size={15} />
+                Graphics
+              </button>
+              <button className={`gl-tab ${activeTab === 'launch' ? 'gl-tab--active' : ''}`} onClick={() => setActiveTab('launch')}>
+                <Cpu size={15} />
+                Launch Options
+              </button>
+              <button className={`gl-tab ${activeTab === 'system' ? 'gl-tab--active' : ''}`} onClick={() => setActiveTab('system')}>
+                <Shield size={15} />
+                System
+              </button>
+            </div>
 
-              {/* Launch Options Module */}
-              <motion.div
-                className="optimization-module"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.2 }}
-              >
-                <div className="module-header">
-                  <Cpu className="module-icon" size={24} />
-                  <h3>{selectedGame.recommended.launch.title}</h3>
-                </div>
-                <div className="launch-options">
-                  <div className="launch-combined">
-                    <div className="combined-header">
-                      <span>Combined Launch Options</span>
-                      <div className="header-buttons">
-                        {selectedGame.id === 'apex-legends' && (
-                          <button 
-                            className="show-commands-button"
-                            onClick={() => setShowCommandsModal(true)}
-                          >
-                            <Info size={16} />
-                            Show Commands
-                          </button>
-                        )}
-                        <button 
-                          className="copy-all-button"
-                          onClick={() => handleCopySettings(
-                            selectedGame.recommended.launch.options.map(o => o.flag).join(' ')
-                          )}
-                        >
-                          <Copy size={16} />
-                          Copy All
-                        </button>
+            {/* Tab Content */}
+            <div className="gl-tab-content">
+              <AnimatePresence mode="wait">
+                {/* Graphics Tab */}
+                {activeTab === 'graphics' && (
+                  <motion.div key="gfx" initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }} transition={{ duration: 0.2 }}>
+                    {selectedGame.id === 'apex-legends' && (
+                      <div className="gl-presets-bar">
+                        <div className="gl-preset-group">
+                          <span className="gl-preset-label">Aspect Ratio</span>
+                          {['16:9', '16:10', '4:3'].map(r => (
+                            <button key={r} className={`gl-preset-btn ${selectedAspectRatio === r ? 'gl-preset-btn--active' : ''}`} onClick={() => setSelectedAspectRatio(r)}>{r}</button>
+                          ))}
+                        </div>
+                        <div className="gl-preset-group">
+                          <span className="gl-preset-label">Resolution</span>
+                          {['Native', '2K', '3K', '4K'].map(p => (
+                            <button key={p} className={`gl-preset-btn ${selectedResPreset === p ? 'gl-preset-btn--active' : ''}`} onClick={() => setSelectedResPreset(p)}>{p}</button>
+                          ))}
+                        </div>
                       </div>
+                    )}
+                    <div className="gl-settings-grid">
+                      {displayedGraphicsSettings.map((s, i) => (
+                        <div key={`${s.name}-${i}`} className="gl-setting">
+                          <div className="gl-setting__top">
+                            <span className="gl-setting__name">{s.name}</span>
+                            <span className="gl-setting__val">{s.value}</span>
+                          </div>
+                          <p className="gl-setting__desc">{s.description}</p>
+                          <div className="gl-setting__rail" />
+                        </div>
+                      ))}
                     </div>
-                    <code className="combined-code">
-                      {selectedGame.recommended.launch.options.map(o => o.flag).join(' ')}
-                    </code>
-                  </div>
-                </div>
-              </motion.div>
+                  </motion.div>
+                )}
+
+                {/* Launch Tab */}
+                {activeTab === 'launch' && (
+                  <motion.div key="launch" initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }} transition={{ duration: 0.2 }}>
+                    <div className="gl-launch-combined">
+                      <div className="gl-launch-combined__header">
+                        <span>Combined Launch String</span>
+                        <div className="gl-launch-combined__actions">
+                          {selectedGame.id === 'apex-legends' && (
+                            <button className="gl-cmd-btn gl-cmd-btn--info" onClick={() => setShowCommandsModal(true)}>
+                              <Info size={14} /> All Commands
+                            </button>
+                          )}
+                          <button className="gl-cmd-btn gl-cmd-btn--copy" onClick={() => handleCopySettings(selectedGame.recommended.launch.options.map(o => o.flag).join(' '))}>
+                            <Copy size={14} /> Copy All
+                          </button>
+                        </div>
+                      </div>
+                      <code className="gl-launch-combined__code">
+                        {selectedGame.recommended.launch.options.map(o => o.flag).join(' ')}
+                      </code>
+                    </div>
+
+                    <div className="gl-launch-list">
+                      {selectedGame.recommended.launch.options.map((opt, i) => (
+                        <div key={`${opt.flag}-${i}`} className="gl-launch-item">
+                          <div className="gl-launch-item__head">
+                            <code className="gl-launch-item__flag">{opt.flag}</code>
+                            <span className={`gl-impact gl-impact--${opt.impact.toLowerCase()}`}>{opt.impact}</span>
+                            <button className="gl-launch-item__copy" onClick={() => handleCopySettings(opt.flag)}>
+                              <Copy size={13} />
+                            </button>
+                          </div>
+                          <p className="gl-launch-item__desc">{opt.description}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* System Tab */}
+                {activeTab === 'system' && (
+                  <motion.div key="sys" initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }} transition={{ duration: 0.2 }}>
+                    <div className="gl-sys-grid">
+                      {selectedGame.recommended.performance.tweaks.map((t, i) => (
+                        <div key={`${t.name}-${i}`} className="gl-sys-card">
+                          <div className="gl-sys-card__head">
+                            <span className="gl-sys-card__name">{t.name}</span>
+                            <span className="gl-sys-card__val">{t.value}</span>
+                          </div>
+                          <p className="gl-sys-card__benefit">{t.benefit}</p>
+                          <div className="gl-sys-card__bar" />
+                        </div>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </motion.div>
         )}
@@ -535,71 +551,49 @@ const GameLibrary: React.FC = () => {
       <AnimatePresence>
         {showCommandsModal && selectedGame?.id === 'apex-legends' && (
           <motion.div
-            className="commands-modal-overlay"
+            className="gl-modal-overlay"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => setShowCommandsModal(false)}
           >
             <motion.div
-              className="commands-modal"
-              initial={{ scale: 0.9, opacity: 0 }}
+              className="gl-modal"
+              initial={{ scale: 0.92, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
+              exit={{ scale: 0.92, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="commands-modal-header">
-                <div className="modal-title-section">
-                  <Info size={24} />
-                  <h3>Available Apex Legends Commands</h3>
+              <div className="gl-modal__header">
+                <div className="gl-modal__title-wrap">
+                  <Info size={20} />
+                  <h3>Apex Legends — All Commands</h3>
                 </div>
-                <button 
-                  className="modal-close-button"
-                  onClick={() => setShowCommandsModal(false)}
-                >
-                  <X size={24} />
+                <button className="gl-modal__close" onClick={() => setShowCommandsModal(false)}>
+                  <X size={20} />
                 </button>
               </div>
-              <div className="commands-modal-content">
-                <p className="modal-description">
-                  These are all the working launch options for Apex Legends. Copy individual commands or use the "Copy All" button for optimal performance.
-                </p>
-                <div className="commands-list">
-                  {(selectedGame.id === 'apex-legends' ? apexAllCommands : selectedGame.recommended.launch.options).map((option, index) => (
-                    <div
-                      key={`${option.flag}-${index}`}
-                      className="command-item"
-                    >
-                      <div className="command-header">
-                        <code className="command-flag">{option.flag}</code>
-                        <button
-                          className="copy-command-button"
-                          onClick={() => handleCopySettings(option.flag)}
-                        >
-                          <Copy size={14} />
+              <div className="gl-modal__body">
+                <p className="gl-modal__desc">All verified launch options. Copy individual flags or grab the full string.</p>
+                <div className="gl-modal__list">
+                  {apexAllCommands.map((opt, i) => (
+                    <div key={`${opt.flag}-${i}`} className="gl-modal__item">
+                      <div className="gl-modal__item-head">
+                        <code className="gl-modal__item-flag">{opt.flag}</code>
+                        <span className={`gl-impact gl-impact--${opt.impact.toLowerCase()}`}>{opt.impact}</span>
+                        <button className="gl-modal__item-copy" onClick={() => handleCopySettings(opt.flag)}>
+                          <Copy size={13} />
                         </button>
                       </div>
-                      <p className="command-description">{option.description}</p>
-                      <span className={`command-impact impact-${option.impact.toLowerCase()}`}>
-                        Impact: {option.impact}
-                      </span>
+                      <p className="gl-modal__item-desc">{opt.description}</p>
                     </div>
                   ))}
                 </div>
-                <div className="modal-footer">
-                  <button
-                    className="modal-copy-all-button"
-                    onClick={() => {
-                      handleCopySettings(
-                        selectedGame.recommended.launch.options.map(o => o.flag).join(' ')
-                      );
-                      setShowCommandsModal(false);
-                    }}
-                  >
-                    <Copy size={16} />
-                    Copy All Commands
-                  </button>
-                </div>
+              </div>
+              <div className="gl-modal__footer">
+                <button className="gl-cmd-btn gl-cmd-btn--copy" onClick={() => { handleCopySettings(selectedGame.recommended.launch.options.map(o => o.flag).join(' ')); setShowCommandsModal(false); }}>
+                  <Copy size={15} /> Copy All Commands
+                </button>
               </div>
             </motion.div>
           </motion.div>
