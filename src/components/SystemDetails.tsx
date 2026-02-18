@@ -22,6 +22,13 @@ const fmt = (n: number): string => {
   return `${(n / 1073741824).toFixed(2)} GB/s`;
 };
 
+// Convert MiB (nvidia-smi) to GB for UI display (show 1 decimal unless whole number)
+const formatMiBtoGB = (mb?: number | null): string => {
+  if (!mb || mb <= 0) return '—';
+  const gb = mb / 1024;
+  return gb % 1 === 0 ? `${gb.toFixed(0)} GB` : `${gb.toFixed(1)} GB`;
+};
+
 /* ─── Shared gradient def ─── */
 const GradDef: React.FC = () => (
   <svg width="0" height="0" style={{ position: 'absolute' }}>
@@ -190,7 +197,11 @@ const SystemDetails: React.FC<SystemDetailsProps> = ({ systemStats, hardwareInfo
           gaugeValue={hasGpu ? ext.gpuUsage : 0} gaugeUnit="%"
           delay={0.08}
         >
-          {hw?.gpuVramTotal && <Row label="VRAM" value={hw.gpuVramTotal} />}
+          {(ext && ext.gpuVramTotal > 0) ? (
+            <Row label="VRAM" value={formatMiBtoGB(ext.gpuVramTotal)} />
+          ) : (
+            hw?.gpuVramTotal && <Row label="VRAM" value={hw.gpuVramTotal} />
+          )}
           {hw?.gpuDriverVersion && <Row label="Driver" value={hw.gpuDriverVersion} />}
           {hasGpu ? (
             <>
@@ -199,7 +210,7 @@ const SystemDetails: React.FC<SystemDetailsProps> = ({ systemStats, hardwareInfo
                 <BarRow
                   label="VRAM Used"
                   pct={(ext.gpuVramUsed / ext.gpuVramTotal) * 100}
-                  display={`${ext.gpuVramUsed} / ${ext.gpuVramTotal} MB`}
+                  display={`${formatMiBtoGB(ext.gpuVramUsed)} / ${formatMiBtoGB(ext.gpuVramTotal)}`}
                 />
               )}
             </>

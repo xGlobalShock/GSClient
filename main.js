@@ -491,7 +491,16 @@ ipcMain.handle('system:get-hardware-info', async () => {
     const parts = get(1).split('|||').map((s) => s.trim());
     info.gpuName = parts[0] || 'Unknown GPU';
     info.gpuVramTotal = parts[1] && parts[1] !== '0' ? `${parts[1]} GB` : '';
-    info.gpuDriverVersion = parts[2] || '';
+
+    // Prefer the NVIDIA "driver_version" from nvidia-smi (matches NVIDIA Control Panel/App).
+    // Fallback to Win32_VideoController.DriverVersion when nvidia-smi isn't present.
+    try {
+      const nv = await execAsync('nvidia-smi --query-gpu=driver_version --format=csv,noheader,nounits', { shell: true, timeout: 3000 });
+      const nvver = (nv.stdout || '').trim().split('\n')[0].trim();
+      info.gpuDriverVersion = nvver || (parts[2] || '');
+    } catch (e) {
+      info.gpuDriverVersion = parts[2] || '';
+    }
   } catch { info.gpuName = 'Unknown GPU'; }
 
   // Derive full RAM brand+series name from part number and manufacturer
