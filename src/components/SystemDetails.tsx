@@ -39,10 +39,9 @@ const ArcGauge: React.FC<{ value: number; unit?: string; displayValue?: string |
   const r = 22;
   const circ = 2 * Math.PI * r;
   const pct = Math.max(0, Math.min(value, 100));
-  // 270° arc: starts at 7 o'clock (225°), ends at 5 o'clock
   const arcLen = circ * 0.75;
   const offset = arcLen - (pct / 100) * arcLen;
-  const rotation = 135; // degrees to rotate so arc starts bottom-left
+  const rotation = 135;
 
   return (
     <div className="sysdet-arc-gauge">
