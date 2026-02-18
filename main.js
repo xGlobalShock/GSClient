@@ -401,6 +401,12 @@ ipcMain.handle('system:get-hardware-info', async () => {
     allDrives: [],
     networkAdapter: '',
     ipAddress: '',
+    // Motherboard & BIOS (populated later)
+    motherboardManufacturer: '',
+    motherboardProduct: '',
+    motherboardSerial: '',
+    biosVersion: '',
+    biosDate: '',
     windowsVersion: '',
     windowsBuild: '',
     systemUptime: '',
@@ -437,9 +443,9 @@ ipcMain.handle('system:get-hardware-info', async () => {
       `powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-CimInstance Win32_LogicalDisk -Filter \\"DriveType=3\\" | ForEach-Object { $totalGB = [math]::Round($_.Size/1GB,1); $freeGB = [math]::Round($_.FreeSpace/1GB,1); Write-Output \\"$($_.DeviceID)|$totalGB|$freeGB|$($_.VolumeName)\\" }"`,
       { shell: true, timeout: 10000 }
     ),
-    // 5: Network adapter + IP
+    // 5: Network adapter + IPv4 + LinkSpeed + MAC + IPv6 + Gateway + DNS
     execAsync(
-      `powershell -NoProfile -ExecutionPolicy Bypass -Command "$a = Get-NetAdapter | Where-Object { $_.Status -eq 'Up' } | Select-Object -First 1; $ip = (Get-NetIPAddress -InterfaceIndex $a.ifIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue | Select-Object -First 1).IPAddress; Write-Output ($a.Name + ' (' + $a.InterfaceDescription + ')'); Write-Output '|||'; Write-Output $ip"`,
+      `powershell -NoProfile -ExecutionPolicy Bypass -Command "$a = Get-NetAdapter | Where-Object { $_.Status -eq 'Up' } | Select-Object -First 1; $link = $a.LinkSpeed; $ipv4 = (Get-NetIPAddress -InterfaceIndex $a.ifIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue | Select-Object -First 1).IPAddress; $ipv6 = (Get-NetIPAddress -InterfaceIndex $a.ifIndex -AddressFamily IPv6 -ErrorAction SilentlyContinue | Select-Object -First 1).IPAddress; $mac = $a.MacAddress; $gw = (Get-NetIPConfiguration -InterfaceIndex $a.ifIndex -ErrorAction SilentlyContinue).Ipv4DefaultGateway.NextHop; $dns = (Get-DnsClientServerAddress -InterfaceIndex $a.ifIndex -ErrorAction SilentlyContinue -AddressFamily IPv4 | Select-Object -First 1).ServerAddresses -join ','; Write-Output ($a.Name + ' (' + $a.InterfaceDescription + ')'); Write-Output '|||'; Write-Output ($ipv4); Write-Output '|||'; Write-Output ($link); Write-Output '|||'; Write-Output ($mac); Write-Output '|||'; Write-Output ($ipv6); Write-Output '|||'; Write-Output ($gw); Write-Output '|||'; Write-Output ($dns)"`,
       { shell: true, timeout: 10000 }
     ),
     // 6: Windows version + build
@@ -476,6 +482,32 @@ ipcMain.handle('system:get-hardware-info', async () => {
 
   // Helper to extract settled value
   const get = (i) => results[i].status === 'fulfilled' ? results[i].value.stdout.trim() : '';
+
+  // Additional hardware lookups (motherboard + BIOS) — run separately to avoid reshuffling the main results array
+  try {
+    const mb = await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "$b = Get-CimInstance Win32_BaseBoard -ErrorAction SilentlyContinue | Select-Object -First 1; if ($b) { $prod = $b.Product; if (-not $prod) { $prod = $b.Name } if (-not $prod) { $prod = $b.Caption } Write-Output ($b.Manufacturer + '|||' + $prod + '|||' + $b.SerialNumber) } else { Write-Output '|||' }"`, { shell: true, timeout: 8000 });
+    const mbRaw = (mb.stdout || '').trim();
+    if (mbRaw) {
+      const parts = mbRaw.split('|||').map(s => s.trim());
+      info.motherboardManufacturer = parts[0] || '';
+      info.motherboardProduct = parts[1] || '';
+      info.motherboardSerial = parts[2] || '';
+    }
+  } catch (e) {
+    // ignore
+  }
+
+  try {
+    const bio = await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "$bio = Get-CimInstance Win32_BIOS -ErrorAction SilentlyContinue | Select-Object -First 1; if ($bio) { $ver = $bio.SMBIOSBIOSVersion; if (-not $ver) { $ver = $bio.Version } if (-not $ver) { $ver = $bio.BIOSVersion -join ',' } $date = ''; try { $date = ([Management.ManagementDateTimeConverter]::ToDateTime($bio.ReleaseDate).ToString('yyyy-MM-dd')) } catch { $date = '' } Write-Output ($ver + '|||' + $date) } else { Write-Output '||' }"`, { shell: true, timeout: 8000 });
+    const bioRaw = (bio.stdout || '').trim();
+    if (bioRaw) {
+      const parts = bioRaw.split('|||').map(s => s.trim());
+      info.biosVersion = parts[0] || '';
+      info.biosDate = parts[1] || '';
+    }
+  } catch (e) {
+    // ignore
+  }
 
   // 0: CPU
   try {
@@ -632,6 +664,11 @@ ipcMain.handle('system:get-hardware-info', async () => {
     const parts = get(5).split('|||').map((s) => s.trim());
     info.networkAdapter = parts[0] || '';
     info.ipAddress = parts[1] || '';
+    info.networkLinkSpeed = parts[2] || '';
+    info.macAddress = parts[3] || '';
+    info.ipv6Address = parts[4] || '';
+    info.gateway = parts[5] || '';
+    info.dns = parts[6] || '';
   } catch {}
 
   // 6: Windows — with additional validation for Win11 vs Win10
@@ -665,6 +702,26 @@ ipcMain.handle('system:get-hardware-info', async () => {
   // 8: Power plan
   try { info.powerPlan = get(8) || ''; } catch {}
 
+  // Fallback: some systems may not expose Win32_PowerPlan; try powercfg as a reliable fallback
+  if (!info.powerPlan) {
+    try {
+      const pc = await execAsync('powercfg /getactivescheme', { shell: true, timeout: 4000 });
+      const out = (pc.stdout || '').trim();
+      // Example output: Power Scheme GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c  (High performance)
+      const m = out.match(/\(([^)]+)\)$/);
+      if (m && m[1]) {
+        info.powerPlan = m[1].trim();
+      } else {
+        // fallback: try to extract text after the GUID
+        const parts = out.split(/\)\s*/).map(p => p.trim()).filter(Boolean);
+        const last = parts[parts.length - 1] || '';
+        if (last) info.powerPlan = last.replace(/^\(|\)$/g, '').trim();
+      }
+    } catch (e) {
+      // ignore — leave powerPlan empty
+    }
+  }
+
   // 9: Battery
   try {
     const parts = get(9).split('|||').map((s) => s.trim());
@@ -684,6 +741,8 @@ ipcMain.handle('system:get-hardware-info', async () => {
 
   // 11: Disk free
   try { info.diskFreeGB = parseFloat(get(11)) || 0; } catch {}
+
+
 
   return info;
 });
@@ -735,9 +794,9 @@ ipcMain.handle('system:get-extended-stats', async () => {
       `powershell -NoProfile -ExecutionPolicy Bypass -Command "$c = Get-Counter '\\Network Interface(*)\\Bytes Sent/sec','\\Network Interface(*)\\Bytes Received/sec' -SampleInterval 1 -MaxSamples 1 -ErrorAction SilentlyContinue; $s = $c.CounterSamples; $up = ($s | Where-Object { $_.Path -like '*Bytes Sent*' } | Measure-Object -Property CookedValue -Sum).Sum; $down = ($s | Where-Object { $_.Path -like '*Bytes Received*' } | Measure-Object -Property CookedValue -Sum).Sum; Write-Output ([math]::Round($up)); Write-Output '|||'; Write-Output ([math]::Round($down))"`,
       { shell: true, timeout: 6000 }
     ),
-    // 4: Wi-Fi signal
+    // 4: Wi-Fi SSID + Signal
     execAsync(
-      `powershell -NoProfile -ExecutionPolicy Bypass -Command "(netsh wlan show interfaces | Select-String 'Signal').ToString().Split(':')[1].Trim()"`,
+      `powershell -NoProfile -ExecutionPolicy Bypass -Command "$w = netsh wlan show interfaces; $ssid = ($w | Select-String -Pattern '^\s*SSID' -NotMatch 'BSSID' | Select-Object -First 1).ToString().Split(':')[1].Trim(); $sig = ($w | Select-String 'Signal').ToString().Split(':')[1].Trim(); Write-Output ($ssid + '|||' + $sig)"`,
       { shell: true, timeout: 5000 }
     ),
     // 5: RAM usage in GB
@@ -759,6 +818,11 @@ ipcMain.handle('system:get-extended-stats', async () => {
     execAsync(
       `powershell -NoProfile -ExecutionPolicy Bypass -Command "$up = (Get-Date) - (Get-CimInstance Win32_OperatingSystem).LastBootUpTime; '{0}d {1}h {2}m' -f $up.Days, $up.Hours, $up.Minutes"`,
       { shell: true, timeout: 5000 }
+    ),
+    // 9: Latency (ping to 1.1.1.1)
+    execAsync(
+      `powershell -NoProfile -ExecutionPolicy Bypass -Command "try { (Test-Connection -Count 1 -ComputerName 1.1.1.1 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty ResponseTime) } catch { '' }"`,
+      { shell: true, timeout: 4000 }
     ),
   ]);
 
@@ -798,10 +862,16 @@ ipcMain.handle('system:get-extended-stats', async () => {
     ext.networkDown = parseInt(parts[1]) || 0;
   } catch {}
 
-  // 4: Wi-Fi signal
+  // 4: Wi-Fi SSID + Signal
   try {
     const raw = get(4);
-    if (raw) ext.wifiSignal = parseInt(raw) || -1;
+    if (raw && raw.includes('|||')) {
+      const parts = raw.split('|||').map(s => s.trim());
+      ext.ssid = parts[0] || '';
+      ext.wifiSignal = parseInt(parts[1]) || -1;
+    } else if (raw) {
+      ext.wifiSignal = parseInt(raw) || -1;
+    }
   } catch {}
 
   // 5: RAM GB
@@ -823,6 +893,9 @@ ipcMain.handle('system:get-extended-stats', async () => {
 
   // 8: Uptime
   try { ext.systemUptime = get(8) || ''; } catch {}
+
+  // 9: Latency (ms)
+  try { ext.latencyMs = parseInt(get(9)) || 0; } catch {}
 
   return ext;
 });

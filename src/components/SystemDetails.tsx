@@ -75,13 +75,13 @@ const ArcGauge: React.FC<{ value: number; unit?: string; displayValue?: string |
 };
 
 /* ─── Info row ─── */
-const Row: React.FC<{ label: string; value?: string | number; accent?: boolean; chip?: 'green' | 'yellow' }> = ({ label, value, accent, chip }) => (
+const Row: React.FC<{ label: string; value?: React.ReactNode; accent?: boolean; chip?: 'green' | 'yellow' }> = ({ label, value, accent, chip }) => (
   <div className="sysdet-row">
     <span className="sysdet-label">{label}</span>
     {chip ? (
-      <span className={`sysdet-chip ${chip}`}>{value || '—'}</span>
+      <span className={`sysdet-chip ${chip}`}>{value ?? '—'}</span>
     ) : (
-      <span className={`sysdet-value${accent ? ' sysdet-accent' : ''}`}>{value || '—'}</span>
+      <div className={`sysdet-value${accent ? ' sysdet-accent' : ''}`}>{value ?? '—'}</div>
     )}
   </div>
 );
@@ -102,8 +102,8 @@ const BarRow: React.FC<{ label: string; pct: number; display: string }> = ({ lab
 /* ─── IO badges ─── */
 const IOStrip: React.FC<{ up: string; down: string }> = ({ up, down }) => (
   <div className="sysdet-io-strip">
-    <span className="sysdet-io-badge up"><ArrowUp size={11} />{up}</span>
-    <span className="sysdet-io-badge down"><ArrowDown size={11} />{down}</span>
+    <span className="sysdet-io-badge up"><ArrowUp size={9} />{up}</span>
+    <span className="sysdet-io-badge down"><ArrowDown size={9} />{down}</span>
   </div>
 );
 
@@ -150,6 +150,14 @@ const Card: React.FC<{
 /* ═══════════════════════════════════════════
    Main component
 ═══════════════════════════════════════════ */
+
+// Clean motherboard/product name for display (remove parenthetical SKU/codes)
+const cleanBoardName = (name?: string) => {
+  if (!name) return '';
+  // remove parenthetical content and trailing codes like " - something"
+  return name.replace(/\s*\(.*?\)\s*/g, '').replace(/\s*-\s*.*/g, '').trim();
+};
+
 const SystemDetails: React.FC<SystemDetailsProps> = ({ systemStats, hardwareInfo, extendedStats }) => {
   const hw = hardwareInfo;
   const ext = extendedStats;
@@ -174,6 +182,7 @@ const SystemDetails: React.FC<SystemDetailsProps> = ({ systemStats, hardwareInfo
         >
           <Row label="Cores / Threads" value={hw ? `${hw.cpuCores}C / ${hw.cpuThreads}T` : undefined} />
           <Row label="Max Clock" value={hw?.cpuMaxClock} />
+          <Row label="CPU Temp" value={s?.temperature > 0 ? `${s.temperature}°C` : undefined} accent />
           {ext && ext.cpuClock > 0 && (
             <Row label="Current Clock" value={`${(ext.cpuClock / 1000).toFixed(2)} GHz`} accent />
           )}
@@ -254,9 +263,16 @@ const SystemDetails: React.FC<SystemDetailsProps> = ({ systemStats, hardwareInfo
               display={`${hw.diskFreeGB.toFixed(0)} GB free`}
             />
           )}
-          {ext && (ext.diskReadSpeed > 0 || ext.diskWriteSpeed > 0) && (
-            <IOStrip up={fmt(ext.diskWriteSpeed)} down={fmt(ext.diskReadSpeed)} />
-          )}
+          <Row
+            label="Read/Write"
+            value={ext && (ext.diskReadSpeed > 0 || ext.diskWriteSpeed > 0) ? (
+              <div className="sysdet-value-with-io">
+                <div className="sysdet-io-badges-wrap">
+                  <IOStrip up={fmt(ext.diskWriteSpeed)} down={fmt(ext.diskReadSpeed)} />
+                </div>
+              </div>
+            ) : '—'}
+          />
           {hw && hw.allDrives && hw.allDrives.length > 1 && (
             <div className="sysdet-drives">
               <div className="sysdet-drives-title">All Drives</div>
@@ -282,10 +298,24 @@ const SystemDetails: React.FC<SystemDetailsProps> = ({ systemStats, hardwareInfo
           gaugeUnit="Mbps"
           delay={0.20}
         >
-          {hw?.ipAddress && <Row label="IP Address" value={hw.ipAddress} />}
-          {ext && (ext.networkUp > 0 || ext.networkDown > 0) && (
-            <IOStrip up={fmt(ext.networkUp)} down={fmt(ext.networkDown)} />
-          )}
+          {hw?.ipAddress && <Row label="Local IP Address" value={hw.ipAddress} />}
+          {hw?.ipv6Address && <Row label="IPv6" value={hw.ipv6Address} />}
+          {hw?.macAddress && <Row label="MAC" value={hw.macAddress} />}
+          {hw?.gateway && <Row label="Gateway" value={hw.gateway} />}
+          {hw?.dns && <Row label="DNS" value={hw.dns} />}
+          {ext?.ssid && <Row label="Wi‑Fi SSID" value={ext.ssid} />}
+          {ext && ext.latencyMs && ext.latencyMs > 0 && <Row label="Ping/Latency" value={`${ext.latencyMs} ms`} />}
+          {hw?.networkLinkSpeed && <Row label="Link Speed" value={hw.networkLinkSpeed} />}
+          <Row
+            label="Realtime Speed"
+            value={ext && (ext.networkUp > 0 || ext.networkDown > 0) ? (
+              <div className="sysdet-value-with-io">
+                <div className="sysdet-io-badges-wrap">
+                  <IOStrip up={fmt(ext.networkUp)} down={fmt(ext.networkDown)} />
+                </div>
+              </div>
+            ) : '—'}
+          />
           {ext && ext.wifiSignal > 0 && (
             <div className="sysdet-inline-row wifi">
               <Wifi size={13} />
@@ -303,14 +333,11 @@ const SystemDetails: React.FC<SystemDetailsProps> = ({ systemStats, hardwareInfo
           delay={0.24}
         >
           <Row label="Build" value={hw?.windowsBuild} />
+          <Row label="Motherboard" value={hw?.motherboardProduct ? cleanBoardName(hw.motherboardProduct) : hw?.motherboardManufacturer} />
+          <Row label="BIOS" value={(hw?.biosVersion || hw?.biosDate) ? `${hw?.biosVersion || 'Unknown'}${hw?.biosDate ? ' — ' + hw.biosDate : ''}` : undefined} />
+          <Row label="Board S/N" value={hw?.motherboardSerial || '—'} />
           <Row label="Uptime" value={ext?.systemUptime ?? hw?.systemUptime} />
-          <Row label="Processes" value={ext?.processCount} accent />
-          {hw?.powerPlan && (
-            <div className="sysdet-inline-row power">
-              <Zap size={13} />
-              <span>{hw.powerPlan}</span>
-            </div>
-          )}
+          <Row label="Power Plan" value={hw?.powerPlan ?? '—'} />
           {hw?.hasBattery && (
             <div className="sysdet-inline-row batt">
               <Battery size={13} />

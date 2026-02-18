@@ -33,7 +33,18 @@ export interface HardwareInfo {
   diskHealth: string;
   allDrives: { letter: string; totalGB: number; freeGB: number; label: string }[];
   networkAdapter: string;
+  networkLinkSpeed?: string;
   ipAddress: string;
+  ipv6Address?: string;
+  macAddress?: string;
+  gateway?: string;
+  dns?: string;
+  // Motherboard & BIOS
+  motherboardManufacturer?: string;
+  motherboardProduct?: string;
+  motherboardSerial?: string;
+  biosVersion?: string;
+  biosDate?: string;
   windowsVersion: string;
   windowsBuild: string;
   systemUptime: string;
@@ -52,7 +63,9 @@ export interface ExtendedStats {
   gpuVramTotal: number;
   networkUp: number;
   networkDown: number;
+  ssid?: string;
   wifiSignal: number;
+  latencyMs?: number;
   ramUsedGB: number;
   ramTotalGB: number;
   diskReadSpeed: number;
@@ -95,6 +108,8 @@ function App() {
         try {
           const info = await window.electron.ipcRenderer.invoke('system:get-hardware-info');
           setHardwareInfo(info);
+
+
         } catch (error) {
           console.error('Error fetching hardware info:', error);
         }
