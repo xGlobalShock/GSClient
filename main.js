@@ -491,7 +491,43 @@ ipcMain.handle('system:get-hardware-info', async () => {
       const parts = mbRaw.split('|||').map(s => s.trim());
       info.motherboardManufacturer = parts[0] || '';
       info.motherboardProduct = parts[1] || '';
-      info.motherboardSerial = parts[2] || '';
+
+      // Sanitize the motherboard serial: many OEMs return placeholders like "Default string" or "To be filled by OEM"
+      let rawSerial = (parts[2] || '').trim();
+      const invalidSerials = ['default string','to be filled by o.e.m.','to be filled by oem','system serial number','not specified','none','unknown','baseboard serial number'];
+      const serialLower = rawSerial.toLowerCase();
+      const isBad = !rawSerial || invalidSerials.includes(serialLower) || /^0+$/.test(rawSerial) || rawSerial.length < 3;
+
+      if (!isBad) {
+        info.motherboardSerial = rawSerial;
+      } else {
+        // Fallback: try alternative WMI classes (SystemEnclosure / ComputerSystemProduct)
+        try {
+          const fb = await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "($e = Get-CimInstance Win32_SystemEnclosure -ErrorAction SilentlyContinue | Select-Object -First 1).SerialNumber; if (-not $e) { $e = (Get-CimInstance Win32_ComputerSystemProduct -ErrorAction SilentlyContinue).IdentifyingNumber }; Write-Output ($e -ne $null ? $e : '')"`, { shell: true, timeout: 4000 });
+          const fbSerial = (fb.stdout || '').trim();
+          if (fbSerial && !/^0+$/.test(fbSerial) && fbSerial.length >= 3 && !invalidSerials.includes(fbSerial.toLowerCase())) {
+            info.motherboardSerial = fbSerial;
+          } else {
+            info.motherboardSerial = '';
+          }
+        } catch (e) {
+          info.motherboardSerial = '';
+        }
+      }
+    }
+  } catch (e) {
+    // ignore
+  }
+
+  // Physical disks: model, serial, firmware, size (GB)
+  try {
+    const pd = await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-CimInstance Win32_DiskDrive | ForEach-Object { $m = ($_.Model -replace '\\n',' '); $sn = ($_.SerialNumber -replace '\\s',''); $fw = ($_.FirmwareRevision -replace '\\s',''); $size = [math]::Round($_.Size/1GB); Write-Output ($m + '|||' + $sn + '|||' + $fw + '|||' + $size) }"`, { shell: true, timeout: 8000 });
+    const pdRaw = (pd.stdout || '').trim();
+    if (pdRaw) {
+      info.physicalDisks = pdRaw.split('\n').filter(l => l.trim()).map((line) => {
+        const parts = line.split('|||').map(s => s.trim());
+        return { model: parts[0] || '', serial: parts[1] || '', firmware: parts[2] || '', sizeGB: parseInt(parts[3]) || 0 };
+      });
     }
   } catch (e) {
     // ignore

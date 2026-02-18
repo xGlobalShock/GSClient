@@ -158,6 +158,46 @@ const cleanBoardName = (name?: string) => {
   return name.replace(/\s*\(.*?\)\s*/g, '').replace(/\s*-\s*.*/g, '').trim();
 };
 
+// Treat common placeholder/invalid serial strings as empty so UI shows "—"
+const isPlaceholderSerial = (s?: string) => {
+  if (!s) return true;
+  const v = s.trim().toLowerCase();
+  const invalid = ['default string','to be filled by o.e.m.','to be filled by oem','system serial number','not specified','none','unknown','baseboard serial number'];
+  if (invalid.includes(v)) return true;
+  if (/^0+$/.test(s)) return true;
+  if (s.trim().length < 3) return true;
+  return false;
+};
+
+// Mask disk serials for privacy (show last 4 chars if available)
+const maskSerial = (s?: string) => {
+  if (!s) return '—';
+  const t = s.trim();
+  if (t.length <= 4) return `••••${t}`;
+  return `••••${t.slice(-4)}`;
+};
+
+// Parse strings like "1 Gbps", "100 Mbps" or numeric bps to Mbps (returns number in Mbps)
+const parseLinkSpeedStr = (s?: string): number | undefined => {
+  if (!s) return undefined;
+  const str = String(s).trim();
+  // common patterns: "1 Gbps", "100 Mbps", "1000 Mb/s"
+  const m = str.match(/([0-9]+(?:\.[0-9]+)?)\s*(g|m)/i);
+  if (m) {
+    const val = parseFloat(m[1]);
+    const unit = m[2].toLowerCase();
+    return unit === 'g' ? val * 1000 : val;
+  }
+  // numeric fallback: could be bps or Mbps
+  const num = parseFloat(str.replace(/[^0-9\.]/g, ''));
+  if (!isNaN(num)) {
+    // if number is large assume it's in bps (e.g. 1000000000)
+    if (num > 10000) return Math.round(num / 1000000);
+    return num; // assume Mbps already
+  }
+  return undefined;
+};
+
 const SystemDetails: React.FC<SystemDetailsProps> = ({ systemStats, hardwareInfo, extendedStats }) => {
   const hw = hardwareInfo;
   const ext = extendedStats;
@@ -294,12 +334,21 @@ const SystemDetails: React.FC<SystemDetailsProps> = ({ systemStats, hardwareInfo
         {/* ── Network ── */}
         <Card icon={<Network size={17} />} title="Network"
           subtitle={hw?.networkAdapter}
-          gaugeValue={ext ? Math.min(((ext.networkUp + ext.networkDown) / (1024 * 1024 * 15)) * 100, 100) : 0}
+          // show arc relative to the link speed (or 1Gbps fallback); display center shows Mbps
+          gaugeValue={(() => {
+            const up = ext?.networkUp ?? 0;
+            const down = ext?.networkDown ?? 0;
+            const bytes = up + down; // bytes/sec
+            const mbps = Math.round(((bytes * 8) / (1024 * 1024)) * 10) / 10; // Mbit/s (one decimal)
+            const link = parseLinkSpeedStr(hw?.networkLinkSpeed) ?? 1000; // Mbps fallback to 1Gbps
+            const pct = link > 0 ? Math.min((mbps / link) * 100, 100) : 0;
+            return pct;
+          })()}
+          gaugeDisplay={(() => Math.round(((ext?.networkUp ?? 0) + (ext?.networkDown ?? 0)) * 8 / (1024 * 1024)))()}
           gaugeUnit="Mbps"
           delay={0.20}
         >
           {hw?.ipAddress && <Row label="Local IP Address" value={hw.ipAddress} />}
-          {hw?.ipv6Address && <Row label="IPv6" value={hw.ipv6Address} />}
           {hw?.macAddress && <Row label="MAC" value={hw.macAddress} />}
           {hw?.gateway && <Row label="Gateway" value={hw.gateway} />}
           {hw?.dns && <Row label="DNS" value={hw.dns} />}
@@ -335,7 +384,7 @@ const SystemDetails: React.FC<SystemDetailsProps> = ({ systemStats, hardwareInfo
           <Row label="Build" value={hw?.windowsBuild} />
           <Row label="Motherboard" value={hw?.motherboardProduct ? cleanBoardName(hw.motherboardProduct) : hw?.motherboardManufacturer} />
           <Row label="BIOS" value={(hw?.biosVersion || hw?.biosDate) ? `${hw?.biosVersion || 'Unknown'}${hw?.biosDate ? ' — ' + hw.biosDate : ''}` : undefined} />
-          <Row label="Board S/N" value={hw?.motherboardSerial || '—'} />
+          <Row label="Board S/N" value={!isPlaceholderSerial(hw?.motherboardSerial) ? hw?.motherboardSerial : '—'} />
           <Row label="Uptime" value={ext?.systemUptime ?? hw?.systemUptime} />
           <Row label="Power Plan" value={hw?.powerPlan ?? '—'} />
           {hw?.hasBattery && (
