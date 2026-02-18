@@ -229,47 +229,79 @@ const Performance: React.FC = () => {
     }
   };
 
+  const appliedCount = Object.values(enabledTweaks).filter(Boolean).length;
+  const totalCount = performanceTweaks.length;
+
   return (
     <motion.div
-      className="performance-container"
+      className="perf-page"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      transition={{ duration: 0.5 }}
+      transition={{ duration: 0.6 }}
     >
-      <h2 className="section-title">System Tweaks</h2>
-      <div className="section-header-row">
-        <p className="section-subtitle">
-          Kernel and registry optimizations for minimal latency and maximum performance
-        </p>
-
-        <div className="restore-controls restore-controls-right">
-          <button
-            className="restore-button"
-            onClick={handleCreateRestorePoint}
-            disabled={creatingRestore}
-            title="Create a system restore point (retries if Windows throttles)"
-          >
-            <ArrowCounterClockwise size={16} weight="bold" className="button-icon" />
-            {creatingRestore ? 'Creating...' : 'Create Restore Point'}
-          </button>
-          <button className="restore-button" style={{ background: 'linear-gradient(135deg,#3498db,#2eccf7)' }} onClick={() => { addToast('Checking tweak status...', 'info'); runChecksOnDemand(); }}>
-            Refresh Checks
-          </button>
-          {lastRestoreInfo && (
-            <div className="restore-info">Last: {lastRestoreInfo.postObj?.CreationTime || lastRestoreInfo.postObj?.CreationTimeUtc || ''}</div>
-          )}
-
-
+      {/* Futuristic Header Panel */}
+      <div className="perf-hero">
+        <div className="perf-hero-bg" />
+        <div className="perf-hero-content">
+          <div className="perf-hero-left">
+            <div className="perf-hero-badge">SYSTEM CORE</div>
+            <h1 className="perf-hero-title">System Tweaks</h1>
+            <p className="perf-hero-subtitle">
+              Kernel &amp; registry optimizations for minimal latency and maximum performance
+            </p>
+          </div>
+          <div className="perf-hero-right">
+            <div className="perf-hero-stat">
+              <div className="perf-hero-stat-ring">
+                <svg viewBox="0 0 80 80" className="perf-ring-svg">
+                  <circle cx="40" cy="40" r="34" className="perf-ring-track" />
+                  <circle
+                    cx="40" cy="40" r="34"
+                    className="perf-ring-fill"
+                    style={{
+                      strokeDasharray: `${(appliedCount / totalCount) * 213.6} 213.6`
+                    }}
+                  />
+                </svg>
+                <span className="perf-ring-label">{appliedCount}/{totalCount}</span>
+              </div>
+              <span className="perf-hero-stat-text">Active</span>
+            </div>
+            <div className="perf-hero-actions">
+              <button
+                className="perf-action-btn perf-action-restore"
+                onClick={handleCreateRestorePoint}
+                disabled={creatingRestore}
+                title="Create a system restore point"
+              >
+                <ArrowCounterClockwise size={15} weight="bold" />
+                <span>{creatingRestore ? 'Creating...' : 'Restore Point'}</span>
+              </button>
+              <button
+                className="perf-action-btn perf-action-refresh"
+                onClick={() => { addToast('Scanning tweak status...', 'info'); runChecksOnDemand(); }}
+              >
+                <ArrowCounterClockwise size={15} weight="bold" />
+                <span>Scan Status</span>
+              </button>
+            </div>
+            {lastRestoreInfo && (
+              <div className="perf-restore-info">
+                Last: {lastRestoreInfo.postObj?.CreationTime || lastRestoreInfo.postObj?.CreationTimeUtc || ''}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
-      </div>
 
-      <div className="tweaks-grid">
+      {/* Tweaks Grid */}
+      <div className="perf-tweaks-grid">
         {performanceTweaks.map((tweak, index) => (
           <motion.div
             key={tweak.id}
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: index * 0.1 }}
+            initial={{ y: 30, opacity: 0, scale: 0.95 }}
+            animate={{ y: 0, opacity: 1, scale: 1 }}
+            transition={{ delay: index * 0.08, type: 'spring', stiffness: 200, damping: 20 }}
           >
             <PerformanceTweakCard
               id={tweak.id}

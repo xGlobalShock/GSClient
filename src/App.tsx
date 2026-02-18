@@ -12,6 +12,55 @@ import { ToastProvider } from './contexts/ToastContext';
 import { ToastContainer } from './components/ToastContainer';
 import './App.css';
 
+export interface HardwareInfo {
+  cpuName: string;
+  gpuName: string;
+  ramInfo: string;
+  ramBrand: string;
+  ramPartNumber: string;
+  diskName: string;
+  cpuCores: number;
+  cpuThreads: number;
+  cpuMaxClock: string;
+  gpuVramTotal: string;
+  gpuDriverVersion: string;
+  ramTotalGB: number;
+  ramUsedGB: number;
+  ramSticks: string;
+  diskTotalGB: number;
+  diskFreeGB: number;
+  diskType: string;
+  diskHealth: string;
+  allDrives: { letter: string; totalGB: number; freeGB: number; label: string }[];
+  networkAdapter: string;
+  ipAddress: string;
+  windowsVersion: string;
+  windowsBuild: string;
+  systemUptime: string;
+  powerPlan: string;
+  hasBattery: boolean;
+  batteryPercent: number;
+  batteryStatus: string;
+}
+
+export interface ExtendedStats {
+  cpuClock: number;
+  perCoreCpu: number[];
+  gpuUsage: number;
+  gpuTemp: number;
+  gpuVramUsed: number;
+  gpuVramTotal: number;
+  networkUp: number;
+  networkDown: number;
+  wifiSignal: number;
+  ramUsedGB: number;
+  ramTotalGB: number;
+  diskReadSpeed: number;
+  diskWriteSpeed: number;
+  processCount: number;
+  systemUptime: string;
+}
+
 function App() {
     const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState('dashboard');
@@ -21,6 +70,8 @@ function App() {
     disk: 0,
     temperature: 0,
   });
+  const [hardwareInfo, setHardwareInfo] = useState<HardwareInfo | undefined>(undefined);
+  const [extendedStats, setExtendedStats] = useState<ExtendedStats | undefined>(undefined);
 
   useEffect(() => {
     // Loader timeout (simulate app/data loading)
@@ -38,15 +89,43 @@ function App() {
       }
     };
 
+    // Fetch hardware info once
+    const fetchHardwareInfo = async () => {
+      if (window.electron?.ipcRenderer) {
+        try {
+          const info = await window.electron.ipcRenderer.invoke('system:get-hardware-info');
+          setHardwareInfo(info);
+        } catch (error) {
+          console.error('Error fetching hardware info:', error);
+        }
+      }
+    };
+    fetchHardwareInfo();
+
+    // Fetch extended stats (live metrics)
+    const fetchExtendedStats = async () => {
+      if (window.electron?.ipcRenderer) {
+        try {
+          const ext = await window.electron.ipcRenderer.invoke('system:get-extended-stats');
+          setExtendedStats(ext);
+        } catch (error) {
+          console.error('Error fetching extended stats:', error);
+        }
+      }
+    };
+    fetchExtendedStats();
+
     // Initial fetch
     fetchSystemStats();
 
     // Update every 2 seconds
     const interval = setInterval(fetchSystemStats, 2000);
+    const extInterval = setInterval(fetchExtendedStats, 3000);
 
     return () => {
       clearTimeout(timer);
       clearInterval(interval);
+      clearInterval(extInterval);
     };
   }, []);
 
@@ -54,7 +133,7 @@ function App() {
     return (
       <>
         <div style={{ display: currentPage === 'dashboard' ? 'block' : 'none' }}>
-          <Dashboard systemStats={systemStats} />
+          <Dashboard systemStats={systemStats} hardwareInfo={hardwareInfo} extendedStats={extendedStats} />
         </div>
         <div style={{ display: currentPage === 'performance' ? 'block' : 'none' }}>
           <Performance />

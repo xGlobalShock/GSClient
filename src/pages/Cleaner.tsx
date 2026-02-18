@@ -74,9 +74,13 @@ const Cleaner: React.FC = () => {
         if (result.success) {
           // Build detailed message with file and size info
           if (result.filesDeleted !== undefined && result.filesBefore !== undefined) {
-            message = `${result.message}\n${result.filesDeleted}/${result.filesBefore} files deleted (${result.filesAfter} remaining)\n${result.spaceSaved} freed`;
+            // Check if spaceSaved is numeric (contains MB/GB) or just text
+            const isNumeric = /^\d+/.test(result.spaceSaved);
+            message = `${result.message}\n${result.filesDeleted}/${result.filesBefore} files deleted (${result.filesAfter} remaining)\n${isNumeric ? 'Space freed: ' : ''}${result.spaceSaved}`;
           } else {
-            message = `${result.message}\n${result.spaceSaved} freed`;
+            // For simple cleaners without file counts
+            const isNumeric = /^\d+/.test(result.spaceSaved);
+            message = `${result.message}\n${isNumeric ? 'Space freed: ' : ''}${result.spaceSaved}`;
           }
         }
         
@@ -96,37 +100,47 @@ const Cleaner: React.FC = () => {
 
   return (
     <motion.div
-      className="cleaner-container"
+      className="cleaner-page"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.5 }}
     >
-      <h2 className="section-title">System Cleaner</h2>
-      <p className="section-subtitle">
-        Optimize your system by clearing unnecessary cache and temporary files
-      </p>
+      {/* Hero header */}
+      <div className="cleaner-hero">
+        <div className="cleaner-hero-glow" />
+        <div className="cleaner-hero-content">
+          <div className="cleaner-hero-left">
+            <div className="cleaner-hero-badge">MAINTENANCE</div>
+            <h1 className="cleaner-hero-title">System Cleaner</h1>
+            <p className="cleaner-hero-sub">
+              Optimize your system by clearing unnecessary cache and temporary files
+            </p>
+          </div>
+        </div>
+      </div>
 
       {/* Tab Navigation */}
       <div className="cleaner-tabs">
         {tabs.map((tab) => (
           <button
             key={tab.id}
-            className={`tab-button ${activeTab === tab.id ? 'active' : ''}`}
+            className={`cleaner-tab ${activeTab === tab.id ? 'cleaner-tab--active' : ''}`}
             onClick={() => setActiveTab(tab.id as any)}
           >
-            <span className="tab-label">{tab.label}</span>
-            <span className="tab-count">{tab.count}</span>
+            <span className="cleaner-tab-label">{tab.label}</span>
+            <span className="cleaner-tab-count">{tab.count}</span>
           </button>
         ))}
       </div>
 
+      {/* Cards grid */}
       <div className="cleaner-grid">
         {utilityTabs[activeTab].map((utility, index) => (
           <motion.div
             key={utility.id}
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: index * 0.1 }}
+            initial={{ y: 25, opacity: 0, scale: 0.96 }}
+            animate={{ y: 0, opacity: 1, scale: 1 }}
+            transition={{ delay: index * 0.06, type: 'spring', stiffness: 200, damping: 22 }}
           >
             <CleanerCard
               id={utility.id}

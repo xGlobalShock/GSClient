@@ -10,6 +10,7 @@ interface StatCardProps {
   icon: React.ReactNode;
   status: 'good' | 'warning' | 'critical';
   isUnavailable?: boolean;
+  subtitle?: string;
 }
 
 const StatCard: React.FC<StatCardProps> = ({
@@ -19,6 +20,7 @@ const StatCard: React.FC<StatCardProps> = ({
   icon,
   status,
   isUnavailable = false,
+  subtitle,
 }) => {
   const getStatusColor = () => {
     switch (status) {
@@ -77,6 +79,7 @@ const StatCard: React.FC<StatCardProps> = ({
               </div>
             </div>
             <div className={`stat-badge stat-${isUnavailable ? 'unavailable' : status} stat-badge-below`}>{isUnavailable ? 'UNAVAILABLE' : status.toUpperCase()}</div>
+            {subtitle && <div className="stat-subtitle" title={subtitle}>{subtitle}</div>}
           </div>
         </div>
 

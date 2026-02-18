@@ -1,5 +1,5 @@
 import React from 'react';
-import { Cpu, Warning, Trash, ArrowCounterClockwise, Question, Monitor, Cloud, CheckCircle } from 'phosphor-react';
+import { Check, ArrowCounterClockwise } from 'phosphor-react';
 import '../styles/CleanerCard.css';
 
 interface CleanerCardProps {
@@ -33,47 +33,74 @@ const CleanerCard: React.FC<CleanerCardProps> = ({
     }
   };
 
-  // Render image if icon is a string (image path), else render as React component
   const renderIcon = () => {
     if (typeof Icon === 'string') {
-      // Standardize all image icon sizes to 40x40px
       return (
         <img
           src={Icon}
           alt={title + ' icon'}
-          className="card-icon"
-          style={{ width: 40, height: 40, objectFit: 'contain' }}
+          className="cc-icon-img"
         />
       );
     }
     if (Icon) {
-      // Standardize all React icon sizes to 40px
-      return <Icon size={40} color={color} className="card-icon" />;
+      return <Icon size={22} className="cc-icon-svg" />;
     }
     return null;
   };
 
   return (
-    <div className="cleaner-card" style={{ borderColor: color }}>
-      <div className="card-header">
-        <div className="card-title-section">
-          <h3 className="card-title">{title}</h3>
-          <p className="card-cache-type">{cacheType}</p>
+    <div className={`cc ${isLoading ? 'cc--busy' : ''}`}>
+      {/* Top edge sweep */}
+      <div className="cc-edge" />
+
+      {/* Corner accents */}
+      <div className="cc-corner cc-corner--tl" />
+      <div className="cc-corner cc-corner--tr" />
+      <div className="cc-corner cc-corner--bl" />
+      <div className="cc-corner cc-corner--br" />
+
+      {/* Loading sweep */}
+      {isLoading && <div className="cc-sweep" />}
+
+      <div className="cc-inner">
+        {/* Top: category + icon */}
+        <div className="cc-top">
+          <span className="cc-category">{cacheType}</span>
+          <div className="cc-icon-box">
+            {renderIcon()}
+          </div>
         </div>
-        {renderIcon()}
+
+        {/* Title */}
+        <h3 className="cc-title">{title}</h3>
+
+        {/* Description */}
+        <p className="cc-desc">{description}</p>
+
+        {/* Divider */}
+        <div className="cc-divider" />
+
+        {/* Action button */}
+        <button
+          className="cc-btn"
+          onClick={handleClick}
+          disabled={isLoading}
+        >
+          {isLoading ? (
+            <>
+              <span className="cc-spinner" />
+              <span>Cleaning...</span>
+            </>
+          ) : (
+            <>
+              <Check size={13} weight="bold" />
+              <span>{buttonText}</span>
+            </>
+          )}
+          <div className="cc-btn-shine" />
+        </button>
       </div>
-
-      <p className="card-description">{description}</p>
-
-      <button
-        className="card-button"
-        style={{ backgroundColor: '#27ae60', color: '#fff' }}
-        onClick={handleClick}
-        disabled={isLoading}
-      >
-        <CheckCircle size={16} weight="bold" className="button-icon" />
-        {isLoading ? 'Cleaning...' : buttonText}
-      </button>
     </div>
   );
 };

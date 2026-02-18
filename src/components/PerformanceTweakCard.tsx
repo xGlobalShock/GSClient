@@ -1,5 +1,5 @@
 import React from 'react';
-import { CheckCircle, ArrowCounterClockwise } from 'phosphor-react';
+import { Check, ArrowCounterClockwise, Power } from 'phosphor-react';
 import '../styles/PerformanceTweakCard.css';
 
 interface PerformanceTweakCardProps {
@@ -49,56 +49,78 @@ const PerformanceTweakCard: React.FC<PerformanceTweakCardProps> = ({
     }
   };
 
-  // Show Apply button if not enabled, or if Win32 Priority is at default (value 2)
   const showApplyButton = !isEnabled;
 
   return (
-    <div className="tweak-card" style={{ borderColor: color }}>
-      <div className="tweak-header">
-        <div className="tweak-title-section">
-          <h3 className="tweak-title">{title}</h3>
-          <p className="tweak-category">{category}</p>
+    <div className={`tc ${isEnabled ? 'tc--active' : ''} ${isLoading ? 'tc--loading' : ''}`}>
+      {/* Animated border glow */}
+      <div className="tc-border-glow" />
+      
+      {/* Corner accents */}
+      <div className="tc-corner tc-corner--tl" />
+      <div className="tc-corner tc-corner--tr" />
+      <div className="tc-corner tc-corner--bl" />
+      <div className="tc-corner tc-corner--br" />
+
+      {/* Scanline overlay */}
+      <div className="tc-scanline" />
+
+      {/* Content */}
+      <div className="tc-inner">
+        {/* Top row: status indicator + category */}
+        <div className="tc-top-row">
+          <div className={`tc-power-indicator ${isEnabled ? 'tc-power--on' : 'tc-power--off'}`}>
+            <Power size={10} weight="bold" />
+          </div>
+          <span className="tc-category">{category}</span>
+          {isChecking && <div className="tc-scan-badge">SCANNING</div>}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {typeof icon === 'string' ? (
-            <img src={icon} alt={title} className="tweak-icon" style={{ width: 28, height: 28, color }} />
+
+        {/* Title + Icon row */}
+        <div className="tc-title-row">
+          <div className="tc-icon-container">
+            {typeof icon === 'string' ? (
+              <img src={icon} alt={title} className="tc-icon-img" />
+            ) : (
+              React.createElement(icon, { size: 22, className: 'tc-icon-svg' })
+            )}
+          </div>
+          <h3 className="tc-title">{title}</h3>
+        </div>
+
+        {/* Description */}
+        <p className="tc-desc">{description}</p>
+
+        {/* Divider line */}
+        <div className="tc-divider" />
+
+        {/* Bottom: action + status */}
+        <div className="tc-bottom">
+          {showApplyButton ? (
+            <button
+              className="tc-btn tc-btn--apply"
+              onClick={handleClick}
+              disabled={isLoading}
+            >
+              <Check size={14} weight="bold" />
+              <span>{isLoading ? 'Applying...' : 'Apply'}</span>
+              <div className="tc-btn-shine" />
+            </button>
           ) : (
-            React.createElement(icon, { size: 28, color, className: 'tweak-icon' })
+            <button
+              className="tc-btn tc-btn--revert"
+              onClick={handleReset}
+              disabled={isLoading}
+            >
+              <ArrowCounterClockwise size={14} weight="bold" />
+              <span>{isLoading ? 'Reverting...' : 'Revert'}</span>
+              <div className="tc-btn-shine" />
+            </button>
           )}
-          {/* small checking spinner */}
-          {typeof (window as any) !== 'undefined' && (typeof (window as any).document !== 'undefined') && (
-            <div className={`check-spinner ${isChecking ? 'visible' : ''}`} title={isChecking ? 'Checking status...' : ''}></div>
-          )}
-        </div>
-      </div>
-
-      <p className="tweak-description">{description}</p>
-
-      <div className="tweak-footer">
-        {showApplyButton ? (
-          <button
-            className="tweak-button tweak-button-apply"
-            style={{ backgroundColor: '#27ae60', color: '#fff' }}
-            onClick={handleClick}
-            disabled={isLoading}
-          >
-            <CheckCircle size={16} weight="bold" className="button-icon" />
-            {isLoading ? 'Applying...' : buttonText}
-          </button>
-        ) : (
-          <button
-            className="tweak-button tweak-button-reset"
-            style={{ backgroundColor: '#FFD600', color: '#222' }}
-            onClick={handleReset}
-            disabled={isLoading}
-          >
-            <ArrowCounterClockwise size={16} weight="bold" className="button-icon" />
-            {isLoading ? 'Resetting...' : 'Reset to Default'}
-          </button>
-        )}
-        <div className={`tweak-status ${isEnabled ? 'enabled' : 'disabled'}`}>
-          <span className="status-dot"></span>
-          <span className="status-text">{isEnabled ? 'Applied' : 'Not Applied'}</span>
+          <div className={`tc-status ${isEnabled ? 'tc-status--on' : 'tc-status--off'}`}>
+            <div className="tc-status-dot" />
+            <span>{isEnabled ? 'TWEAK APPLIED' : 'NOT APPLIED'}</span>
+          </div>
         </div>
       </div>
     </div>

@@ -376,6 +376,448 @@ ipcMain.handle('system:get-stats', async () => {
   };
 });
 
+// Hardware Info IPC Handler - fetches PC part names + static system info (called once on startup)
+ipcMain.handle('system:get-hardware-info', async () => {
+  const info = {
+    cpuName: '',
+    gpuName: '',
+    ramInfo: '',
+    ramBrand: '',
+    ramPartNumber: '',
+    diskName: '',
+    // Extended static info
+    cpuCores: 0,
+    cpuThreads: 0,
+    cpuMaxClock: '',
+    gpuVramTotal: '',
+    gpuDriverVersion: '',
+    ramTotalGB: 0,
+    ramUsedGB: 0,
+    ramSticks: '',
+    diskTotalGB: 0,
+    diskFreeGB: 0,
+    diskType: '',
+    diskHealth: '',
+    allDrives: [],
+    networkAdapter: '',
+    ipAddress: '',
+    windowsVersion: '',
+    windowsBuild: '',
+    systemUptime: '',
+    powerPlan: '',
+    hasBattery: false,
+    batteryPercent: 0,
+    batteryStatus: '',
+  };
+
+  // Run all static queries in parallel for speed
+  const results = await Promise.allSettled([
+    // 0: CPU Name + cores + threads + max clock
+    execAsync(
+      `powershell -NoProfile -ExecutionPolicy Bypass -Command "$cpu = Get-CimInstance Win32_Processor | Select-Object -First 1; Write-Output ($cpu.Name); Write-Output '|||'; Write-Output ($cpu.NumberOfCores); Write-Output '|||'; Write-Output ($cpu.NumberOfLogicalProcessors); Write-Output '|||'; Write-Output ($cpu.MaxClockSpeed)"`,
+      { shell: true, timeout: 10000 }
+    ),
+    // 1: GPU Name + VRAM + driver version (filter out virtual adapters)
+    execAsync(
+      `powershell -NoProfile -ExecutionPolicy Bypass -Command "$gpu = Get-CimInstance Win32_VideoController | Where-Object { $_.Status -eq 'OK' -and $_.Name -notmatch '(Virtual|Dummy|Parsec|Remote|Generic)' } | Select-Object -First 1; if (!$gpu) { $gpu = Get-CimInstance Win32_VideoController | Where-Object { $_.Status -eq 'OK' } | Select-Object -First 1 }; if ($gpu) { Write-Output ($gpu.Name); Write-Output '|||'; Write-Output ([math]::Round($gpu.AdapterRAM / 1GB, 1)); Write-Output '|||'; Write-Output ($gpu.DriverVersion) } else { Write-Output 'Unknown GPU'; Write-Output '|||'; Write-Output '0'; Write-Output '|||'; Write-Output 'N/A' }"`,
+      { shell: true, timeout: 10000 }
+    ),
+    // 2: RAM info (total, JEDEC speed, configured speed, sticks, manufacturer, partNumber)
+    execAsync(
+      `powershell -NoProfile -ExecutionPolicy Bypass -Command "$mem = Get-CimInstance Win32_PhysicalMemory; $totalGB = [math]::Round(($mem | Measure-Object -Property Capacity -Sum).Sum / 1GB); $first = $mem | Select-Object -First 1; $jedecSpeed = $first.Speed; $configSpeed = $first.ConfiguredClockSpeed; $sticks = $mem.Count; $mfr = $first.Manufacturer; $part = $first.PartNumber; Write-Output \\\"$totalGB\\\"; Write-Output '|||'; Write-Output \\\"$jedecSpeed\\\"; Write-Output '|||'; Write-Output \\\"$configSpeed\\\"; Write-Output '|||'; Write-Output \\\"$sticks stick(s)\\\"; Write-Output '|||'; Write-Output \\\"$mfr\\\"; Write-Output '|||'; Write-Output \\\"$part\\\"\"`,
+      { shell: true, timeout: 10000 }
+    ),
+    // 3: Disk name + type + health + size
+    execAsync(
+      `powershell -NoProfile -ExecutionPolicy Bypass -Command "$d = Get-PhysicalDisk | Select-Object -First 1; if (!$d) { $d = Get-CimInstance Win32_DiskDrive | Select-Object -First 1; Write-Output ($d.Model); Write-Output '|||'; Write-Output 'Unknown'; Write-Output '|||'; Write-Output 'Unknown'; Write-Output '|||'; Write-Output ([math]::Round($d.Size/1GB)); } else { Write-Output ($d.FriendlyName); Write-Output '|||'; Write-Output ($d.MediaType); Write-Output '|||'; Write-Output ($d.HealthStatus); Write-Output '|||'; Write-Output ([math]::Round($d.Size/1GB)); }"`,
+      { shell: true, timeout: 10000 }
+    ),
+    // 4: All logical drives
+    execAsync(
+      `powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-CimInstance Win32_LogicalDisk -Filter \\"DriveType=3\\" | ForEach-Object { $totalGB = [math]::Round($_.Size/1GB,1); $freeGB = [math]::Round($_.FreeSpace/1GB,1); Write-Output \\"$($_.DeviceID)|$totalGB|$freeGB|$($_.VolumeName)\\" }"`,
+      { shell: true, timeout: 10000 }
+    ),
+    // 5: Network adapter + IP
+    execAsync(
+      `powershell -NoProfile -ExecutionPolicy Bypass -Command "$a = Get-NetAdapter | Where-Object { $_.Status -eq 'Up' } | Select-Object -First 1; $ip = (Get-NetIPAddress -InterfaceIndex $a.ifIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue | Select-Object -First 1).IPAddress; Write-Output ($a.Name + ' (' + $a.InterfaceDescription + ')'); Write-Output '|||'; Write-Output $ip"`,
+      { shell: true, timeout: 10000 }
+    ),
+    // 6: Windows version + build
+    // 6: Windows version + build (with Win11 detection fallback)
+    execAsync(
+      `powershell -NoProfile -ExecutionPolicy Bypass -Command "$r = Get-ItemProperty 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion' -ErrorAction SilentlyContinue; $prod = $r.ProductName; $disp = $r.DisplayVersion; $build = $r.CurrentBuildNumber; if (!$prod) { $wmi = Get-WmiObject Win32_OperatingSystem -ErrorAction SilentlyContinue; $prod = $wmi.Caption }; if ($build -ge 22000 -and $prod -notmatch '11') { $prod = $prod -replace 'Windows 10', 'Windows 11' } elseif ($build -lt 22000 -and $prod -notmatch '10') { $prod = $prod -replace 'Windows 11', 'Windows 10' }; if (!$prod) { $prod = 'Windows' }; Write-Output $prod; Write-Output '|||'; Write-Output ($disp + ' (Build ' + $build + ')')"`,
+      { shell: true, timeout: 10000 }
+    ),
+    execAsync(
+      `powershell -NoProfile -ExecutionPolicy Bypass -Command "$up = (Get-Date) - (Get-CimInstance Win32_OperatingSystem).LastBootUpTime; Write-Output ('{0}d {1}h {2}m' -f $up.Days, $up.Hours, $up.Minutes)"`,
+      { shell: true, timeout: 10000 }
+    ),
+    // 8: Power plan
+    execAsync(
+      `powershell -NoProfile -ExecutionPolicy Bypass -Command "(Get-CimInstance -Namespace root\\cimv2\\power -ClassName Win32_PowerPlan | Where-Object { $_.IsActive }).ElementName"`,
+      { shell: true, timeout: 10000 }
+    ),
+    // 9: Battery
+    execAsync(
+      `powershell -NoProfile -ExecutionPolicy Bypass -Command "$b = Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue; if ($b) { Write-Output 'true'; Write-Output '|||'; Write-Output ($b.EstimatedChargeRemaining); Write-Output '|||'; $st = switch($b.BatteryStatus) { 1 {'Discharging'} 2 {'AC Connected'} 3 {'Fully Charged'} 4 {'Low'} 5 {'Critical'} 6 {'Charging'} 7 {'Charging (High)'} 8 {'Charging (Low)'} 9 {'Charging (Critical)'} default {'Unknown'} }; Write-Output $st } else { Write-Output 'false' }"`,
+      { shell: true, timeout: 10000 }
+    ),
+    // 10: RAM usage in GB
+    execAsync(
+      `powershell -NoProfile -ExecutionPolicy Bypass -Command "$o = Get-CimInstance Win32_OperatingSystem; $totalGB = [math]::Round($o.TotalVisibleMemorySize/1MB, 1); $freeGB = [math]::Round($o.FreePhysicalMemory/1MB, 1); $usedGB = [math]::Round($totalGB - $freeGB, 1); Write-Output \\"$usedGB|||$totalGB\\""`,
+      { shell: true, timeout: 10000 }
+    ),
+    // 11: Disk C free space
+    execAsync(
+      `powershell -NoProfile -ExecutionPolicy Bypass -Command "$d = Get-CimInstance Win32_LogicalDisk -Filter \\"DeviceID='C:'\\" ; Write-Output ([math]::Round($d.FreeSpace/1GB,1))"`,
+      { shell: true, timeout: 10000 }
+    ),
+  ]);
+
+  // Helper to extract settled value
+  const get = (i) => results[i].status === 'fulfilled' ? results[i].value.stdout.trim() : '';
+
+  // 0: CPU
+  try {
+    const parts = get(0).split('|||').map((s) => s.trim());
+    info.cpuName = parts[0] || 'Unknown CPU';
+    info.cpuCores = parseInt(parts[1]) || 0;
+    info.cpuThreads = parseInt(parts[2]) || 0;
+    info.cpuMaxClock = parts[3] ? `${(parseInt(parts[3]) / 1000).toFixed(2)} GHz` : '';
+  } catch { info.cpuName = 'Unknown CPU'; }
+
+  // 1: GPU
+  try {
+    const parts = get(1).split('|||').map((s) => s.trim());
+    info.gpuName = parts[0] || 'Unknown GPU';
+    info.gpuVramTotal = parts[1] && parts[1] !== '0' ? `${parts[1]} GB` : '';
+    info.gpuDriverVersion = parts[2] || '';
+  } catch { info.gpuName = 'Unknown GPU'; }
+
+  // Derive full RAM brand+series name from part number and manufacturer
+  const resolveRamBrand = (mfr, partNum) => {
+    const part = (partNum || '').trim();
+    const partLow = part.toLowerCase();
+    const mfrLow = (mfr || '').toLowerCase().trim();
+
+    // ── G.Skill series decode from part number suffix ──
+    // Format: F4-<speed>C<cas>-<size><series-code>
+    if (/^f[34]-\d/i.test(part)) {
+      const suffix = (part.split('-').pop() || '').replace(/^\d+/, '').toUpperCase();
+      const gskillSeries = {
+        'GTZRX': 'G.Skill Trident Z Royal',
+        'GTZRS': 'G.Skill Trident Z Royal Silver',
+        'GTZR':  'G.Skill Trident Z RGB',
+        'GTZ':   'G.Skill Trident Z',
+        'GTZN':  'G.Skill Trident Z Neo',
+        'GTZNR': 'G.Skill Trident Z Neo',
+        'GFX':   'G.Skill Trident Z5 RGB',
+        'GX':    'G.Skill Trident Z5',
+        'GVK':   'G.Skill Ripjaws V',
+        'GRK':   'G.Skill Ripjaws V',
+        'GBKD':  'G.Skill Ripjaws 4',
+        'GNT':   'G.Skill Aegis',
+        'GIS':   'G.Skill ARES',
+        'GQSB':  'G.Skill Sniper X',
+      };
+      // Try longest match first
+      for (const [code, name] of Object.entries(gskillSeries)) {
+        if (suffix.endsWith(code)) return name;
+      }
+      return 'G.Skill';
+    }
+
+    // ── Corsair series ──
+    if (/^cmk/i.test(part)) return 'Corsair Vengeance RGB Pro';
+    if (/^cmt/i.test(part)) return 'Corsair Dominator Platinum';
+    if (/^cmd/i.test(part)) return 'Corsair Dominator';
+    if (/^cmw/i.test(part)) return 'Corsair Vengeance RGB';
+    if (/^cms/i.test(part)) return 'Corsair';
+    if (/vengeance/i.test(partLow)) return 'Corsair Vengeance';
+    if (/dominator/i.test(partLow)) return 'Corsair Dominator';
+
+    // ── Kingston / HyperX / Fury ──
+    if (/^khx/i.test(part)) return 'Kingston HyperX';
+    if (/^hx\d/i.test(part)) return 'Kingston HyperX';
+    if (/^kf\d/i.test(part)) return 'Kingston Fury';
+    if (/^kcp/i.test(part)) return 'Kingston';
+    if (/fury/i.test(partLow)) return 'Kingston Fury';
+
+    // ── Crucial / Micron ──
+    if (/^ble/i.test(part)) return 'Crucial Ballistix';
+    if (/^bls/i.test(part)) return 'Crucial Ballistix Sport';
+    if (/^ct\d/i.test(part)) return 'Crucial';
+    if (/^mt\d/i.test(part)) return 'Micron';
+
+    // ── SK Hynix ──
+    if (/^hma|^hmt|^hmab/i.test(part)) return 'SK Hynix';
+
+    // ── Samsung ──
+    if (/^m3[78]/i.test(part)) return 'Samsung';
+
+    // ── TeamGroup ──
+    if (/^tf[ab]\d|^tdeed/i.test(part)) return 'TeamGroup T-Force';
+    if (/^tf\d/i.test(part)) return 'TeamGroup';
+
+    // ── Patriot ──
+    if (/^psd|^pv[e34]/i.test(part)) return 'Patriot Viper';
+
+    // ── JEDEC hex manufacturer code fallback ──
+    const jedecMap = {
+      '04f1': 'G.Skill', '04cd': 'Kingston', '9e': 'Kingston',
+      'ce': 'Samsung',   '00ce': 'Samsung',   '80ce': 'Samsung',
+      'ad': 'SK Hynix',  '00ad': 'SK Hynix',  '80ad': 'SK Hynix',
+      '2c': 'Micron',    '002c': 'Micron',    '802c': 'Micron',
+      '859b': 'Corsair', '0cf8': 'Crucial',   '0b': 'Nanya', '0783': 'Transcend',
+    };
+    const mfrKey = mfrLow.replace(/^0x/, '');
+    if (jedecMap[mfrKey]) return jedecMap[mfrKey];
+
+    // If manufacturer is a readable string (not a raw hex code), use it directly
+    if (mfr && !/^[0-9a-f]{2,8}$/i.test(mfr.trim())) return mfr.trim();
+
+    return '';
+  };
+
+  // 2: RAM
+  try {
+    const parts = get(2).split('|||').map((s) => s.trim());
+    const totalGB = parseInt(parts[0]) || Math.round(os.totalmem() / (1024 * 1024 * 1024));
+    const jedecSpeed = parts[1] || '';
+    const configSpeed = parts[2] || '';
+    // Use configured (XMP/DOCP) speed if available, otherwise fall back to JEDEC speed
+    const speed = configSpeed && configSpeed !== '0' ? configSpeed : jedecSpeed;
+    info.ramInfo = speed ? `${totalGB} GB @ ${speed} MHz` : `${totalGB} GB`;
+    info.ramTotalGB = totalGB;
+    info.ramSticks = parts[3] || '';
+    info.ramBrand = resolveRamBrand(parts[4], parts[5]);
+    info.ramPartNumber = (parts[5] || '').trim();
+  } catch {
+    const totalGB = Math.round(os.totalmem() / (1024 * 1024 * 1024));
+    info.ramInfo = `${totalGB} GB`;
+    info.ramTotalGB = totalGB;
+  }
+
+  // 3: Disk
+  try {
+    const parts = get(3).split('|||').map((s) => s.trim());
+    info.diskName = parts[0] || 'Unknown Disk';
+    info.diskType = parts[1] || '';
+    info.diskHealth = parts[2] || '';
+    info.diskTotalGB = parseInt(parts[3]) || 0;
+  } catch { info.diskName = 'Unknown Disk'; }
+
+  // 4: All drives
+  try {
+    const drivesRaw = get(4);
+    if (drivesRaw) {
+      info.allDrives = drivesRaw.split('\n').filter((l) => l.trim()).map((line) => {
+        const [letter, totalGB, freeGB, label] = line.trim().split('|');
+        return { letter: letter || '', totalGB: parseFloat(totalGB) || 0, freeGB: parseFloat(freeGB) || 0, label: label || '' };
+      });
+    }
+  } catch {}
+
+  // 5: Network
+  try {
+    const parts = get(5).split('|||').map((s) => s.trim());
+    info.networkAdapter = parts[0] || '';
+    info.ipAddress = parts[1] || '';
+  } catch {}
+
+  // 6: Windows — with additional validation for Win11 vs Win10
+  try {
+    let parts = get(6).split('|||').map((s) => s.trim());
+    let prod = parts[0] || '';
+    let build = parts[1] || '';
+    
+    // Extract build number for verification
+    const buildMatch = build.match(/Build (\d+)/);
+    const buildNum = buildMatch ? parseInt(buildMatch[1]) : 0;
+    
+    // If build >= 22000, it's Windows 11; if < 22000, it's Windows 10
+    // Correct any mislabeling
+    if (buildNum >= 22000 && !prod.includes('11')) {
+      prod = prod.replace(/Windows 10/i, 'Windows 11').replace(/win10/i, 'Windows 11') || 'Windows 11 Pro';
+    } else if (buildNum > 0 && buildNum < 22000 && prod.includes('11')) {
+      prod = prod.replace(/Windows 11/i, 'Windows 10');
+    }
+    
+    info.windowsVersion = prod || 'Unknown';
+    info.windowsBuild = build || 'Unknown';
+  } catch {
+    info.windowsVersion = 'Unknown';
+    info.windowsBuild = 'Unknown';
+  }
+
+  // 7: Uptime
+  try { info.systemUptime = get(7) || ''; } catch {}
+
+  // 8: Power plan
+  try { info.powerPlan = get(8) || ''; } catch {}
+
+  // 9: Battery
+  try {
+    const parts = get(9).split('|||').map((s) => s.trim());
+    info.hasBattery = parts[0] === 'true';
+    if (info.hasBattery) {
+      info.batteryPercent = parseInt(parts[1]) || 0;
+      info.batteryStatus = parts[2] || '';
+    }
+  } catch {}
+
+  // 10: RAM GB usage
+  try {
+    const parts = get(10).split('|||').map((s) => s.trim());
+    info.ramUsedGB = parseFloat(parts[0]) || 0;
+    info.ramTotalGB = parseFloat(parts[1]) || info.ramTotalGB;
+  } catch {}
+
+  // 11: Disk free
+  try { info.diskFreeGB = parseFloat(get(11)) || 0; } catch {}
+
+  return info;
+});
+
+// Extended Stats IPC Handler - live metrics polled periodically
+ipcMain.handle('system:get-extended-stats', async () => {
+  const ext = {
+    // CPU
+    cpuClock: 0,
+    perCoreCpu: [],
+    // GPU (NVIDIA via nvidia-smi)
+    gpuUsage: -1,
+    gpuTemp: -1,
+    gpuVramUsed: -1,
+    gpuVramTotal: -1,
+    // Network
+    networkUp: 0,
+    networkDown: 0,
+    wifiSignal: -1,
+    // RAM
+    ramUsedGB: 0,
+    ramTotalGB: 0,
+    // Disk I/O
+    diskReadSpeed: 0,
+    diskWriteSpeed: 0,
+    // System
+    processCount: 0,
+    systemUptime: '',
+  };
+
+  const results = await Promise.allSettled([
+    // 0: Per-core CPU usage
+    execAsync(
+      `powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-Counter '\\Processor(*)\\% Processor Time' -SampleInterval 1 -MaxSamples 1 | Select-Object -ExpandProperty CounterSamples | Where-Object { $_.InstanceName -ne '_total' } | Sort-Object InstanceName | ForEach-Object { [math]::Round($_.CookedValue, 1) }"`,
+      { shell: true, timeout: 6000 }
+    ),
+    // 1: CPU current clock speed
+    execAsync(
+      `powershell -NoProfile -ExecutionPolicy Bypass -Command "(Get-CimInstance Win32_Processor | Select-Object -First 1).CurrentClockSpeed"`,
+      { shell: true, timeout: 5000 }
+    ),
+    // 2: GPU stats via nvidia-smi (NVIDIA only)
+    execAsync(
+      `nvidia-smi --query-gpu=utilization.gpu,temperature.gpu,memory.used,memory.total --format=csv,noheader,nounits`,
+      { shell: true, timeout: 5000 }
+    ),
+    // 3: Network throughput
+    execAsync(
+      `powershell -NoProfile -ExecutionPolicy Bypass -Command "$c = Get-Counter '\\Network Interface(*)\\Bytes Sent/sec','\\Network Interface(*)\\Bytes Received/sec' -SampleInterval 1 -MaxSamples 1 -ErrorAction SilentlyContinue; $s = $c.CounterSamples; $up = ($s | Where-Object { $_.Path -like '*Bytes Sent*' } | Measure-Object -Property CookedValue -Sum).Sum; $down = ($s | Where-Object { $_.Path -like '*Bytes Received*' } | Measure-Object -Property CookedValue -Sum).Sum; Write-Output ([math]::Round($up)); Write-Output '|||'; Write-Output ([math]::Round($down))"`,
+      { shell: true, timeout: 6000 }
+    ),
+    // 4: Wi-Fi signal
+    execAsync(
+      `powershell -NoProfile -ExecutionPolicy Bypass -Command "(netsh wlan show interfaces | Select-String 'Signal').ToString().Split(':')[1].Trim()"`,
+      { shell: true, timeout: 5000 }
+    ),
+    // 5: RAM usage in GB
+    execAsync(
+      `powershell -NoProfile -ExecutionPolicy Bypass -Command "$o = Get-CimInstance Win32_OperatingSystem; $t = [math]::Round($o.TotalVisibleMemorySize/1MB,1); $f = [math]::Round($o.FreePhysicalMemory/1MB,1); Write-Output ($t - $f); Write-Output '|||'; Write-Output $t"`,
+      { shell: true, timeout: 5000 }
+    ),
+    // 6: Disk I/O
+    execAsync(
+      `powershell -NoProfile -ExecutionPolicy Bypass -Command "$c = Get-Counter '\\PhysicalDisk(_Total)\\Disk Read Bytes/sec','\\PhysicalDisk(_Total)\\Disk Write Bytes/sec' -SampleInterval 1 -MaxSamples 1 -ErrorAction SilentlyContinue; $s = $c.CounterSamples; $r = ($s | Where-Object { $_.Path -like '*Read*' }).CookedValue; $w = ($s | Where-Object { $_.Path -like '*Write*' }).CookedValue; Write-Output ([math]::Round($r)); Write-Output '|||'; Write-Output ([math]::Round($w))"`,
+      { shell: true, timeout: 6000 }
+    ),
+    // 7: Process count
+    execAsync(
+      `powershell -NoProfile -ExecutionPolicy Bypass -Command "(Get-Process).Count"`,
+      { shell: true, timeout: 5000 }
+    ),
+    // 8: System uptime
+    execAsync(
+      `powershell -NoProfile -ExecutionPolicy Bypass -Command "$up = (Get-Date) - (Get-CimInstance Win32_OperatingSystem).LastBootUpTime; '{0}d {1}h {2}m' -f $up.Days, $up.Hours, $up.Minutes"`,
+      { shell: true, timeout: 5000 }
+    ),
+  ]);
+
+  const get = (i) => results[i].status === 'fulfilled' ? results[i].value.stdout.trim() : '';
+
+  // 0: Per-core CPU
+  try {
+    const raw = get(0);
+    if (raw) {
+      ext.perCoreCpu = raw.split('\n').map(l => parseFloat(l.trim())).filter(v => !isNaN(v));
+    }
+  } catch {}
+
+  // 1: CPU clock
+  try {
+    ext.cpuClock = parseInt(get(1)) || 0;
+  } catch {}
+
+  // 2: GPU (nvidia-smi)
+  try {
+    const raw = get(2);
+    if (raw) {
+      const parts = raw.split(',').map(s => parseFloat(s.trim()));
+      if (parts.length >= 4) {
+        ext.gpuUsage = isNaN(parts[0]) ? -1 : Math.round(parts[0]);
+        ext.gpuTemp = isNaN(parts[1]) ? -1 : Math.round(parts[1]);
+        ext.gpuVramUsed = isNaN(parts[2]) ? -1 : Math.round(parts[2]);
+        ext.gpuVramTotal = isNaN(parts[3]) ? -1 : Math.round(parts[3]);
+      }
+    }
+  } catch {}
+
+  // 3: Network
+  try {
+    const parts = get(3).split('|||').map(s => s.trim());
+    ext.networkUp = parseInt(parts[0]) || 0;
+    ext.networkDown = parseInt(parts[1]) || 0;
+  } catch {}
+
+  // 4: Wi-Fi signal
+  try {
+    const raw = get(4);
+    if (raw) ext.wifiSignal = parseInt(raw) || -1;
+  } catch {}
+
+  // 5: RAM GB
+  try {
+    const parts = get(5).split('|||').map(s => s.trim());
+    ext.ramUsedGB = parseFloat(parts[0]) || 0;
+    ext.ramTotalGB = parseFloat(parts[1]) || 0;
+  } catch {}
+
+  // 6: Disk I/O
+  try {
+    const parts = get(6).split('|||').map(s => s.trim());
+    ext.diskReadSpeed = parseInt(parts[0]) || 0;
+    ext.diskWriteSpeed = parseInt(parts[1]) || 0;
+  } catch {}
+
+  // 7: Process count
+  try { ext.processCount = parseInt(get(7)) || 0; } catch {}
+
+  // 8: Uptime
+  try { ext.systemUptime = get(8) || ''; } catch {}
+
+  return ext;
+});
+
 // Cleaner IPC Handlers
 ipcMain.handle('cleaner:clear-nvidia-cache', async () => {
   try {
@@ -1136,55 +1578,149 @@ ipcMain.handle('cleaner:clear-update-cache', async () => {
       };
     }
 
-    // Gather pre-deletion stats using PowerShell (non-blocking)
-    const statsCmd = `powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-ChildItem -Path '${updateDir}' -Recurse -Force -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum -ErrorAction SilentlyContinue | ConvertTo-Json -Compress"`;
-    let filesBefore = 0;
+    // 1. Stop Windows Update and related services to release folder locks
+    const stopServicesCmd = `powershell -NoProfile -ExecutionPolicy Bypass -Command "
+      @('wuauserv', 'usosvc', 'UsoSvc') | ForEach-Object {
+        try {
+          Stop-Service -Name \\$_ -Force -ErrorAction Stop
+        } catch {
+          # Service may not be running, that's okay
+        }
+      }
+      # Wait longer to ensure all locks are released
+      Start-Sleep -Milliseconds 1500
+    "`;
+    
+    try {
+      await execAsync(stopServicesCmd, { shell: true, timeout: 30000 });
+    } catch (e) {
+      // Continue anyway, services might not exist on all systems
+    }
+
+    // 2. Gather pre-deletion stats
+    const statsCmd = `powershell -NoProfile -ExecutionPolicy Bypass -Command "(Get-ChildItem -Path '${updateDir}' -Recurse -Force -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum"`;
     let totalSize = 0;
+    let filesBefore = 0;
 
     try {
       const statRes = await execAsync(statsCmd, { shell: true, timeout: 30000 });
       const stdout = (statRes.stdout || '').trim();
-      if (stdout) {
-        try {
-          const parsed = JSON.parse(stdout);
-          filesBefore = parsed.Count || 0;
-          totalSize = parsed.Sum || 0;
-        } catch (e) {
-          // ignore parse errors
-        }
-      }
+      totalSize = parseInt(stdout) || 0;
+      // Also count files
+      const countCmd = `powershell -NoProfile -ExecutionPolicy Bypass -Command "(Get-ChildItem -Path '${updateDir}' -Recurse -Force -ErrorAction SilentlyContinue | Measure-Object).Count"`;
+      const countRes = await execAsync(countCmd, { shell: true, timeout: 30000 });
+      filesBefore = parseInt(countRes.stdout) || 0;
+      console.log(`[Cache Stats] Total size: ${totalSize} bytes, Files: ${filesBefore}`);
     } catch (e) {
-      // If stats collection fails, may need admin - check before attempting deletion
+      // Stats collection is best-effort; continue with deletion anyway
+      console.error('[Cache Stats] Failed to collect stats:', e.message);
+    }
+
+    // Check if folder has content
+    if (filesBefore === 0) {
+      console.log('[Cache Check] Folder appears empty already');
       return {
-        success: false,
-        message: 'Run the app as administrator'
+        success: true,
+        message: `Cache folder is already empty`,
+        filesDeleted: 0,
+        filesBefore: 0,
+        filesAfter: 0,
+        spaceSaved: `0 MB`,
+        details: `No files to delete`,
       };
     }
 
-    // Remove files using PowerShell Remove-Item to avoid blocking the main event loop
-    const removeCmd = `powershell -NoProfile -ExecutionPolicy Bypass -Command "Remove-Item -Path '${updateDir}\\*' -Recurse -Force -ErrorAction SilentlyContinue"`;
+    // 3. Clear the cache folder with retry logic
+    let deletionSuccess = false;
+    let lastError = null;
     
-    try {
-      await execAsync(removeCmd, { shell: true, timeout: 120000 });
-    } catch (removeError) {
-      // Removal failed - always needs admin for Windows Update cache
-      return { success: false, message: 'Run the app as administrator' };
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        // First two attempts: Try standard removal
+        if (attempt <= 2) {
+          let removeCmd;
+          if (attempt === 1) {
+            removeCmd = `powershell -NoProfile -ExecutionPolicy Bypass -Command "Remove-Item -Path '${updateDir}\\*' -Recurse -Force -ErrorAction Stop"`;
+          } else {
+            removeCmd = `powershell -NoProfile -ExecutionPolicy Bypass -Command "
+              Get-ChildItem -Path '${updateDir}' -Force -Recurse -ErrorAction Stop |
+              Remove-Item -Recurse -Force -Confirm:\\$false -ErrorAction Stop
+            "`;
+          }
+          await execAsync(removeCmd, { shell: true, timeout: 120000 });
+        } else {
+          // Third attempt: Nuclear option - remove entire folder and recreate it
+          const nukeCmd = `powershell -NoProfile -ExecutionPolicy Bypass -Command "
+            Remove-Item -Path '${updateDir}' -Recurse -Force -ErrorAction Stop;
+            Start-Sleep -Milliseconds 500;
+            New-Item -ItemType Directory -Path '${updateDir}' -Force -ErrorAction Stop | Out-Null
+          "`;
+          await execAsync(nukeCmd, { shell: true, timeout: 120000 });
+        }
+        deletionSuccess = true;
+        break; // Success, exit retry loop
+      } catch (removeError) {
+        lastError = removeError;
+        console.error(`[Attempt ${attempt}] Cache deletion failed:`, removeError.message, removeError.stderr);
+        if (attempt < 3) {
+          // Wait before retry
+          await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+        }
+      }
     }
 
-    // Return pre-computed size as space saved (best-effort)
-    const sizeInMB = (totalSize / (1024 * 1024)).toFixed(2);
+    // 4. Restart Windows Update services
+    const restartCmd = `powershell -NoProfile -ExecutionPolicy Bypass -Command "
+      @('wuauserv', 'usosvc', 'UsoSvc') | ForEach-Object {
+        try {
+          Start-Service -Name \\$_ -ErrorAction SilentlyContinue
+        } catch {
+          # Service may not exist, that's okay
+        }
+      }
+    "`;
+    try {
+      await execAsync(restartCmd, { shell: true, timeout: 10000 });
+    } catch (e) {
+      // Service restart failure is non-critical
+    }
 
-    return {
-      success: true,
-      message: `Cleared Windows Update cache`,
-      filesDeleted: filesBefore,
-      filesBefore: filesBefore,
-      filesAfter: 0,
-      spaceSaved: `${sizeInMB} MB`,
-      details: `${filesBefore}/${filesBefore} files deleted (0 remaining)`,
-    };
+    // 5. Return result
+    const sizeInMB = (totalSize / (1024 * 1024)).toFixed(2);
+    
+    if (deletionSuccess) {
+      console.log('[Cache Deletion] Success - removed ' + filesBefore + ' files');
+      return {
+        success: true,
+        message: `Cleared Windows Update cache`,
+        filesDeleted: filesBefore,
+        filesBefore: filesBefore,
+        filesAfter: 0,
+        spaceSaved: `${sizeInMB} MB`,
+        details: `${filesBefore} file(s) deleted`,
+      };
+    } else {
+      // Check what went wrong
+      const errorOutput = lastError ? (lastError.stderr || lastError.stdout || lastError.message || '').toLowerCase() : '';
+      console.error('[Cache Deletion] Failed with error:', errorOutput);
+      
+      if (errorOutput.includes('access is denied') || errorOutput.includes('access denied')) {
+        console.error('[Cache Deletion] Detected: Permission denied');
+        return { success: false, message: 'Run the app as administrator' };
+      } else if (errorOutput.includes('is in use') || errorOutput.includes('cannot be removed') || errorOutput.includes('being used')) {
+        console.error('[Cache Deletion] Detected: File in use');
+        return { success: false, message: 'Some cache files are still in use. Try restarting your computer.' };
+      } else {
+        console.error('[Cache Deletion] Unknown error:', lastError);
+        return {
+          success: false,
+          message: 'Could not clear cache. Try restarting your computer.',
+          spaceSaved: '0 MB',
+          details: lastError ? lastError.message : 'Unknown error'
+        };
+      }
+    }
   } catch (error) {
-    // Windows Update cache ALWAYS needs admin rights - never show detailed error
     return { success: false, message: 'Run the app as administrator' };
   }
 });
@@ -1194,57 +1730,89 @@ ipcMain.handle('cleaner:clear-dns-cache', async () => {
     // Get DNS cache entry count before clearing
     let entriesBefore = 0;
     try {
-      const displayResult = await execAsync('powershell -NoProfile -Command "ipconfig /displaydns"', { shell: true, timeout: 10000 });
+      const displayResult = await execAsync('powershell -NoProfile -ExecutionPolicy Bypass -Command "ipconfig /displaydns"', { shell: true, timeout: 10000 });
       const entries = displayResult.stdout.match(/Record Name/gi);
       entriesBefore = entries ? entries.length : 0;
+      console.log(`[DNS Cache] Entries before: ${entriesBefore}`);
     } catch (e) {
+      console.error('[DNS Cache] Error counting entries before:', e.message);
       // Ignore errors getting count
     }
     
     // Try multiple methods to clear DNS cache
     let dnsCleared = false;
     let method = '';
+    let lastError = null;
     
     // Method 1: Try PowerShell Clear-DnsClientCache (Windows 8+)
     try {
-      await execAsync('powershell -NoProfile -Command "Clear-DnsClientCache -Confirm:$false"', { shell: true, timeout: 15000 });
+      console.log('[DNS Cache] Attempting Method 1: Clear-DnsClientCache');
+      await execAsync('powershell -NoProfile -ExecutionPolicy Bypass -Command "Clear-DnsClientCache -Confirm:$false"', { shell: true, timeout: 15000 });
       dnsCleared = true;
       method = 'PowerShell Clear-DnsClientCache';
+      console.log('[DNS Cache] Method 1 succeeded');
     } catch (error) {
+      console.error('[DNS Cache] Method 1 failed:', error.message);
+      lastError = error;
       // Method 1 failed, try next method
     }
     
-    // Method 2: If Method 1 fails, try ipconfig /flushdns
+    // Method 2: If Method 1 fails, try ipconfig /flushdns directly
     if (!dnsCleared) {
       try {
-        const result = await execAsync('powershell -NoProfile -Command "ipconfig /flushdns"', { shell: true, timeout: 15000 });
-        dnsCleared = true;
-        method = 'ipconfig /flushdns';
+        console.log('[DNS Cache] Attempting Method 2: ipconfig /flushdns');
+        // Run ipconfig /flushdns in command prompt, not PowerShell for better compatibility
+        const result = await execAsync('cmd /c ipconfig /flushdns', { shell: true, timeout: 15000 });
+        if (result.stdout.includes('cleared') || result.stdout.includes('Cleared') || !result.stderr) {
+          dnsCleared = true;
+          method = 'ipconfig /flushdns (cmd)';
+          console.log('[DNS Cache] Method 2 succeeded');
+        }
       } catch (error) {
-        // Method 2 failed, try next method
+        console.error('[DNS Cache] Method 2 (cmd) failed:', error.message);
+        lastError = error;
+        // Try alternative: ipconfig /flushdns through PowerShell
+        try {
+          console.log('[DNS Cache] Attempting Method 2 Alternative: ipconfig /flushdns (PowerShell)');
+          const psResult = await execAsync('powershell -NoProfile -ExecutionPolicy Bypass -Command "& cmd /c ipconfig /flushdns"', { shell: true, timeout: 15000 });
+          dnsCleared = true;
+          method = 'ipconfig /flushdns (PowerShell)';
+          console.log('[DNS Cache] Method 2 Alternative succeeded');
+        } catch (error2) {
+          console.error('[DNS Cache] Method 2 Alternative failed:', error2.message);
+          lastError = error2;
+        }
       }
     }
     
-    // Method 3: Restart DNS Client service (most reliable)
+    // Method 3: Restart DNS Client service (most reliable on locked systems)
     if (!dnsCleared) {
       try {
+        console.log('[DNS Cache] Attempting Method 3: DNS Client Service restart');
         // Stop the service
-        await execAsync('powershell -NoProfile -Command "Stop-Service -Name dnscache -Force -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 500"', { shell: true, timeout: 15000 });
+        await execAsync('powershell -NoProfile -ExecutionPolicy Bypass -Command "Stop-Service -Name dnscache -Force -ErrorAction Stop; Start-Sleep -Milliseconds 1000"', { shell: true, timeout: 15000 });
         // Start the service
-        await execAsync('powershell -NoProfile -Command "Start-Service -Name dnscache -ErrorAction SilentlyContinue"', { shell: true, timeout: 15000 });
+        await execAsync('powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Service -Name dnscache -ErrorAction Stop"', { shell: true, timeout: 15000 });
         dnsCleared = true;
         method = 'DNS Client Service restart';
+        console.log('[DNS Cache] Method 3 succeeded');
       } catch (error) {
+        console.error('[DNS Cache] Method 3 failed:', error.message);
+        lastError = error;
         // Method 3 failed
       }
     }
     
     if (!dnsCleared) {
+      console.error('[DNS Cache] All methods failed:', lastError);
       return {
         success: false,
         message: 'Failed to clear DNS cache. Please ensure the app is running as Administrator.',
+        details: lastError ? lastError.message : 'Unknown error'
       };
     }
+    
+    console.log(`[DNS Cache] Successfully cleared using method: ${method}`);
     
     // Wait a moment for DNS cache to fully clear
     await new Promise(resolve => setTimeout(resolve, 1000));
@@ -1252,17 +1820,20 @@ ipcMain.handle('cleaner:clear-dns-cache', async () => {
     // Verify DNS cache was actually cleared
     let entriesAfter = 0;
     try {
-      const displayAfter = await execAsync('powershell -NoProfile -Command "ipconfig /displaydns"', { shell: true, timeout: 10000 });
+      const displayAfter = await execAsync('powershell -NoProfile -ExecutionPolicy Bypass -Command "ipconfig /displaydns"', { shell: true, timeout: 10000 });
       const entriesMatch = displayAfter.stdout.match(/Record Name/gi);
       entriesAfter = entriesMatch ? entriesMatch.length : 0;
+      console.log(`[DNS Cache] Entries after: ${entriesAfter}`);
     } catch (e) {
+      console.error('[DNS Cache] Error counting entries after:', e.message);
       // Ignore verification error
     }
 
     return {
       success: true,
       message: 'DNS cache cleared successfully',
-      spaceSaved: entriesBefore > 0 ? `${entriesBefore} files deleted` : '0 files deleted',
+      spaceSaved: entriesBefore > 0 ? `${entriesBefore} DNS entries removed` : 'DNS cache cleared',
+      details: `Method: ${method}`,
     };
     
   } catch (error) {
@@ -1444,7 +2015,7 @@ ipcMain.handle('cleaner:empty-recycle-bin', async () => {
         return {
           success: true,
           message: 'Recycle bin emptied successfully',
-          spaceSaved: 'Disk space freed',
+          spaceSaved: 'Disk space now freed',
         };
       }
     } catch (e) {

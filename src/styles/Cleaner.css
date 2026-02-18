@@ -1,134 +1,192 @@
-.cleaner-container {
+/* =============================================
+   CLEANER PAGE — FUTURISTIC HOLOGRID DESIGN
+   ============================================= */
+
+.cleaner-page {
   display: flex;
   flex-direction: column;
   gap: 20px;
 }
 
-.section-title {
-  font-size: 28px;
-  font-weight: 900;
-  letter-spacing: 1px;
-  color: var(--text-primary);
-  margin: 0;
+/* ——— HERO HEADER ——— */
+.cleaner-hero {
   position: relative;
-  padding-bottom: 10px;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(0, 255, 170, 0.12);
+  background: linear-gradient(135deg, rgba(8, 12, 30, 0.95) 0%, rgba(12, 20, 45, 0.85) 50%, rgba(8, 12, 30, 0.95) 100%);
 }
 
-.section-title::after {
+.cleaner-hero::before {
   content: '';
   position: absolute;
-  bottom: 0;
+  top: 0;
   left: 0;
-  width: 40px;
-  height: 3px;
-  background: linear-gradient(90deg, var(--color-primary), var(--color-secondary));
-  border-radius: 2px;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, rgba(0, 255, 170, 0.45) 30%, rgba(0, 200, 255, 0.45) 70%, transparent 100%);
 }
 
-.section-subtitle {
-  font-size: 14px;
-  color: rgba(255, 255, 255, 0.6);
+.cleaner-hero-glow {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 55% 55% at 75% 35%, rgba(0, 255, 170, 0.05) 0%, transparent 70%),
+    radial-gradient(ellipse 40% 50% at 15% 65%, rgba(0, 150, 255, 0.04) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.cleaner-hero-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 22px 28px;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.cleaner-hero-left {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cleaner-hero-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  color: rgba(0, 255, 170, 0.75);
+  text-transform: uppercase;
+  padding: 3px 10px;
+  border: 1px solid rgba(0, 255, 170, 0.18);
+  border-radius: 4px;
+  background: rgba(0, 255, 170, 0.04);
+  width: fit-content;
+}
+
+.cleaner-hero-title {
+  font-size: 22px;
+  font-weight: 800;
+  color: #fff;
   margin: 0;
+  letter-spacing: -0.3px;
+  text-shadow: 0 0 24px rgba(0, 255, 170, 0.12);
+}
+
+.cleaner-hero-sub {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.45);
+  margin: 0;
+  max-width: 420px;
   line-height: 1.5;
 }
 
-/* Tabs Styling */
+/* ——— TABS ——— */
 .cleaner-tabs {
   display: flex;
-  gap: 8px;
-  margin: 25px 0;
-  flex-wrap: wrap;
-  padding: 0;
-  border-bottom: 2px solid rgba(255, 255, 255, 0.08);
+  gap: 4px;
+  padding: 4px;
+  background: rgba(10, 14, 35, 0.6);
+  border: 1px solid rgba(0, 255, 170, 0.08);
+  border-radius: 10px;
+  width: fit-content;
 }
 
-.tab-button {
-  padding: 14px 32px;
-  background: transparent;
-  border: none;
-  border-bottom: 3px solid transparent;
-  color: rgba(255, 255, 255, 0.65);
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 0.4px;
-  cursor: pointer;
+.cleaner-tab {
   display: flex;
   align-items: center;
-  gap: 10px;
-  transition: all 0.3s ease;
+  gap: 8px;
+  padding: 9px 20px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+  transition: all 0.25s ease;
   position: relative;
 }
 
-.tab-button:hover {
-  color: rgba(255, 255, 255, 0.85);
+.cleaner-tab:hover {
+  color: rgba(255, 255, 255, 0.7);
   background: rgba(255, 255, 255, 0.03);
 }
 
-.tab-button.active {
-  color: #ffffff;
-  border-bottom-color: var(--color-primary);
-  background: rgba(255, 193, 7, 0.08);
-  font-weight: 700;
+.cleaner-tab--active {
+  color: rgba(0, 255, 170, 0.95);
+  background: rgba(0, 255, 170, 0.06);
+  border-color: rgba(0, 255, 170, 0.18);
+  box-shadow: 0 0 16px rgba(0, 255, 170, 0.05);
 }
 
-.tab-label {
+.cleaner-tab--active:hover {
+  color: rgba(0, 255, 170, 1);
+}
+
+.cleaner-tab-label {
   white-space: nowrap;
 }
 
-.tab-count {
+.cleaner-tab-count {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 26px;
-  height: 26px;
-  padding: 0 6px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 5px;
-  font-size: 12px;
+  min-width: 22px;
+  height: 20px;
+  padding: 0 5px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+  font-size: 10px;
   font-weight: 700;
   transition: all 0.25s ease;
 }
 
-.tab-button:hover .tab-count {
-  background: rgba(255, 255, 255, 0.15);
+.cleaner-tab--active .cleaner-tab-count {
+  background: rgba(0, 255, 170, 0.15);
+  color: rgba(0, 255, 170, 0.9);
 }
 
-.tab-button.active .tab-count {
-  background: var(--color-primary);
-  color: #000;
-}
-
+/* ——— GRID ——— */
 .cleaner-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   gap: 12px;
   width: 100%;
 }
 
 @media (max-width: 1400px) {
   .cleaner-grid {
-    grid-template-columns: repeat(4, 1fr);
-  }
-}
-
-@media (max-width: 1024px) {
-  .cleaner-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
   }
 }
 
 @media (max-width: 768px) {
-  .cleaner-grid {
-    grid-template-columns: repeat(2, 1fr);
+  .cleaner-hero-content {
+    padding: 18px 20px;
+  }
+
+  .cleaner-hero-title {
+    font-size: 18px;
   }
 
   .cleaner-tabs {
-    gap: 8px;
+    width: 100%;
+    overflow-x: auto;
   }
 
-  .tab-button {
-    padding: 10px 16px;
-    font-size: 13px;
+  .cleaner-tab {
+    padding: 8px 14px;
+    font-size: 11px;
+  }
+
+  .cleaner-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 
@@ -137,21 +195,8 @@
     grid-template-columns: 1fr;
   }
 
-  .cleaner-tabs {
-    gap: 6px;
-    overflow-x: auto;
-    padding-bottom: 5px;
-  }
-
-  .tab-button {
-    padding: 8px 12px;
-    font-size: 12px;
-    white-space: nowrap;
-  }
-
-  .tab-count {
-    width: 18px;
-    height: 18px;
-    font-size: 11px;
+  .cleaner-tab {
+    padding: 7px 12px;
+    font-size: 10px;
   }
 }

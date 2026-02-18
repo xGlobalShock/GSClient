@@ -3,7 +3,7 @@ export interface ObsPreset {
   name: string;
   description: string;
   features: string[];
-  icon: string;
+  iconName: string;
   color: string;
   difficulty: 'Beginner' | 'Intermediate' | 'Advanced';
 }
@@ -21,7 +21,7 @@ export const OBS_PRESETS: ObsPreset[] = [
       'Custom Overlays',
       'Scene Collection Setup',
     ],
-    icon: '🌐',
+    iconName: 'broadcast',
     color: '#FF00FF',
     difficulty: 'Intermediate',
   },
@@ -38,7 +38,7 @@ export const OBS_PRESETS: ObsPreset[] = [
       'Scenes for Gameplay, BRB, and Ending',
       'Best settings for Twitch',
     ],
-    icon: '🎮',
+    iconName: 'gamepad',
     color: '#00FF88',
     difficulty: 'Intermediate',
   },
