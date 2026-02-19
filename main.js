@@ -825,10 +825,10 @@ ipcMain.handle('system:get-extended-stats', async () => {
       `nvidia-smi --query-gpu=utilization.gpu,temperature.gpu,memory.used,memory.total --format=csv,noheader,nounits`,
       { shell: true, timeout: 5000 }
     ),
-    // 3: Network throughput
+    // 3: Network throughput — sample twice (400ms) and average to better capture short bursts
     execAsync(
-      `powershell -NoProfile -ExecutionPolicy Bypass -Command "$c = Get-Counter '\\Network Interface(*)\\Bytes Sent/sec','\\Network Interface(*)\\Bytes Received/sec' -SampleInterval 1 -MaxSamples 1 -ErrorAction SilentlyContinue; $s = $c.CounterSamples; $up = ($s | Where-Object { $_.Path -like '*Bytes Sent*' } | Measure-Object -Property CookedValue -Sum).Sum; $down = ($s | Where-Object { $_.Path -like '*Bytes Received*' } | Measure-Object -Property CookedValue -Sum).Sum; Write-Output ([math]::Round($up)); Write-Output '|||'; Write-Output ([math]::Round($down))"`,
-      { shell: true, timeout: 6000 }
+      `powershell -NoProfile -ExecutionPolicy Bypass -Command "$a = Get-NetAdapter | Where-Object { $_.Status -eq 'Up' -and $_.Name -notmatch 'Virtual|vEthernet|Loopback|Microsoft|Container' } | Select-Object -First 1; if ($a) { $name = $a.Name; $s1 = Get-NetAdapterStatistics -Name $name; Start-Sleep -Milliseconds 400; $s2 = Get-NetAdapterStatistics -Name $name; Start-Sleep -Milliseconds 400; $s3 = Get-NetAdapterStatistics -Name $name; $up1 = ($s2.SentBytes - $s1.SentBytes) / 0.4; $up2 = ($s3.SentBytes - $s2.SentBytes) / 0.4; $down1 = ($s2.ReceivedBytes - $s1.ReceivedBytes) / 0.4; $down2 = ($s3.ReceivedBytes - $s2.ReceivedBytes) / 0.4; $up = [math]::Round((($up1 + $up2)/2)); $down = [math]::Round((($down1 + $down2)/2)); Write-Output ($up); Write-Output '|||'; Write-Output ($down) } else { $c = Get-Counter '\\Network Interface(*)\\Bytes Sent/sec','\\Network Interface(*)\\Bytes Received/sec' -SampleInterval 1 -MaxSamples 1 -ErrorAction SilentlyContinue; $s = $c.CounterSamples; $up = ($s | Where-Object { $_.Path -like '*Bytes Sent*' } | Measure-Object -Property CookedValue -Sum).Sum; $down = ($s | Where-Object { $_.Path -like '*Bytes Received*' } | Measure-Object -Property CookedValue -Sum).Sum; Write-Output ([math]::Round($up)); Write-Output '|||'; Write-Output ([math]::Round($down)) }"`,
+      { shell: true, timeout: 9000 }
     ),
     // 4: Wi-Fi SSID + Signal
     execAsync(
@@ -855,9 +855,9 @@ ipcMain.handle('system:get-extended-stats', async () => {
       `powershell -NoProfile -ExecutionPolicy Bypass -Command "$up = (Get-Date) - (Get-CimInstance Win32_OperatingSystem).LastBootUpTime; '{0}d {1}h {2}m' -f $up.Days, $up.Hours, $up.Minutes"`,
       { shell: true, timeout: 5000 }
     ),
-    // 9: Latency (ping to 1.1.1.1)
+    // 9: Latency (ping to 8.8.8.8)
     execAsync(
-      `powershell -NoProfile -ExecutionPolicy Bypass -Command "try { (Test-Connection -Count 1 -ComputerName 1.1.1.1 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty ResponseTime) } catch { '' }"`,
+      `powershell -NoProfile -ExecutionPolicy Bypass -Command "try { (Test-Connection -Count 1 -ComputerName 8.8.8.8 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty ResponseTime) } catch { '' }"`,
       { shell: true, timeout: 4000 }
     ),
   ]);

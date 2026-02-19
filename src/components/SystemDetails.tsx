@@ -22,6 +22,13 @@ const fmt = (n: number): string => {
   return `${(n / 1073741824).toFixed(2)} GB/s`;
 };
 
+// Format bytes/sec as megabits/sec for network realtime badges (one decimal)
+const fmtMbps = (bytesPerSec?: number) => {
+  if (!bytesPerSec || bytesPerSec <= 0) return '0 Mbps';
+  const mbps = (bytesPerSec * 8) / (1024 * 1024);
+  return mbps >= 100 ? `${Math.round(mbps)} Mbps` : `${mbps.toFixed(1)} Mbps`;
+};
+
 // Convert MiB (nvidia-smi) to GB for UI display (show 1 decimal unless whole number)
 const formatMiBtoGB = (mb?: number | null): string => {
   if (!mb || mb <= 0) return '—';
@@ -222,7 +229,7 @@ const SystemDetails: React.FC<SystemDetailsProps> = ({ systemStats, hardwareInfo
         >
           <Row label="Cores / Threads" value={hw ? `${hw.cpuCores}C / ${hw.cpuThreads}T` : undefined} />
           <Row label="Max Clock" value={hw?.cpuMaxClock} />
-          <Row label="CPU Temp" value={s?.temperature > 0 ? `${s.temperature}°C` : undefined} accent />
+          <Row label="CPU Temp" value={s?.temperature > 0 ? `${Math.trunc(s.temperature)}°C` : undefined} accent />
           {ext && ext.cpuClock > 0 && (
             <Row label="Current Clock" value={`${(ext.cpuClock / 1000).toFixed(2)} GHz`} accent />
           )}
@@ -254,7 +261,7 @@ const SystemDetails: React.FC<SystemDetailsProps> = ({ systemStats, hardwareInfo
           {hw?.gpuDriverVersion && <Row label="Driver" value={hw.gpuDriverVersion} />}
           {hasGpu ? (
             <>
-              <Row label="GPU Temp" value={ext.gpuTemp >= 0 ? `${ext.gpuTemp}°C` : undefined} accent />
+              <Row label="GPU Temp" value={ext.gpuTemp >= 0 ? `${Math.trunc(ext.gpuTemp)}°C` : undefined} accent />
               {ext.gpuVramUsed >= 0 && ext.gpuVramTotal > 0 && (
                 <BarRow
                   label="VRAM Used"
@@ -360,7 +367,7 @@ const SystemDetails: React.FC<SystemDetailsProps> = ({ systemStats, hardwareInfo
             value={ext && (ext.networkUp > 0 || ext.networkDown > 0) ? (
               <div className="sysdet-value-with-io">
                 <div className="sysdet-io-badges-wrap">
-                  <IOStrip up={fmt(ext.networkUp)} down={fmt(ext.networkDown)} />
+                  <IOStrip up={fmtMbps(ext.networkUp)} down={fmtMbps(ext.networkDown)} />
                 </div>
               </div>
             ) : '—'}

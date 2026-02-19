@@ -135,7 +135,7 @@ function App() {
 
     // Update every 2 seconds
     const interval = setInterval(fetchSystemStats, 2000);
-    const extInterval = setInterval(fetchExtendedStats, 3000);
+    const extInterval = setInterval(fetchExtendedStats, 1500);
 
     return () => {
       clearTimeout(timer);
