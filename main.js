@@ -1,4 +1,5 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
+const Sudoer = require('electron-sudo').default;
 const path = require('path');
 const fs = require('fs');
 const { exec, spawn } = require('child_process');
@@ -74,6 +75,7 @@ app.disableHardwareAcceleration();
 app.commandLine.appendSwitch('disable-gpu');
 app.commandLine.appendSwitch('disable-gpu-compositing');
 
+
 // Simple admin check for Windows
 let isElevated = false;
 if (process.platform === 'win32') {
@@ -82,6 +84,14 @@ if (process.platform === 'win32') {
     isElevated = true;
   } catch (e) {
     isElevated = false;
+  }
+  // Only require elevation in production (packaged app)
+  if (!isElevated && app.isPackaged) {
+    const sudoer = new Sudoer({name: 'GS Optimizer'});
+    const args = process.argv.slice(1).map(a => `\"${a}\"`).join(' ');
+    sudoer.spawn(process.execPath, args, {detached: true, stdio: 'ignore'});
+    app.quit();
+    return;
   }
 }
 
