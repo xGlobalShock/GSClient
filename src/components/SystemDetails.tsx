@@ -360,7 +360,7 @@ const SystemDetails: React.FC<SystemDetailsProps> = ({ systemStats, hardwareInfo
           {hw?.gateway && <Row label="Gateway" value={hw.gateway} />}
           {hw?.dns && <Row label="DNS" value={hw.dns} />}
           {ext?.ssid && <Row label="Wi‑Fi SSID" value={ext.ssid} />}
-          {ext && ext.latencyMs && ext.latencyMs > 0 && <Row label="Ping/Latency" value={`${ext.latencyMs} ms`} />}
+          {ext && ext.latencyMs > 0 && <Row label="Ping/Latency" value={`${ext.latencyMs} ms`} />}
           {hw?.networkLinkSpeed && <Row label="Link Speed" value={hw.networkLinkSpeed} />}
           <Row
             label="Realtime Speed"

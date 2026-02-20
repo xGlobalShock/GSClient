@@ -89,10 +89,14 @@ function App() {
   const [hardwareInfo, setHardwareInfo] = useState<HardwareInfo | undefined>(undefined);
   const [extendedStats, setExtendedStats] = useState<ExtendedStats | undefined>(undefined);
 
+  // Dismiss the loader as soon as both basic stats and hardware info arrive
   useEffect(() => {
-    // Loader timeout (simulate app/data loading)
-    const timer = setTimeout(() => setIsLoading(false), 5000);
+    if (isLoading && statsLoaded && hardwareInfo) {
+      setIsLoading(false);
+    }
+  }, [isLoading, statsLoaded, hardwareInfo]);
 
+  useEffect(() => {
     // Fetch hardware info once
     const fetchHardwareInfo = async () => {
       if (window.electron?.ipcRenderer) {
@@ -105,61 +109,72 @@ function App() {
       }
     };
     fetchHardwareInfo();
-
-    return () => {
-      clearTimeout(timer);
-    };
   }, []);
 
   useEffect(() => {
-    // Only poll system stats if Dashboard or Performance is visible
-    if (currentPage === 'dashboard' || currentPage === 'performance') {
-      // Get real system stats
+    // Poll system stats when loading or when Dashboard/Performance is visible
+    if (isLoading || currentPage === 'dashboard' || currentPage === 'performance') {
+      let statsBusy = false;
+      let extBusy = false;
+      let cancelled = false;
+
+      // Get real system stats — with overlap guard
       const fetchSystemStats = async () => {
-        if (window.electron?.ipcRenderer) {
-          try {
+        if (statsBusy || cancelled) return;
+        statsBusy = true;
+        try {
+          if (window.electron?.ipcRenderer) {
             const stats = await window.electron.ipcRenderer.invoke('system:get-stats');
-            setSystemStats(stats);
-            if (!statsLoaded) {
-              setStatsLoaded(true);
+            if (!cancelled) {
+              setSystemStats(stats);
+              if (!statsLoaded) setStatsLoaded(true);
             }
-          } catch (error) {
-            console.error('Error fetching system stats:', error);
           }
+        } catch (error) {
+          console.error('Error fetching system stats:', error);
+        } finally {
+          statsBusy = false;
         }
       };
 
-      // Fetch extended stats (live metrics)
+      // Fetch extended stats (live metrics) — with overlap guard
       const fetchExtendedStats = async () => {
-        if (window.electron?.ipcRenderer) {
-          try {
+        if (extBusy || cancelled) return;
+        extBusy = true;
+        try {
+          if (window.electron?.ipcRenderer) {
             const ext = await window.electron.ipcRenderer.invoke('system:get-extended-stats');
-            setExtendedStats(ext);
-            if (!extLoaded) {
-              setExtLoaded(true);
+            if (!cancelled) {
+              setExtendedStats(ext);
+              if (!extLoaded) setExtLoaded(true);
             }
-          } catch (error) {
-            console.error('Error fetching extended stats:', error);
           }
+        } catch (error) {
+          console.error('Error fetching extended stats:', error);
+        } finally {
+          extBusy = false;
         }
       };
 
-      // Initial fetch
+      // Initial fetch — both start immediately
       fetchSystemStats();
       fetchExtendedStats();
 
-      // Update every 2 seconds
-      const interval = setInterval(fetchSystemStats, 2000);
-      const extInterval = setInterval(fetchExtendedStats, 1500);
+      // Basic stats (CPU/RAM/Disk/Temp) are fast (~1.3s), poll every 3s
+      const interval = setInterval(fetchSystemStats, 3000);
+      // Extended stats (per-core, network, disk I/O etc.) take ~4s, poll every 5s
+      // to avoid always hitting the overlap guard
+      const extInterval = setInterval(fetchExtendedStats, 5000);
 
       return () => {
+        cancelled = true;
         clearInterval(interval);
         clearInterval(extInterval);
       };
     }
-    // If not dashboard/performance, do not poll
+    // If not dashboard/performance and not loading, do not poll
     return undefined;
-  }, [currentPage]);
+  }, [isLoading, currentPage]);
 
   const renderPage = () => {
     return (
@@ -169,7 +184,7 @@ function App() {
             systemStats={systemStats}
             hardwareInfo={hardwareInfo}
             extendedStats={extendedStats}
-            statsLoaded={statsLoaded && extLoaded}
+            statsLoaded={statsLoaded}
           />
         </div>
         <div style={{ display: currentPage === 'performance' ? 'block' : 'none' }}>

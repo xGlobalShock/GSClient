@@ -8,6 +8,33 @@ const os = require('os');
 
 const execAsync = promisify(exec);
 
+// ──────────────────────────────────────────────────────
+// PowerShell Script Runner
+// Writes multiline scripts to a temp .ps1 file and runs them via -File.
+// Avoids quoting/escaping issues, no command-line length limit, and
+// scripts are consolidated so we only need 1-2 spawns per poll cycle.
+// ──────────────────────────────────────────────────────
+let _psTempCounter = 0;
+function runPSScript(script, timeoutMs = 8000) {
+  const tmpFile = path.join(os.tmpdir(), `gs_ps_${process.pid}_${++_psTempCounter}.ps1`);
+  // Prepend $ErrorActionPreference and append exit 0 to ensure clean exit
+  const wrappedScript = '$ErrorActionPreference = "SilentlyContinue"\n' + script + '\nexit 0';
+  fs.writeFileSync(tmpFile, wrappedScript, 'utf8');
+  return execAsync(
+    `powershell -NoProfile -ExecutionPolicy Bypass -File "${tmpFile}"`,
+    { shell: true, timeout: timeoutMs }
+  ).then(r => {
+    try { fs.unlinkSync(tmpFile); } catch {}
+    return r.stdout.trim();
+  }).catch(err => {
+    try { fs.unlinkSync(tmpFile); } catch {}
+    // Recover partial stdout even if PowerShell exited with non-zero code
+    console.warn('[runPSScript] PS error:', err.message?.substring(0, 150));
+    if (err.stdout) return err.stdout.trim();
+    return '';
+  });
+}
+
 // Helper function to detect permission errors
 function isPermissionError(error) {
   if (!error || !error.message) return false;
@@ -244,147 +271,97 @@ ipcMain.handle('system:open-system-protection', async () => {
   }
 });
 
-// System Stats IPC Handler with robust fallbacks
+// ──────────────────────────────────────────────────────
+// System Stats IPC Handler — single consolidated PowerShell call
+// Fetches CPU %, RAM %, Disk %, and Temperature in ONE invocation
+// via -EncodedCommand. Falls back to Node.js os module for RAM.
+// ──────────────────────────────────────────────────────
+let _statsInFlight = false;
 ipcMain.handle('system:get-stats', async () => {
-  const results = {
-    cpu: 0,
-    ram: 0,
-    disk: 0,
-    temperature: 0,
-    errors: []
-  };
-
-  // CPU Monitoring - Primary: Get-Counter, Fallback: tasklist parsing
+  // Overlap guard — if the previous poll hasn't finished, return cached
+  if (_statsInFlight) return _lastStats;
+  _statsInFlight = true;
   try {
-    try {
-      const cpuCmd = `powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-Counter '\\\\Processor(_Total)\\\\% Processor Time' -SampleInterval 1 -MaxSamples 1 | Select-Object -ExpandProperty CounterSamples | Select-Object -ExpandProperty CookedValue"`;
-      const cpuResult = await execAsync(cpuCmd, { shell: true, timeout: 5000 });
-      const cpuValue = parseFloat(cpuResult.stdout.trim());
-      if (!isNaN(cpuValue) && cpuValue >= 0 && cpuValue <= 100) {
-        results.cpu = Math.round(cpuValue * 10) / 10;
-      } else {
-        throw new Error('Invalid CPU value');
-      }
-    } catch {
-      // Fallback: Use WMI via PowerShell
-      const fallbackCmd = `powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-CimInstance Win32_Processor | Select-Object -ExpandProperty LoadPercentage"`;
-      const fallbackResult = await execAsync(fallbackCmd, { shell: true, timeout: 5000 });
-      const cpuValue = parseFloat(fallbackResult.stdout.trim());
-      if (!isNaN(cpuValue) && cpuValue >= 0 && cpuValue <= 100) {
-        results.cpu = Math.round(cpuValue * 10) / 10;
-      } else {
-        results.errors.push('CPU: Both Get-Counter and WMI methods failed');
-        results.cpu = 0;
-      }
-    }
-  } catch (error) {
-    results.errors.push(`CPU monitoring error: ${error.message}`);
-    results.cpu = 0;
+    return await _getStatsImpl();
+  } finally {
+    _statsInFlight = false;
   }
-
-  // RAM Monitoring - Primary: WMI, Fallback: os.totalmem()
-  try {
-    try {
-      const ramCmd = `powershell -NoProfile -ExecutionPolicy Bypass -Command "$os = Get-CimInstance Win32_OperatingSystem; if ($os.TotalVisibleMemorySize -gt 0) { [math]::Round((($os.TotalVisibleMemorySize - $os.FreePhysicalMemory) / $os.TotalVisibleMemorySize) * 100, 1) } else { 'ERROR' }"`;
-      const ramResult = await execAsync(ramCmd, { shell: true, timeout: 5000 });
-      const ramValue = parseFloat(ramResult.stdout.trim());
-      if (!isNaN(ramValue) && ramValue >= 0 && ramValue <= 100) {
-        results.ram = Math.round(ramValue * 10) / 10;
-      } else {
-        throw new Error('Invalid RAM value from WMI');
-      }
-    } catch {
-      // Fallback: Use Node.js os module
-      const totalMem = os.totalmem();
-      const freeMem = os.freemem();
-      if (totalMem > 0) {
-        const ramValue = ((totalMem - freeMem) / totalMem) * 100;
-        results.ram = Math.round(ramValue * 10) / 10;
-      } else {
-        throw new Error('Cannot calculate RAM with os module');
-      }
-    }
-  } catch (error) {
-    results.errors.push(`RAM monitoring error: ${error.message}`);
-    results.ram = 0;
-  }
-
-  // Disk Monitoring - Primary: WMI C:, Fallback: Node.js fs stats on C:
-  try {
-    try {
-      const diskCmd = `powershell -NoProfile -ExecutionPolicy Bypass -Command "$disk = Get-CimInstance Win32_LogicalDisk -Filter 'DeviceID=\\'C:\\''; if ($disk -and $disk.Size -gt 0) { [math]::Round((($disk.Size - $disk.FreeSpace) / $disk.Size) * 100, 1) } else { 'ERROR' }"`;
-      const diskResult = await execAsync(diskCmd, { shell: true, timeout: 5000 });
-      const diskValue = parseFloat(diskResult.stdout.trim());
-      if (!isNaN(diskValue) && diskValue >= 0 && diskValue <= 100) {
-        results.disk = Math.round(diskValue * 10) / 10;
-      } else {
-        throw new Error('Invalid disk value from WMI');
-      }
-    } catch {
-      // Fallback: Try alternative WMI query
-      const fallbackCmd = `powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-Volume -DriveLetter C -ErrorAction SilentlyContinue | ForEach-Object {if ($_.Size -gt 0) { [math]::Round((1 - ($_.SizeRemaining / $_.Size)) * 100, 1) }}"`;
-      const fallbackResult = await execAsync(fallbackCmd, { shell: true, timeout: 5000 });
-      const diskValue = parseFloat(fallbackResult.stdout.trim());
-      if (!isNaN(diskValue) && diskValue >= 0 && diskValue <= 100) {
-        results.disk = Math.round(diskValue * 10) / 10;
-      } else {
-        throw new Error('Disk monitoring failed');
-      }
-    }
-  } catch (error) {
-    results.errors.push(`Disk monitoring error: ${error.message}`);
-    results.disk = 0;
-  }
-
-  // Temperature Monitoring - Primary: WMI sensors, Fallback: estimation
-  try {
-    try {
-      const tempCmd = `powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-CimInstance -Namespace 'root/wmi' -ClassName MSAcpi_ThermalZoneTemperature -ErrorAction SilentlyContinue | ForEach-Object { $_.CurrentTemperature / 10 - 273.15 } | Select-Object -First 1"`;
-      const tempResult = await execAsync(tempCmd, { shell: true, timeout: 5000 });
-      const tempValue = parseFloat(tempResult.stdout.trim());
-      if (!isNaN(tempValue) && tempValue > 0 && tempValue < 150) {
-        results.temperature = Math.round(tempValue * 10) / 10;
-      } else {
-        throw new Error('No valid sensor reading');
-      }
-    } catch {
-      // Fallback: Try alternative WMI path
-      try {
-        const fallbackCmd = `powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-WmiObject -Namespace 'root\\cimv2' -Class Win32_TemperatureProbe -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty CurrentReading | ForEach-Object { $_ / 10 }"`;
-        const fallbackResult = await execAsync(fallbackCmd, { shell: true, timeout: 5000 });
-        const tempValue = parseFloat(fallbackResult.stdout.trim());
-        if (!isNaN(tempValue) && tempValue > 0 && tempValue < 150) {
-          results.temperature = Math.round(tempValue * 10) / 10;
-        } else {
-          throw new Error('Alternative WMI failed');
-        }
-      } catch {
-        // Last fallback: Estimate from CPU usage (better than failing)
-        const estimated = 40 + (results.cpu * 0.4);
-        results.temperature = Math.round(estimated * 10) / 10;
-        results.errors.push('Temperature: Using CPU-based estimation (no sensors found)');
-      }
-    }
-  } catch (error) {
-    // Final fallback for temperature
-    const estimated = 40 + (results.cpu * 0.4);
-    results.temperature = Math.round(estimated * 10) / 10;
-    results.errors.push(`Temperature error: ${error.message} - using estimation`);
-  }
-
-  // Log errors for debugging (visible in console)
-  if (results.errors.length > 0) {
-    console.warn('[System Stats] Monitoring issues:', results.errors);
-  }
-
-  // Return only the required fields (clean up errors for production)
-  return {
-    cpu: results.cpu,
-    ram: results.ram,
-    disk: results.disk,
-    temperature: results.temperature
-  };
 });
+
+let _lastStats = { cpu: 0, ram: 0, disk: 0, temperature: 0 };
+
+async function _getStatsImpl() {
+  const errors = [];
+  let cpu = 0, ram = 0, disk = 0, temperature = 0;
+
+  // ── Single consolidated PowerShell script ──
+  // Returns: cpu|ram|disk|temp  separated by |||  
+  const script = `
+    $out = @('0','0','0','0')
+    # CPU — WMI LoadPercentage (instant, no sampling delay)
+    try {
+      $c = (Get-CimInstance Win32_Processor | Select-Object -First 1).LoadPercentage
+      if ($c -ne $null) { $out[0] = [string][math]::Round($c, 1) }
+    } catch {}
+    # RAM
+    try {
+      $o = Get-CimInstance Win32_OperatingSystem
+      if ($o.TotalVisibleMemorySize -gt 0) {
+        $out[1] = [string][math]::Round(($o.TotalVisibleMemorySize - $o.FreePhysicalMemory) / $o.TotalVisibleMemorySize * 100, 1)
+      }
+    } catch {}
+    # Disk C:
+    try {
+      $d = Get-CimInstance Win32_LogicalDisk -Filter "DeviceID='C:'"
+      if ($d -and $d.Size -gt 0) {
+        $out[2] = [string][math]::Round(($d.Size - $d.FreeSpace) / $d.Size * 100, 1)
+      }
+    } catch {}
+    # Temperature — MSAcpi_ThermalZoneTemperature
+    try {
+      $t = Get-CimInstance -Namespace 'root/wmi' -ClassName MSAcpi_ThermalZoneTemperature -ErrorAction SilentlyContinue | Select-Object -First 1
+      if ($t) {
+        $tc = $t.CurrentTemperature / 10 - 273.15
+        if ($tc -gt 0 -and $tc -lt 150) { $out[3] = [string][math]::Round($tc, 1) }
+      }
+    } catch {}
+    Write-Output ($out -join '|||')
+  `;
+
+  try {
+    const raw = await runPSScript(script, 6000);
+    const parts = raw.trim().split('|||');
+    if (parts.length >= 4) {
+      const cpuVal = parseFloat(parts[0]);
+      const ramVal = parseFloat(parts[1]);
+      const diskVal = parseFloat(parts[2]);
+      const tempVal = parseFloat(parts[3]);
+      if (!isNaN(cpuVal) && cpuVal >= 0 && cpuVal <= 100) cpu = Math.round(cpuVal * 10) / 10;
+      if (!isNaN(ramVal) && ramVal >= 0 && ramVal <= 100) ram = Math.round(ramVal * 10) / 10;
+      if (!isNaN(diskVal) && diskVal >= 0 && diskVal <= 100) disk = Math.round(diskVal * 10) / 10;
+      if (!isNaN(tempVal) && tempVal > 0 && tempVal < 150) temperature = Math.round(tempVal * 10) / 10;
+    }
+  } catch (err) {
+    errors.push(`Consolidated stats error: ${err.message}`);
+  }
+
+  // Fallbacks using Node.js (zero-cost)
+  if (ram === 0) {
+    const totalMem = os.totalmem();
+    const freeMem = os.freemem();
+    if (totalMem > 0) ram = Math.round(((totalMem - freeMem) / totalMem) * 1000) / 10;
+  }
+  // Temperature estimation fallback
+  if (temperature === 0) {
+    temperature = Math.round((40 + cpu * 0.4) * 10) / 10;
+    if (errors.length === 0) errors.push('Temperature: Using CPU-based estimation');
+  }
+
+  if (errors.length > 0) console.warn('[System Stats]', errors);
+
+  _lastStats = { cpu, ram, disk, temperature };
+  return _lastStats;
+}
 
 // Hardware Info IPC Handler - fetches PC part names + static system info (called once on startup)
 ipcMain.handle('system:get-hardware-info', async () => {
@@ -793,103 +770,161 @@ ipcMain.handle('system:get-hardware-info', async () => {
   return info;
 });
 
-// Extended Stats IPC Handler - live metrics polled periodically
+// ──────────────────────────────────────────────────────
+// Extended Stats IPC Handler — consolidated into 2 calls:
+//   1) One big PowerShell script via -EncodedCommand
+//      (per-core CPU, clock, network, RAM GB, disk I/O,
+//       process count, uptime, Wi-Fi, latency)
+//   2) nvidia-smi (separate binary, fast, only if NVIDIA GPU)
+// ──────────────────────────────────────────────────────
+let _extInFlight = false;
+let _lastExt = {
+  cpuClock: 0, perCoreCpu: [], gpuUsage: -1, gpuTemp: -1,
+  gpuVramUsed: -1, gpuVramTotal: -1, networkUp: 0, networkDown: 0,
+  wifiSignal: -1, ramUsedGB: 0, ramTotalGB: 0, diskReadSpeed: 0,
+  diskWriteSpeed: 0, processCount: 0, systemUptime: '', latencyMs: 0,
+};
+
 ipcMain.handle('system:get-extended-stats', async () => {
+  // Overlap guard
+  if (_extInFlight) return _lastExt;
+  _extInFlight = true;
+  try {
+    return await _getExtStatsImpl();
+  } finally {
+    _extInFlight = false;
+  }
+});
+
+async function _getExtStatsImpl() {
   const ext = {
-    // CPU
-    cpuClock: 0,
-    perCoreCpu: [],
-    // GPU (NVIDIA via nvidia-smi)
-    gpuUsage: -1,
-    gpuTemp: -1,
-    gpuVramUsed: -1,
-    gpuVramTotal: -1,
-    // Network
-    networkUp: 0,
-    networkDown: 0,
-    wifiSignal: -1,
-    // RAM
-    ramUsedGB: 0,
-    ramTotalGB: 0,
-    // Disk I/O
-    diskReadSpeed: 0,
-    diskWriteSpeed: 0,
-    // System
-    processCount: 0,
-    systemUptime: '',
+    cpuClock: 0, perCoreCpu: [], gpuUsage: -1, gpuTemp: -1,
+    gpuVramUsed: -1, gpuVramTotal: -1, networkUp: 0, networkDown: 0,
+    wifiSignal: -1, ramUsedGB: 0, ramTotalGB: 0, diskReadSpeed: 0,
+    diskWriteSpeed: 0, processCount: 0, systemUptime: '', latencyMs: 0,
   };
 
-  const results = await Promise.allSettled([
-    // 0: Per-core CPU usage
+  // ── All PS queries use runPSScript (temp .ps1 file + -File flag) ──
+  // This avoids cmd.exe quoting issues that break -Command one-liners.
+  // We run 4 parallel tasks: fastCIM, counters, network, nvidia-smi.
+
+  const [fastR, counterR, netR, gpuR] = await Promise.allSettled([
+
+    // ── Fast CIM queries (sub-second): clock, RAM, procCount, uptime, latency ──
+    runPSScript(`
+try { $clock = (Get-CimInstance Win32_Processor | Select-Object -First 1).CurrentClockSpeed } catch { $clock = 0 }
+try {
+  $o = Get-CimInstance Win32_OperatingSystem
+  $ramT = [math]::Round($o.TotalVisibleMemorySize / 1MB, 1)
+  $ramU = [math]::Round(($o.TotalVisibleMemorySize - $o.FreePhysicalMemory) / 1MB, 1)
+  $up = (Get-Date) - $o.LastBootUpTime
+  $uptime = '{0}d {1}h {2}m' -f $up.Days, $up.Hours, $up.Minutes
+} catch { $ramT = 0; $ramU = 0; $uptime = '' }
+try { $procs = (Get-Process).Count } catch { $procs = 0 }
+try {
+  $ping = Test-Connection -Count 1 -ComputerName 8.8.8.8 -ErrorAction SilentlyContinue
+  $lat = if ($ping) { $ping.ResponseTime } else { 0 }
+} catch { $lat = 0 }
+Write-Output "$clock|$ramU|$ramT|$procs|$uptime|$lat"
+    `, 6000),
+
+    // ── Get-Counter: per-core CPU + disk I/O (1-second sample) ──
+    runPSScript(`
+try {
+  $c = Get-Counter -Counter @(
+    '\\Processor(*)\\% Processor Time',
+    '\\PhysicalDisk(_Total)\\Disk Read Bytes/sec',
+    '\\PhysicalDisk(_Total)\\Disk Write Bytes/sec'
+  ) -SampleInterval 1 -MaxSamples 1 -ErrorAction SilentlyContinue
+  $s = $c.CounterSamples
+  $cores = $s | Where-Object { $_.Path -like '*processor(*)*' -and $_.InstanceName -ne '_total' } | Sort-Object InstanceName
+  $coreStr = ($cores | ForEach-Object { [math]::Round($_.CookedValue, 1) }) -join ','
+  $dr = ($s | Where-Object { $_.Path -like '*read*' }).CookedValue
+  $dw = ($s | Where-Object { $_.Path -like '*write*' }).CookedValue
+  Write-Output ($coreStr + '|' + [math]::Round($dr) + '|' + [math]::Round($dw))
+} catch { Write-Output '|0|0' }
+    `, 6000),
+
+    // ── Network: throughput delta + Wi-Fi + SSID ──
+    runPSScript(`
+try {
+  $a = Get-NetAdapter | Where-Object { $_.Status -eq 'Up' -and $_.Name -notmatch 'Virtual|vEthernet|Loopback|Microsoft|Container' } | Select-Object -First 1
+  if ($a) {
+    $n = $a.Name
+    $s1 = Get-NetAdapterStatistics -Name $n
+    Start-Sleep -Milliseconds 500
+    $s2 = Get-NetAdapterStatistics -Name $n
+    $up = [math]::Round(($s2.SentBytes - $s1.SentBytes) / 0.5)
+    $dn = [math]::Round(($s2.ReceivedBytes - $s1.ReceivedBytes) / 0.5)
+  } else { $up = 0; $dn = 0 }
+} catch { $up = 0; $dn = 0 }
+
+$ssid = ''; $sig = ''
+try {
+  $w = netsh wlan show interfaces 2>$null
+  if ($w) {
+    $sl = $w | Select-String -Pattern '^\\s*SSID' | Where-Object { $_.ToString() -notmatch 'BSSID' } | Select-Object -First 1
+    $sg2 = $w | Select-String 'Signal' | Select-Object -First 1
+    if ($sl) { $ssid = $sl.ToString().Split(':',2)[1].Trim() }
+    if ($sg2) { $sig = $sg2.ToString().Split(':',2)[1].Trim() }
+  }
+} catch {}
+
+Write-Output "$up|$dn|$ssid|$sig"
+    `, 5000),
+
+    // ── GPU via nvidia-smi (separate binary, fast) ──
     execAsync(
-      `powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-Counter '\\Processor(*)\\% Processor Time' -SampleInterval 1 -MaxSamples 1 | Select-Object -ExpandProperty CounterSamples | Where-Object { $_.InstanceName -ne '_total' } | Sort-Object InstanceName | ForEach-Object { [math]::Round($_.CookedValue, 1) }"`,
-      { shell: true, timeout: 6000 }
-    ),
-    // 1: CPU current clock speed
-    execAsync(
-      `powershell -NoProfile -ExecutionPolicy Bypass -Command "(Get-CimInstance Win32_Processor | Select-Object -First 1).CurrentClockSpeed"`,
-      { shell: true, timeout: 5000 }
-    ),
-    // 2: GPU stats via nvidia-smi (NVIDIA only)
-    execAsync(
-      `nvidia-smi --query-gpu=utilization.gpu,temperature.gpu,memory.used,memory.total --format=csv,noheader,nounits`,
-      { shell: true, timeout: 5000 }
-    ),
-    // 3: Network throughput — sample twice (400ms) and average to better capture short bursts
-    execAsync(
-      `powershell -NoProfile -ExecutionPolicy Bypass -Command "$a = Get-NetAdapter | Where-Object { $_.Status -eq 'Up' -and $_.Name -notmatch 'Virtual|vEthernet|Loopback|Microsoft|Container' } | Select-Object -First 1; if ($a) { $name = $a.Name; $s1 = Get-NetAdapterStatistics -Name $name; Start-Sleep -Milliseconds 400; $s2 = Get-NetAdapterStatistics -Name $name; Start-Sleep -Milliseconds 400; $s3 = Get-NetAdapterStatistics -Name $name; $up1 = ($s2.SentBytes - $s1.SentBytes) / 0.4; $up2 = ($s3.SentBytes - $s2.SentBytes) / 0.4; $down1 = ($s2.ReceivedBytes - $s1.ReceivedBytes) / 0.4; $down2 = ($s3.ReceivedBytes - $s2.ReceivedBytes) / 0.4; $up = [math]::Round((($up1 + $up2)/2)); $down = [math]::Round((($down1 + $down2)/2)); Write-Output ($up); Write-Output '|||'; Write-Output ($down) } else { $c = Get-Counter '\\Network Interface(*)\\Bytes Sent/sec','\\Network Interface(*)\\Bytes Received/sec' -SampleInterval 1 -MaxSamples 1 -ErrorAction SilentlyContinue; $s = $c.CounterSamples; $up = ($s | Where-Object { $_.Path -like '*Bytes Sent*' } | Measure-Object -Property CookedValue -Sum).Sum; $down = ($s | Where-Object { $_.Path -like '*Bytes Received*' } | Measure-Object -Property CookedValue -Sum).Sum; Write-Output ([math]::Round($up)); Write-Output '|||'; Write-Output ([math]::Round($down)) }"`,
-      { shell: true, timeout: 9000 }
-    ),
-    // 4: Wi-Fi SSID + Signal
-    execAsync(
-      `powershell -NoProfile -ExecutionPolicy Bypass -Command "$w = netsh wlan show interfaces; $ssid = ($w | Select-String -Pattern '^\s*SSID' -NotMatch 'BSSID' | Select-Object -First 1).ToString().Split(':')[1].Trim(); $sig = ($w | Select-String 'Signal').ToString().Split(':')[1].Trim(); Write-Output ($ssid + '|||' + $sig)"`,
-      { shell: true, timeout: 5000 }
-    ),
-    // 5: RAM usage in GB
-    execAsync(
-      `powershell -NoProfile -ExecutionPolicy Bypass -Command "$o = Get-CimInstance Win32_OperatingSystem; $t = [math]::Round($o.TotalVisibleMemorySize/1MB,1); $f = [math]::Round($o.FreePhysicalMemory/1MB,1); Write-Output ($t - $f); Write-Output '|||'; Write-Output $t"`,
-      { shell: true, timeout: 5000 }
-    ),
-    // 6: Disk I/O
-    execAsync(
-      `powershell -NoProfile -ExecutionPolicy Bypass -Command "$c = Get-Counter '\\PhysicalDisk(_Total)\\Disk Read Bytes/sec','\\PhysicalDisk(_Total)\\Disk Write Bytes/sec' -SampleInterval 1 -MaxSamples 1 -ErrorAction SilentlyContinue; $s = $c.CounterSamples; $r = ($s | Where-Object { $_.Path -like '*Read*' }).CookedValue; $w = ($s | Where-Object { $_.Path -like '*Write*' }).CookedValue; Write-Output ([math]::Round($r)); Write-Output '|||'; Write-Output ([math]::Round($w))"`,
-      { shell: true, timeout: 6000 }
-    ),
-    // 7: Process count
-    execAsync(
-      `powershell -NoProfile -ExecutionPolicy Bypass -Command "(Get-Process).Count"`,
-      { shell: true, timeout: 5000 }
-    ),
-    // 8: System uptime
-    execAsync(
-      `powershell -NoProfile -ExecutionPolicy Bypass -Command "$up = (Get-Date) - (Get-CimInstance Win32_OperatingSystem).LastBootUpTime; '{0}d {1}h {2}m' -f $up.Days, $up.Hours, $up.Minutes"`,
-      { shell: true, timeout: 5000 }
-    ),
-    // 9: Latency (ping to 8.8.8.8)
-    execAsync(
-      `powershell -NoProfile -ExecutionPolicy Bypass -Command "try { (Test-Connection -Count 1 -ComputerName 8.8.8.8 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty ResponseTime) } catch { '' }"`,
-      { shell: true, timeout: 4000 }
-    ),
+      'nvidia-smi --query-gpu=utilization.gpu,temperature.gpu,memory.used,memory.total --format=csv,noheader,nounits',
+      { shell: true, timeout: 3000 }
+    ).then(r => (r.stdout || '').trim()).catch(() => ''),
   ]);
 
-  const get = (i) => results[i].status === 'fulfilled' ? results[i].value.stdout.trim() : '';
+  // ── Parse each result independently — each is a pipe-separated string ──
+  const val = (r) => r.status === 'fulfilled' ? (r.value || '') : '';
 
-  // 0: Per-core CPU
+  // Fast CIM: clock|ramU|ramT|procs|uptime|latency
   try {
-    const raw = get(0);
-    if (raw) {
-      ext.perCoreCpu = raw.split('\n').map(l => parseFloat(l.trim())).filter(v => !isNaN(v));
+    const parts = val(fastR).split('|');
+    if (parts.length >= 6) {
+      ext.cpuClock = parseInt(parts[0]) || 0;
+      ext.ramUsedGB = parseFloat(parts[1]) || 0;
+      ext.ramTotalGB = parseFloat(parts[2]) || 0;
+      ext.processCount = parseInt(parts[3]) || 0;
+      ext.systemUptime = parts[4] || '';
+      ext.latencyMs = parseInt(parts[5]) || 0;
     }
   } catch {}
 
-  // 1: CPU clock
+  // Counter: coreCSV|diskRead|diskWrite
   try {
-    ext.cpuClock = parseInt(get(1)) || 0;
+    const raw = val(counterR);
+    if (raw) {
+      const parts = raw.split('|');
+      if (parts.length >= 3) {
+        if (parts[0]) {
+          ext.perCoreCpu = parts[0].split(',').map(v => parseFloat(v)).filter(v => !isNaN(v));
+        }
+        ext.diskReadSpeed = parseInt(parts[1]) || 0;
+        ext.diskWriteSpeed = parseInt(parts[2]) || 0;
+      }
+    }
   } catch {}
 
-  // 2: GPU (nvidia-smi)
+  // Network: up|down|ssid|signal
   try {
-    const raw = get(2);
+    const parts = val(netR).split('|');
+    if (parts.length >= 4) {
+      ext.networkUp = parseInt(parts[0]) || 0;
+      ext.networkDown = parseInt(parts[1]) || 0;
+      if (parts[2]) ext.ssid = parts[2];
+      if (parts[3]) ext.wifiSignal = parseInt(parts[3]) || -1;
+    }
+  } catch {}
+
+  // GPU: usage, temp, vramUsed, vramTotal
+  try {
+    const raw = val(gpuR);
     if (raw) {
       const parts = raw.split(',').map(s => parseFloat(s.trim()));
       if (parts.length >= 4) {
@@ -901,50 +936,9 @@ ipcMain.handle('system:get-extended-stats', async () => {
     }
   } catch {}
 
-  // 3: Network
-  try {
-    const parts = get(3).split('|||').map(s => s.trim());
-    ext.networkUp = parseInt(parts[0]) || 0;
-    ext.networkDown = parseInt(parts[1]) || 0;
-  } catch {}
-
-  // 4: Wi-Fi SSID + Signal
-  try {
-    const raw = get(4);
-    if (raw && raw.includes('|||')) {
-      const parts = raw.split('|||').map(s => s.trim());
-      ext.ssid = parts[0] || '';
-      ext.wifiSignal = parseInt(parts[1]) || -1;
-    } else if (raw) {
-      ext.wifiSignal = parseInt(raw) || -1;
-    }
-  } catch {}
-
-  // 5: RAM GB
-  try {
-    const parts = get(5).split('|||').map(s => s.trim());
-    ext.ramUsedGB = parseFloat(parts[0]) || 0;
-    ext.ramTotalGB = parseFloat(parts[1]) || 0;
-  } catch {}
-
-  // 6: Disk I/O
-  try {
-    const parts = get(6).split('|||').map(s => s.trim());
-    ext.diskReadSpeed = parseInt(parts[0]) || 0;
-    ext.diskWriteSpeed = parseInt(parts[1]) || 0;
-  } catch {}
-
-  // 7: Process count
-  try { ext.processCount = parseInt(get(7)) || 0; } catch {}
-
-  // 8: Uptime
-  try { ext.systemUptime = get(8) || ''; } catch {}
-
-  // 9: Latency (ms)
-  try { ext.latencyMs = parseInt(get(9)) || 0; } catch {}
-
+  _lastExt = ext;
   return ext;
-});
+}
 
 // Cleaner IPC Handlers
 ipcMain.handle('cleaner:clear-nvidia-cache', async () => {
@@ -2204,6 +2198,7 @@ ipcMain.handle('tweak:apply-irq-priority', async () => {
   try {
     const cmd = `If (-not (Test-Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\PriorityControl')) { New-Item -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\PriorityControl' -Force | Out-Null }; Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\PriorityControl' -Name 'IRQ8Priority' -Value 1 -Type DWord -Force; $val = (Get-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\PriorityControl' -Name 'IRQ8Priority').IRQ8Priority; Write-Host "Created: IRQ8Priority = $val"`;
     await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${cmd}"`, { shell: true });
+    _tweakCheckCache = null;
     return { success: true, message: 'IRQ Priority tweak applied successfully' };
   } catch (error) {
     return { success: false, message: `Error: ${error.message}` };
@@ -2214,6 +2209,7 @@ ipcMain.handle('tweak:apply-network-interrupts', async () => {
   try {
     const cmd = `If (-not (Test-Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\NDIS\\Parameters')) { New-Item -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\NDIS\\Parameters' -Force | Out-Null }; Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\NDIS\\Parameters' -Name 'ProcessorThrottleMode' -Value 1 -Type DWord -Force; Write-Host 'Network Interrupts applied'`;
     await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${cmd}"`, { shell: true });
+    _tweakCheckCache = null;
     return { success: true, message: 'Network Interrupts tweak applied successfully' };
   } catch (error) {
     return { success: false, message: `Error: ${error.message}` };
@@ -2224,6 +2220,7 @@ ipcMain.handle('tweak:apply-gpu-scheduling', async () => {
   try {
     const cmd = `If (-not (Test-Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\GraphicsDrivers')) { New-Item -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\GraphicsDrivers' -Force | Out-Null }; Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\GraphicsDrivers' -Name 'HwSchMode' -Value 2 -Type DWord -Force; Write-Host 'GPU Scheduling applied'`;
     await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${cmd}"`, { shell: true });
+    _tweakCheckCache = null;
     return { success: true, message: 'GPU Scheduling tweak applied successfully' };
   } catch (error) {
     return { success: false, message: `Error: ${error.message}` };
@@ -2234,6 +2231,7 @@ ipcMain.handle('tweak:apply-fullscreen-optimization', async () => {
   try {
     const cmd = `If (-not (Test-Path 'HKCU:\\System\\GameConfigStore')) { New-Item -Path 'HKCU:\\System\\GameConfigStore' -Force | Out-Null }; Set-ItemProperty -Path 'HKCU:\\System\\GameConfigStore' -Name 'GameDVR_FSEBehaviorMonitorEnabled' -Value 0 -Type DWord -Force; Write-Host 'Fullscreen Optimization applied'`;
     await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${cmd}"`, { shell: true });
+    _tweakCheckCache = null;
     return { success: true, message: 'Fullscreen Optimization tweak applied successfully' };
   } catch (error) {
     return { success: false, message: `Error: ${error.message}` };
@@ -2244,6 +2242,7 @@ ipcMain.handle('tweak:apply-usb-suspend', async () => {
   try {
     const cmd = `If (-not (Test-Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\USB')) { New-Item -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\USB' -Force | Out-Null }; Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\USB' -Name 'DisableSelectiveSuspend' -Value 1 -Type DWord -Force; Write-Host 'USB Suspend applied'`;
     await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${cmd}"`, { shell: true });
+    _tweakCheckCache = null;
     return { success: true, message: 'USB Suspend tweak applied successfully' };
   } catch (error) {
     return { success: false, message: `Error: ${error.message}` };
@@ -2254,6 +2253,7 @@ ipcMain.handle('tweak:apply-game-dvr', async () => {
   try {
     const cmd = `If (-not (Test-Path 'HKCU:\\System\\GameConfigStore')) { New-Item -Path 'HKCU:\\System\\GameConfigStore' -Force | Out-Null }; Set-ItemProperty -Path 'HKCU:\\System\\GameConfigStore' -Name 'GameDVR_Enabled' -Value 0 -Type DWord -Force; Write-Host 'Game DVR applied'`;
     await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${cmd}"`, { shell: true });
+    _tweakCheckCache = null;
     return { success: true, message: 'Game DVR tweak applied successfully' };
   } catch (error) {
     return { success: false, message: `Error: ${error.message}` };
@@ -2264,6 +2264,7 @@ ipcMain.handle('tweak:apply-win32-priority', async () => {
   try {
     const cmd = `If (-not (Test-Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\PriorityControl')) { New-Item -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\PriorityControl' -Force | Out-Null }; Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\PriorityControl' -Name 'Win32PrioritySeparation' -Value 38 -Type DWord -Force; Write-Host 'Win32 Priority applied'`;
     await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${cmd}"`, { shell: true });
+    _tweakCheckCache = null;
     return { success: true, message: 'Win32 Priority tweak applied successfully' };
   } catch (error) {
     return { success: false, message: `Error: ${error.message}` };
@@ -2271,107 +2272,120 @@ ipcMain.handle('tweak:apply-win32-priority', async () => {
 });
 
 // Check Tweak Status IPC Handlers
+// ──────────────────────────────────────────────────────
+// Tweak Check Handlers — consolidated into a single PS call
+// All 7 registry checks run in ONE PowerShell invocation,
+// then individual handlers pull from the cached result.
+// ──────────────────────────────────────────────────────
+let _tweakCheckCache = null;
+let _tweakCheckAge = 0;
+
+async function _runAllTweakChecks() {
+  // Cache for 2 seconds to avoid re-running when all 7 handlers fire in parallel
+  if (_tweakCheckCache && (Date.now() - _tweakCheckAge < 2000)) return _tweakCheckCache;
+
+  try {
+    const raw = await runPSScript(`
+$r = @{}
+function ChkReg($id, $path, $name) {
+  try {
+    $p = Get-ItemProperty -Path $path -Name $name -ErrorAction SilentlyContinue
+    if ($p -and ($p.PSObject.Properties.Name -contains $name)) {
+      $r[$id] = @{ exists = $true; value = $p.$name }
+    } else {
+      $r[$id] = @{ exists = $false; value = $null }
+    }
+  } catch {
+    $r[$id] = @{ exists = $false; value = $null }
+  }
+}
+ChkReg 'irq' 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\PriorityControl' 'IRQ8Priority'
+ChkReg 'net' 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\NDIS\\Parameters' 'ProcessorThrottleMode'
+ChkReg 'gpu' 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\GraphicsDrivers' 'HwSchMode'
+ChkReg 'fse' 'HKCU:\\System\\GameConfigStore' 'GameDVR_FSEBehaviorMonitorEnabled'
+ChkReg 'usb' 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\USB' 'DisableSelectiveSuspend'
+ChkReg 'dvr' 'HKCU:\\System\\GameConfigStore' 'GameDVR_Enabled'
+ChkReg 'w32' 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\PriorityControl' 'Win32PrioritySeparation'
+$r | ConvertTo-Json -Compress
+    `, 6000);
+
+    if (raw) {
+      _tweakCheckCache = JSON.parse(raw);
+      _tweakCheckAge = Date.now();
+      return _tweakCheckCache;
+    }
+  } catch (e) {
+    console.warn('[TweakCheck] Consolidated check error:', e.message);
+  }
+  return null;
+}
+
+function _tweakResult(data, key, appliedValue) {
+  if (!data || !data[key]) return { applied: false, exists: false, value: null };
+  const entry = data[key];
+  const applied = entry.exists && Number(entry.value) === appliedValue;
+  return { applied, exists: entry.exists, value: entry.value };
+}
+
 ipcMain.handle('tweak:check-irq-priority', async () => {
   try {
-    const cmd = `powershell -NoProfile -ExecutionPolicy Bypass -Command "$p = Get-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\PriorityControl' -Name 'IRQ8Priority' -ErrorAction SilentlyContinue; if ($p) { @{ exists = $true; value = $p.IRQ8Priority } | ConvertTo-Json -Compress } else { @{ exists = $false; value = $null } | ConvertTo-Json -Compress }"`;
-    const result = await execAsync(cmd, { shell: true });
-    const out = (result.stdout || '').trim();
-    if (!out) return { applied: false };
-    const parsed = JSON.parse(out);
-    const applied = parsed.exists && Number(parsed.value) === 1;
-    return { applied, value: parsed.value };
+    const data = await _runAllTweakChecks();
+    return _tweakResult(data, 'irq', 1);
   } catch (error) {
-    console.log('[Tweak Check] IRQ Priority check error:', error.message || error);
     return { applied: false, exists: false, value: null, error: error.message || String(error) };
   }
 });
 
 ipcMain.handle('tweak:check-network-interrupts', async () => {
   try {
-    const cmd = `powershell -NoProfile -ExecutionPolicy Bypass -Command "$p = Get-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\NDIS\\Parameters' -Name 'ProcessorThrottleMode' -ErrorAction SilentlyContinue; if ($p) { @{ exists = $true; value = $p.ProcessorThrottleMode } | ConvertTo-Json -Compress } else { @{ exists = $false; value = $null } | ConvertTo-Json -Compress }"`;
-    const result = await execAsync(cmd, { shell: true });
-    const out = (result.stdout || '').trim();
-    if (!out) return { applied: false };
-    const parsed = JSON.parse(out);
-    const applied = parsed.exists && Number(parsed.value) === 1;
-    return { applied, value: parsed.value };
+    const data = await _runAllTweakChecks();
+    return _tweakResult(data, 'net', 1);
   } catch (error) {
-    console.log('[Tweak Check] Network Interrupts check error:', error.message || error);
     return { applied: false, exists: false, value: null, error: error.message || String(error) };
   }
 });
 
 ipcMain.handle('tweak:check-gpu-scheduling', async () => {
   try {
-    const cmd = `powershell -NoProfile -ExecutionPolicy Bypass -Command "$p = Get-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\GraphicsDrivers' -Name 'HwSchMode' -ErrorAction SilentlyContinue; if ($p) { @{ exists = $true; value = $p.HwSchMode } | ConvertTo-Json -Compress } else { @{ exists = $false; value = $null } | ConvertTo-Json -Compress }"`;
-    const result = await execAsync(cmd, { shell: true });
-    const out = (result.stdout || '').trim();
-    if (!out) return { applied: false };
-    const parsed = JSON.parse(out);
-    const applied = parsed.exists && Number(parsed.value) === 2;
-    return { applied, value: parsed.value };
+    const data = await _runAllTweakChecks();
+    return _tweakResult(data, 'gpu', 2);
   } catch (error) {
-    console.log('[Tweak Check] GPU Scheduling check error:', error.message || error);
     return { applied: false, exists: false, value: null, error: error.message || String(error) };
   }
 });
 
 ipcMain.handle('tweak:check-fullscreen-optimization', async () => {
   try {
-    const cmd = `powershell -NoProfile -ExecutionPolicy Bypass -Command "$p = Get-ItemProperty -Path 'HKCU:\\System\\GameConfigStore' -Name 'GameDVR_FSEBehaviorMonitorEnabled' -ErrorAction SilentlyContinue; if ($p) { @{ exists = $true; value = $p.GameDVR_FSEBehaviorMonitorEnabled } | ConvertTo-Json -Compress } else { @{ exists = $false; value = $null } | ConvertTo-Json -Compress }"`;
-    const result = await execAsync(cmd, { shell: true });
-    const out = (result.stdout || '').trim();
-    if (!out) return { applied: false };
-    const parsed = JSON.parse(out);
-    const applied = parsed.exists && Number(parsed.value) === 0;
-    return { applied, value: parsed.value };
+    const data = await _runAllTweakChecks();
+    return _tweakResult(data, 'fse', 0);
   } catch (error) {
-    console.log('[Tweak Check] Fullscreen Optimization check error:', error.message || error);
     return { applied: false, exists: false, value: null, error: error.message || String(error) };
   }
 });
 
 ipcMain.handle('tweak:check-usb-suspend', async () => {
   try {
-    const cmd = `powershell -NoProfile -ExecutionPolicy Bypass -Command "$p = Get-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\USB' -Name 'DisableSelectiveSuspend' -ErrorAction SilentlyContinue; if ($p) { @{ exists = $true; value = $p.DisableSelectiveSuspend } | ConvertTo-Json -Compress } else { @{ exists = $false; value = $null } | ConvertTo-Json -Compress }"`;
-    const result = await execAsync(cmd, { shell: true });
-    const out = (result.stdout || '').trim();
-    if (!out) return { applied: false };
-    const parsed = JSON.parse(out);
-    const applied = parsed.exists && Number(parsed.value) === 1;
-    return { applied, value: parsed.value };
+    const data = await _runAllTweakChecks();
+    return _tweakResult(data, 'usb', 1);
   } catch (error) {
-    console.log('[Tweak Check] USB Suspend check error:', error.message || error);
     return { applied: false, exists: false, value: null, error: error.message || String(error) };
   }
 });
 
 ipcMain.handle('tweak:check-game-dvr', async () => {
   try {
-    const cmd = `powershell -NoProfile -ExecutionPolicy Bypass -Command "$p = Get-ItemProperty -Path 'HKCU:\\System\\GameConfigStore' -Name 'GameDVR_Enabled' -ErrorAction SilentlyContinue; if ($p) { @{ exists = $true; value = $p.GameDVR_Enabled } | ConvertTo-Json -Compress } else { @{ exists = $false; value = $null } | ConvertTo-Json -Compress }"`;
-    const result = await execAsync(cmd, { shell: true });
-    const out = (result.stdout || '').trim();
-    if (!out) return { applied: false };
-    const parsed = JSON.parse(out);
-    const applied = parsed.exists && Number(parsed.value) === 0;
-    return { applied, value: parsed.value };
+    const data = await _runAllTweakChecks();
+    return _tweakResult(data, 'dvr', 0);
   } catch (error) {
-    console.log('[Tweak Check] Game DVR check error:', error.message || error);
     return { applied: false, exists: false, value: null, error: error.message || String(error) };
   }
 });
 
 ipcMain.handle('tweak:check-win32-priority', async () => {
   try {
-    const cmd = `powershell -NoProfile -ExecutionPolicy Bypass -Command "$p = Get-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\PriorityControl' -Name 'Win32PrioritySeparation' -ErrorAction SilentlyContinue; if ($p) { @{ exists = $true; value = $p.Win32PrioritySeparation } | ConvertTo-Json -Compress } else { @{ exists = $false; value = $null } | ConvertTo-Json -Compress }"`;
-    const result = await execAsync(cmd, { shell: true });
-    const out = (result.stdout || '').trim();
-    if (!out) return { applied: false };
-    const parsed = JSON.parse(out);
-    const applied = parsed.exists && Number(parsed.value) === 38;
-    return { applied, value: parsed.value };
+    const data = await _runAllTweakChecks();
+    return _tweakResult(data, 'w32', 38);
   } catch (error) {
-    console.log('[Tweak Check] Win32 Priority check error:', error.message || error);
     return { applied: false, exists: false, value: null, error: error.message || String(error) };
   }
 });
@@ -2381,6 +2395,7 @@ ipcMain.handle('tweak:reset-irq-priority', async () => {
   try {
     const cmd = `Remove-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\PriorityControl' -Name 'IRQ8Priority' -Force -ErrorAction Stop`;
     await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${cmd}"`, { shell: true });
+    _tweakCheckCache = null;
     return { success: true, message: 'IRQ Priority reset to default' };
   } catch (error) {
     return { success: false, message: 'Failed to reset IRQ Priority - Admin privileges required' };
@@ -2391,6 +2406,7 @@ ipcMain.handle('tweak:reset-network-interrupts', async () => {
   try {
     const cmd = `Remove-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\NDIS\\Parameters' -Name 'ProcessorThrottleMode' -Force -ErrorAction Stop`;
     await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${cmd}"`, { shell: true });
+    _tweakCheckCache = null;
     return { success: true, message: 'Network Interrupts reset to default' };
   } catch (error) {
     return { success: false, message: 'Failed to reset Network Interrupts - Admin privileges required' };
@@ -2401,6 +2417,7 @@ ipcMain.handle('tweak:reset-gpu-scheduling', async () => {
   try {
     const cmd = `Remove-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\GraphicsDrivers' -Name 'HwSchMode' -Force -ErrorAction Stop`;
     await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${cmd}"`, { shell: true });
+    _tweakCheckCache = null;
     return { success: true, message: 'GPU Scheduling reset to default' };
   } catch (error) {
     return { success: false, message: 'Failed to reset GPU Scheduling - Admin privileges required' };
@@ -2411,6 +2428,7 @@ ipcMain.handle('tweak:reset-fullscreen-optimization', async () => {
   try {
     const cmd = `Remove-ItemProperty -Path 'HKCU:\\System\\GameConfigStore' -Name 'GameDVR_FSEBehaviorMonitorEnabled' -Force -ErrorAction Stop`;
     await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${cmd}"`, { shell: true });
+    _tweakCheckCache = null;
     return { success: true, message: 'Fullscreen Optimization reset to default' };
   } catch (error) {
     return { success: false, message: 'Failed to reset Fullscreen Optimization - Admin privileges required' };
@@ -2421,6 +2439,7 @@ ipcMain.handle('tweak:reset-usb-suspend', async () => {
   try {
     const cmd = `Remove-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\USB' -Name 'DisableSelectiveSuspend' -Force -ErrorAction Stop`;
     await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${cmd}"`, { shell: true });
+    _tweakCheckCache = null;
     return { success: true, message: 'USB Suspend reset to default' };
   } catch (error) {
     return { success: false, message: 'Failed to reset USB Suspend - Admin privileges required' };
@@ -2431,6 +2450,7 @@ ipcMain.handle('tweak:reset-game-dvr', async () => {
   try {
     const cmd = `Remove-ItemProperty -Path 'HKCU:\\System\\GameConfigStore' -Name 'GameDVR_Enabled' -Force -ErrorAction Stop`;
     await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${cmd}"`, { shell: true });
+    _tweakCheckCache = null;
     return { success: true, message: 'Game DVR reset to default' };
   } catch (error) {
     return { success: false, message: 'Failed to reset Game DVR - Admin privileges required' };
@@ -2441,6 +2461,7 @@ ipcMain.handle('tweak:reset-win32-priority', async () => {
   try {
     const cmd = `Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\PriorityControl' -Name 'Win32PrioritySeparation' -Value 2 -Type DWord -Force`;
     await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${cmd}"`, { shell: true });
+    _tweakCheckCache = null;
     return { success: true, message: 'Win32 Priority reset to default' };
   } catch (error) {
     return { success: false, message: 'Failed to reset Win32 Priority - Admin privileges required' };
