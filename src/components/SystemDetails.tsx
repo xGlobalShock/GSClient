@@ -312,10 +312,10 @@ const SystemDetails: React.FC<SystemDetailsProps> = ({ systemStats, hardwareInfo
           )}
           <Row
             label="Read/Write"
-            value={ext && (ext.diskReadSpeed > 0 || ext.diskWriteSpeed > 0) ? (
+            value={ext ? (
               <div className="sysdet-value-with-io">
                 <div className="sysdet-io-badges-wrap">
-                  <IOStrip up={fmt(ext.diskWriteSpeed)} down={fmt(ext.diskReadSpeed)} />
+                  <IOStrip up={fmt(ext.diskWriteSpeed || 0)} down={fmt(ext.diskReadSpeed || 0)} />
                 </div>
               </div>
             ) : '—'}

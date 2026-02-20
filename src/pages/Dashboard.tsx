@@ -1,5 +1,6 @@
 import React from 'react';
 import SystemDetails from '../components/SystemDetails';
+import Loader from '../components/Loader';
 import type { HardwareInfo, ExtendedStats } from '../App';
 import '../styles/Dashboard.css';
 
@@ -12,9 +13,15 @@ interface DashboardProps {
   };
   hardwareInfo?: HardwareInfo;
   extendedStats?: ExtendedStats;
+  statsLoaded?: boolean;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ systemStats, hardwareInfo, extendedStats }) => {
+const Dashboard: React.FC<DashboardProps> = ({ systemStats, hardwareInfo, extendedStats, statsLoaded }) => {
+  if (!statsLoaded) {
+    // show page-level loader until first statistics arrive
+    return <div className="dashboard-page"><Loader /></div>;
+  }
+
   return (
     <div className="dashboard-page">
       <SystemDetails systemStats={systemStats} hardwareInfo={hardwareInfo} extendedStats={extendedStats} />

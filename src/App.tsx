@@ -83,6 +83,9 @@ function App() {
     disk: 0,
     temperature: 0,
   });
+  // track whether we've received at least one stats update
+  const [statsLoaded, setStatsLoaded] = useState(false);
+  const [extLoaded, setExtLoaded] = useState(false);
   const [hardwareInfo, setHardwareInfo] = useState<HardwareInfo | undefined>(undefined);
   const [extendedStats, setExtendedStats] = useState<ExtendedStats | undefined>(undefined);
 
@@ -90,26 +93,12 @@ function App() {
     // Loader timeout (simulate app/data loading)
     const timer = setTimeout(() => setIsLoading(false), 5000);
 
-    // Get real system stats
-    const fetchSystemStats = async () => {
-      if (window.electron?.ipcRenderer) {
-        try {
-          const stats = await window.electron.ipcRenderer.invoke('system:get-stats');
-          setSystemStats(stats);
-        } catch (error) {
-          console.error('Error fetching system stats:', error);
-        }
-      }
-    };
-
     // Fetch hardware info once
     const fetchHardwareInfo = async () => {
       if (window.electron?.ipcRenderer) {
         try {
           const info = await window.electron.ipcRenderer.invoke('system:get-hardware-info');
           setHardwareInfo(info);
-
-
         } catch (error) {
           console.error('Error fetching hardware info:', error);
         }
@@ -117,38 +106,71 @@ function App() {
     };
     fetchHardwareInfo();
 
-    // Fetch extended stats (live metrics)
-    const fetchExtendedStats = async () => {
-      if (window.electron?.ipcRenderer) {
-        try {
-          const ext = await window.electron.ipcRenderer.invoke('system:get-extended-stats');
-          setExtendedStats(ext);
-        } catch (error) {
-          console.error('Error fetching extended stats:', error);
-        }
-      }
-    };
-    fetchExtendedStats();
-
-    // Initial fetch
-    fetchSystemStats();
-
-    // Update every 2 seconds
-    const interval = setInterval(fetchSystemStats, 2000);
-    const extInterval = setInterval(fetchExtendedStats, 1500);
-
     return () => {
       clearTimeout(timer);
-      clearInterval(interval);
-      clearInterval(extInterval);
     };
   }, []);
+
+  useEffect(() => {
+    // Only poll system stats if Dashboard or Performance is visible
+    if (currentPage === 'dashboard' || currentPage === 'performance') {
+      // Get real system stats
+      const fetchSystemStats = async () => {
+        if (window.electron?.ipcRenderer) {
+          try {
+            const stats = await window.electron.ipcRenderer.invoke('system:get-stats');
+            setSystemStats(stats);
+            if (!statsLoaded) {
+              setStatsLoaded(true);
+            }
+          } catch (error) {
+            console.error('Error fetching system stats:', error);
+          }
+        }
+      };
+
+      // Fetch extended stats (live metrics)
+      const fetchExtendedStats = async () => {
+        if (window.electron?.ipcRenderer) {
+          try {
+            const ext = await window.electron.ipcRenderer.invoke('system:get-extended-stats');
+            setExtendedStats(ext);
+            if (!extLoaded) {
+              setExtLoaded(true);
+            }
+          } catch (error) {
+            console.error('Error fetching extended stats:', error);
+          }
+        }
+      };
+
+      // Initial fetch
+      fetchSystemStats();
+      fetchExtendedStats();
+
+      // Update every 2 seconds
+      const interval = setInterval(fetchSystemStats, 2000);
+      const extInterval = setInterval(fetchExtendedStats, 1500);
+
+      return () => {
+        clearInterval(interval);
+        clearInterval(extInterval);
+      };
+    }
+    // If not dashboard/performance, do not poll
+    return undefined;
+  }, [currentPage]);
 
   const renderPage = () => {
     return (
       <>
         <div style={{ display: currentPage === 'dashboard' ? 'block' : 'none' }}>
-          <Dashboard systemStats={systemStats} hardwareInfo={hardwareInfo} extendedStats={extendedStats} />
+          <Dashboard
+            systemStats={systemStats}
+            hardwareInfo={hardwareInfo}
+            extendedStats={extendedStats}
+            statsLoaded={statsLoaded && extLoaded}
+          />
         </div>
         <div style={{ display: currentPage === 'performance' ? 'block' : 'none' }}>
           <Performance />

@@ -115,7 +115,7 @@ function createWindow() {
       enableRemoteModule: false,
       devTools: false,
     },
-    icon: path.join(__dirname, 'public/icon.png'),
+    // icon: path.join(__dirname, 'public/icon.png'),
   });
 
   mainWindow.setMenuBarVisibility(false);

@@ -76,19 +76,34 @@ export async function getDiskUsage(): Promise<number> {
   }
 }
 
-// Get system temperature
+// Get system temperature with fallbacks similar to main.js
 export async function getSystemTemperature(): Promise<number> {
   try {
-    const { stdout } = await execAsync(
-      'wmic /namespace:\\\\root\\wmi path win32_perfformatteddata_ohdictsensors_systemtemperature get currentreading /format:list'
-    );
-    const match = stdout.match(/\d+/);
-    if (!match) return 45; // Default temp if not available
-    const temp = parseInt(match[0]);
-    return isNaN(temp) ? 45 : Math.round((temp / 1000) * 100) / 100;
-  } catch {
-    return 45;
+    // try primary PowerShell query (MSAcpi_ThermalZoneTemperature)
+    const tempCmd = `powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-CimInstance -Namespace 'root/wmi' -ClassName MSAcpi_ThermalZoneTemperature -ErrorAction SilentlyContinue | ForEach-Object { $_.CurrentTemperature / 10 - 273.15 } | Select-Object -First 1"`;
+    const { stdout: primary } = await execAsync(tempCmd);
+    const tempValue = parseFloat(primary.trim());
+    if (!isNaN(tempValue) && tempValue > 0 && tempValue < 150) {
+      return Math.round(tempValue * 10) / 10;
+    }
+    // if primary failed or invalid, fall through to alternative
+  } catch (e) {
+    // ignore and try fallback
   }
+
+  try {
+    const fallbackCmd = `powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-WmiObject -Namespace 'root\\cimv2' -Class Win32_TemperatureProbe -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty CurrentReading | ForEach-Object { $_ / 10 }"`;
+    const { stdout: fb } = await execAsync(fallbackCmd);
+    const tempValue = parseFloat(fb.trim());
+    if (!isNaN(tempValue) && tempValue > 0 && tempValue < 150) {
+      return Math.round(tempValue * 10) / 10;
+    }
+  } catch (e) {
+    // ignore
+  }
+
+  // final fallback: return a neutral estimate (could be improved by injecting cpu usage)
+  return 45;
 }
 
 // Get running processes
