@@ -183,12 +183,14 @@ function createWindow() {
 
 app.on('ready', () => {
   createWindow();
-  // Start LibreHardwareMonitor temperature service (must be after declarations)
+  // Start LibreHardwareMonitor sensor service + disk background refresh
   startLHMService();
+  _startDiskRefresh();
 });
 
 app.on('window-all-closed', () => {
   stopLHMService();
+  if (_diskRefreshTimer) { clearInterval(_diskRefreshTimer); _diskRefreshTimer = null; }
   if (process.platform !== 'darwin') {
     app.quit();
   }
@@ -284,20 +286,12 @@ ipcMain.handle('system:open-system-protection', async () => {
 });
 
 // ──────────────────────────────────────────────────────
-// System Stats IPC Handler — single consolidated PowerShell call
-// Fetches CPU %, RAM %, Disk %, and Temperature in ONE invocation
-// via -EncodedCommand. Falls back to Node.js os module for RAM.
+// System Stats IPC Handler — instant reads (no PS spawn)
+// CPU + Temp from LHM background service, RAM from Node.js,
+// Disk from background cache. Zero latency.
 // ──────────────────────────────────────────────────────
-let _statsInFlight = false;
-ipcMain.handle('system:get-stats', async () => {
-  // Overlap guard — if the previous poll hasn't finished, return cached
-  if (_statsInFlight) return _lastStats;
-  _statsInFlight = true;
-  try {
-    return await _getStatsImpl();
-  } finally {
-    _statsInFlight = false;
-  }
+ipcMain.handle('system:get-stats', () => {
+  return _getStatsImpl();
 });
 
 // ──────────────────────────────────────────────────────
@@ -308,6 +302,7 @@ ipcMain.handle('system:get-stats', async () => {
 // ──────────────────────────────────────────────────────
 let _lhmProcess = null;
 let _lhmTemp = 0;           // latest CPU package temp from LHM
+let _lhmCpuLoad = -1;       // latest CPU total load % from LHM
 let _lhmGpuTemp = -1;       // latest GPU temp from LHM
 let _lhmGpuUsage = -1;      // latest GPU load % from LHM
 let _lhmGpuVramUsed = -1;   // GPU VRAM used (MiB)
@@ -329,19 +324,26 @@ function startLHMService() {
     '$computer.IsCpuEnabled = $true',
     '$computer.IsGpuEnabled = $true',
     '$computer.Open()',
+    '# Use % Processor Utility (same counter Task Manager uses — accounts for frequency scaling)',
+    'try { $cpuCounter = New-Object System.Diagnostics.PerformanceCounter("Processor Information", "% Processor Utility", "_Total") ; $cpuCounter.NextValue() | Out-Null } catch { $cpuCounter = $null }',
     'while ($true) {',
     '  try {',
-    '    $cpuTemp = $null; $gpuTemp = $null; $gpuLoad = $null; $gpuVramUsed = $null; $gpuVramTotal = $null',
+    '    $cpuTemp = $null; $cpuLoad = $null; $gpuTemp = $null; $gpuLoad = $null; $gpuVramUsed = $null; $gpuVramTotal = $null',
+    '    # CPU usage from Windows performance counter (matches Task Manager exactly)',
+    '    if ($cpuCounter) { try { $cpuLoad = $cpuCounter.NextValue() } catch {} }',
     '    foreach ($hw in $computer.Hardware) {',
     '      $hw.Update()',
     '      $hwType = $hw.HardwareType.ToString()',
     '      if ($hwType -eq "Cpu") {',
     '        foreach ($sensor in $hw.Sensors) {',
-    '          if ($sensor.SensorType -eq [LibreHardwareMonitor.Hardware.SensorType]::Temperature -and $sensor.Value.HasValue) {',
-    '            if ($sensor.Name -eq "CPU Package") { $cpuTemp = $sensor.Value.Value; break }',
+    '          if (-not $sensor.Value.HasValue) { continue }',
+    '          if ($sensor.SensorType -eq [LibreHardwareMonitor.Hardware.SensorType]::Temperature) {',
+    '            if ($sensor.Name -eq "CPU Package") { $cpuTemp = $sensor.Value.Value }',
     '            if ($sensor.Name -eq "Core Average" -and $cpuTemp -eq $null) { $cpuTemp = $sensor.Value.Value }',
     '            if ($sensor.Name -eq "Core Max" -and $cpuTemp -eq $null) { $cpuTemp = $sensor.Value.Value }',
     '          }',
+    '          # Fallback to LHM load if performance counter unavailable',
+    '          if ($cpuLoad -eq $null -and $sensor.SensorType -eq [LibreHardwareMonitor.Hardware.SensorType]::Load -and $sensor.Name -eq "CPU Total") { $cpuLoad = $sensor.Value.Value }',
     '        }',
     '      }',
     '      if ($hwType -match "Gpu") {',
@@ -357,6 +359,7 @@ function startLHMService() {
     '    }',
     '    $parts = @()',
     '    if ($cpuTemp -ne $null) { $parts += "CPUT:" + [math]::Round($cpuTemp, 1) }',
+    '    if ($cpuLoad -ne $null) { $parts += "CPUL:" + [math]::Round($cpuLoad, 1) }',
     '    if ($gpuTemp -ne $null) { $parts += "GPUT:" + [math]::Round($gpuTemp, 1) }',
     '    if ($gpuLoad -ne $null) { $parts += "GPUL:" + [math]::Round($gpuLoad, 1) }',
     '    if ($gpuVramUsed -ne $null) { $parts += "GPUVRU:" + [math]::Round($gpuVramUsed) }',
@@ -366,7 +369,7 @@ function startLHMService() {
     '      [Console]::Out.Flush()',
     '    }',
     '  } catch {}',
-    '  Start-Sleep -Milliseconds 1000',
+    '  Start-Sleep -Milliseconds 500',
     '}',
 
   ].join('\n');
@@ -394,6 +397,7 @@ function startLHMService() {
         if (isNaN(v)) continue;
         switch (key) {
           case 'CPUT': if (v > 0 && v < 150) { _lhmTemp = Math.round(v * 10) / 10; _lhmAvailable = true; } break;
+          case 'CPUL': if (v >= 0 && v <= 100) _lhmCpuLoad = Math.round(v * 10) / 10; break;
           case 'GPUT': if (v > 0 && v < 150) _lhmGpuTemp = Math.round(v); break;
           case 'GPUL': if (v >= 0 && v <= 100) _lhmGpuUsage = Math.round(v); break;
           case 'GPUVRU': if (v >= 0) _lhmGpuVramUsed = Math.round(v); break;
@@ -429,67 +433,55 @@ function stopLHMService() {
 
 let _lastStats = { cpu: 0, ram: 0, disk: 0, temperature: 0 };
 let _tempSource = 'none';       // 'lhm', 'estimation'
+let _cachedDiskPct = 0;         // disk % refreshed in background (not latency-critical)
+let _diskRefreshTimer = null;
 
-async function _getStatsImpl() {
-  let cpu = 0, ram = 0, disk = 0, temperature = 0;
+// Refresh disk usage in background every 10s (disk changes slowly, no need to block stats)
+function _startDiskRefresh() {
+  const refresh = () => {
+    runPSScript(`
+      try {
+        $d = Get-CimInstance Win32_LogicalDisk -Filter "DeviceID='C:'"
+        if ($d -and $d.Size -gt 0) { Write-Output ([math]::Round(($d.Size - $d.FreeSpace) / $d.Size * 100, 1)) }
+        else { Write-Output '0' }
+      } catch { Write-Output '0' }
+    `, 4000).then(raw => {
+      const v = parseFloat(raw);
+      if (!isNaN(v) && v >= 0 && v <= 100) _cachedDiskPct = Math.round(v * 10) / 10;
+    }).catch(() => {});
+  };
+  refresh(); // initial
+  _diskRefreshTimer = setInterval(refresh, 10000);
+}
 
-  // ── Single consolidated PowerShell script ──
-  // Returns: cpu|||ram|||disk   (temperature handled by LHM service)
-  const script = `
-    $out = @('0','0','0')
-    # CPU — WMI LoadPercentage (instant, no sampling delay)
-    try {
-      $c = (Get-CimInstance Win32_Processor | Select-Object -First 1).LoadPercentage
-      if ($c -ne $null) { $out[0] = [string][math]::Round($c, 1) }
-    } catch {}
-    # RAM
-    try {
-      $o = Get-CimInstance Win32_OperatingSystem
-      if ($o.TotalVisibleMemorySize -gt 0) {
-        $out[1] = [string][math]::Round(($o.TotalVisibleMemorySize - $o.FreePhysicalMemory) / $o.TotalVisibleMemorySize * 100, 1)
-      }
-    } catch {}
-    # Disk C:
-    try {
-      $d = Get-CimInstance Win32_LogicalDisk -Filter "DeviceID='C:'"
-      if ($d -and $d.Size -gt 0) {
-        $out[2] = [string][math]::Round(($d.Size - $d.FreeSpace) / $d.Size * 100, 1)
-      }
-    } catch {}
-    Write-Output ($out -join '|||')
-  `;
+function _getStatsImpl() {
+  // ── All reads are instant (0ms) — no PowerShell spawn ──
+  // CPU: from LHM background service (% Processor Utility counter, 500ms refresh)
+  // RAM: from Node.js os.freemem/totalmem (instant kernel call)
+  // Disk: from background cache (refreshed every 10s)
+  // Temp: from LHM background service (real CPU package sensor, 500ms refresh)
 
-  try {
-    const raw = await runPSScript(script, 6000);
-    const parts = raw.trim().split('|||');
-    if (parts.length >= 3) {
-      const cpuVal = parseFloat(parts[0]);
-      const ramVal = parseFloat(parts[1]);
-      const diskVal = parseFloat(parts[2]);
-      if (!isNaN(cpuVal) && cpuVal >= 0 && cpuVal <= 100) cpu = Math.round(cpuVal * 10) / 10;
-      if (!isNaN(ramVal) && ramVal >= 0 && ramVal <= 100) ram = Math.round(ramVal * 10) / 10;
-      if (!isNaN(diskVal) && diskVal >= 0 && diskVal <= 100) disk = Math.round(diskVal * 10) / 10;
-    }
-  } catch (err) {}
+  let cpu = 0, ram = 0, disk = _cachedDiskPct, temperature = 0;
 
-  // ── Temperature: LHM background service (real CPU package temp) ──
+  // CPU — from LHM (real-time, matches Task Manager)
+  if (_lhmCpuLoad >= 0) {
+    cpu = _lhmCpuLoad;
+  }
+
+  // RAM — instant Node.js kernel call
+  const totalMem = os.totalmem();
+  const freeMem = os.freemem();
+  if (totalMem > 0) ram = Math.round(((totalMem - freeMem) / totalMem) * 1000) / 10;
+
+  // Temperature — from LHM (real sensor)
   if (_lhmAvailable && _lhmTemp > 0) {
     temperature = _lhmTemp;
     _tempSource = 'lhm';
   }
 
-  // Fallbacks using Node.js (zero-cost)
-  if (ram === 0) {
-    const totalMem = os.totalmem();
-    const freeMem = os.freemem();
-    if (totalMem > 0) ram = Math.round(((totalMem - freeMem) / totalMem) * 1000) / 10;
-  }
-
-  // Temperature estimation fallback — dynamic, CPU-load-based
+  // Temperature estimation fallback
   if (temperature === 0) {
     _tempSource = 'estimation';
-    // Base ~38-42°C idle, scales up to ~75-85°C under load
-    // Time-based jitter (±1.5°C) so consecutive reads never look frozen
     const jitter = Math.sin(Date.now() / 5000) * 1.5;
     temperature = Math.round((38 + cpu * 0.45 + jitter) * 10) / 10;
     if (temperature < 30) temperature = 30;

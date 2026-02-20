@@ -160,8 +160,8 @@ function App() {
       fetchSystemStats();
       fetchExtendedStats();
 
-      // Basic stats (CPU/RAM/Disk/Temp) are fast (~1.3s), poll every 3s
-      const interval = setInterval(fetchSystemStats, 3000);
+      // Basic stats are instant (LHM + Node.js, no PS spawn), poll every 1.5s
+      const interval = setInterval(fetchSystemStats, 1500);
       // Extended stats (per-core, network, disk I/O etc.) take ~4s, poll every 5s
       // to avoid always hitting the overlap guard
       const extInterval = setInterval(fetchExtendedStats, 5000);
