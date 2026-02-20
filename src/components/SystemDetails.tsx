@@ -303,13 +303,6 @@ const SystemDetails: React.FC<SystemDetailsProps> = ({ systemStats, hardwareInfo
           <Row label="Health" value={hw?.diskHealth}
             chip={hw?.diskHealth?.toLowerCase() === 'healthy' ? 'green' : 'yellow'}
           />
-          {hw && hw.diskTotalGB > 0 && (
-            <BarRow
-              label="Capacity"
-              pct={hw.diskTotalGB > 0 ? ((hw.diskTotalGB - hw.diskFreeGB) / hw.diskTotalGB) * 100 : 0}
-              display={`${hw.diskFreeGB.toFixed(0)} GB free`}
-            />
-          )}
           <Row
             label="Read/Write"
             value={ext ? (

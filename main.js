@@ -1,33 +1,27 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
-const { exec, spawn } = require('child_process');
+const { exec, execFile, spawn } = require('child_process');
 const { promisify } = require('util');
 const os = require('os');
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
-// ──────────────────────────────────────────────────────
-// PowerShell Script Runner
-// Writes multiline scripts to a temp .ps1 file and runs them via -File.
-// Avoids quoting/escaping issues, no command-line length limit, and
-// scripts are consolidated so we only need 1-2 spawns per poll cycle.
-// ──────────────────────────────────────────────────────
 let _psTempCounter = 0;
 function runPSScript(script, timeoutMs = 8000) {
   const tmpFile = path.join(os.tmpdir(), `gs_ps_${process.pid}_${++_psTempCounter}.ps1`);
-  // Prepend $ErrorActionPreference and append exit 0 to ensure clean exit
   const wrappedScript = '$ErrorActionPreference = "SilentlyContinue"\n' + script + '\nexit 0';
   fs.writeFileSync(tmpFile, wrappedScript, 'utf8');
-  return execAsync(
-    `powershell -NoProfile -ExecutionPolicy Bypass -File "${tmpFile}"`,
-    { shell: true, timeout: timeoutMs }
+  return execFileAsync(
+    'powershell',
+    ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', tmpFile],
+    { timeout: timeoutMs, windowsHide: true }
   ).then(r => {
     try { fs.unlinkSync(tmpFile); } catch {}
     return r.stdout.trim();
   }).catch(err => {
     try { fs.unlinkSync(tmpFile); } catch {}
-    // Recover partial stdout even if PowerShell exited with non-zero code
     console.warn('[runPSScript] PS error:', err.message?.substring(0, 150));
     if (err.stdout) return err.stdout.trim();
     return '';
@@ -532,134 +526,173 @@ ipcMain.handle('system:get-hardware-info', async () => {
     batteryStatus: '',
   };
 
-  // Run all static queries in parallel for speed
-  const results = await Promise.allSettled([
-    // 0: CPU Name + cores + threads + max clock
-    execAsync(
-      `powershell -NoProfile -ExecutionPolicy Bypass -Command "$cpu = Get-CimInstance Win32_Processor | Select-Object -First 1; Write-Output ($cpu.Name); Write-Output '|||'; Write-Output ($cpu.NumberOfCores); Write-Output '|||'; Write-Output ($cpu.NumberOfLogicalProcessors); Write-Output '|||'; Write-Output ($cpu.MaxClockSpeed)"`,
-      { shell: true, timeout: 10000 }
-    ),
-    // 1: GPU Name + VRAM + driver version (filter out virtual adapters)
-    execAsync(
-      `powershell -NoProfile -ExecutionPolicy Bypass -Command "$gpu = Get-CimInstance Win32_VideoController | Where-Object { $_.Status -eq 'OK' -and $_.Name -notmatch '(Virtual|Dummy|Parsec|Remote|Generic)' } | Select-Object -First 1; if (!$gpu) { $gpu = Get-CimInstance Win32_VideoController | Where-Object { $_.Status -eq 'OK' } | Select-Object -First 1 }; if ($gpu) { Write-Output ($gpu.Name); Write-Output '|||'; Write-Output ([math]::Round($gpu.AdapterRAM / 1GB, 1)); Write-Output '|||'; Write-Output ($gpu.DriverVersion) } else { Write-Output 'Unknown GPU'; Write-Output '|||'; Write-Output '0'; Write-Output '|||'; Write-Output 'N/A' }"`,
-      { shell: true, timeout: 10000 }
-    ),
-    // 2: RAM info (total, JEDEC speed, configured speed, sticks, manufacturer, partNumber)
-    execAsync(
-      `powershell -NoProfile -ExecutionPolicy Bypass -Command "$mem = Get-CimInstance Win32_PhysicalMemory; $totalGB = [math]::Round(($mem | Measure-Object -Property Capacity -Sum).Sum / 1GB); $first = $mem | Select-Object -First 1; $jedecSpeed = $first.Speed; $configSpeed = $first.ConfiguredClockSpeed; $sticks = $mem.Count; $mfr = $first.Manufacturer; $part = $first.PartNumber; Write-Output \\\"$totalGB\\\"; Write-Output '|||'; Write-Output \\\"$jedecSpeed\\\"; Write-Output '|||'; Write-Output \\\"$configSpeed\\\"; Write-Output '|||'; Write-Output \\\"$sticks stick(s)\\\"; Write-Output '|||'; Write-Output \\\"$mfr\\\"; Write-Output '|||'; Write-Output \\\"$part\\\"\"`,
-      { shell: true, timeout: 10000 }
-    ),
-    // 3: Disk name + type + health + size
-    execAsync(
-      `powershell -NoProfile -ExecutionPolicy Bypass -Command "$d = Get-PhysicalDisk | Select-Object -First 1; if (!$d) { $d = Get-CimInstance Win32_DiskDrive | Select-Object -First 1; Write-Output ($d.Model); Write-Output '|||'; Write-Output 'Unknown'; Write-Output '|||'; Write-Output 'Unknown'; Write-Output '|||'; Write-Output ([math]::Round($d.Size/1GB)); } else { Write-Output ($d.FriendlyName); Write-Output '|||'; Write-Output ($d.MediaType); Write-Output '|||'; Write-Output ($d.HealthStatus); Write-Output '|||'; Write-Output ([math]::Round($d.Size/1GB)); }"`,
-      { shell: true, timeout: 10000 }
-    ),
-    // 4: All logical drives
-    execAsync(
-      `powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-CimInstance Win32_LogicalDisk -Filter \\"DriveType=3\\" | ForEach-Object { $totalGB = [math]::Round($_.Size/1GB,1); $freeGB = [math]::Round($_.FreeSpace/1GB,1); Write-Output \\"$($_.DeviceID)|$totalGB|$freeGB|$($_.VolumeName)\\" }"`,
-      { shell: true, timeout: 10000 }
-    ),
-    // 5: Network adapter + IPv4 + LinkSpeed + MAC + IPv6 + Gateway + DNS
-    execAsync(
-      `powershell -NoProfile -ExecutionPolicy Bypass -Command "$a = Get-NetAdapter | Where-Object { $_.Status -eq 'Up' } | Select-Object -First 1; $link = $a.LinkSpeed; $ipv4 = (Get-NetIPAddress -InterfaceIndex $a.ifIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue | Select-Object -First 1).IPAddress; $ipv6 = (Get-NetIPAddress -InterfaceIndex $a.ifIndex -AddressFamily IPv6 -ErrorAction SilentlyContinue | Select-Object -First 1).IPAddress; $mac = $a.MacAddress; $gw = (Get-NetIPConfiguration -InterfaceIndex $a.ifIndex -ErrorAction SilentlyContinue).Ipv4DefaultGateway.NextHop; $dns = (Get-DnsClientServerAddress -InterfaceIndex $a.ifIndex -ErrorAction SilentlyContinue -AddressFamily IPv4 | Select-Object -First 1).ServerAddresses -join ','; Write-Output ($a.Name + ' (' + $a.InterfaceDescription + ')'); Write-Output '|||'; Write-Output ($ipv4); Write-Output '|||'; Write-Output ($link); Write-Output '|||'; Write-Output ($mac); Write-Output '|||'; Write-Output ($ipv6); Write-Output '|||'; Write-Output ($gw); Write-Output '|||'; Write-Output ($dns)"`,
-      { shell: true, timeout: 10000 }
-    ),
-    // 6: Windows version + build
-    // 6: Windows version + build (with Win11 detection fallback)
-    execAsync(
-      `powershell -NoProfile -ExecutionPolicy Bypass -Command "$r = Get-ItemProperty 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion' -ErrorAction SilentlyContinue; $prod = $r.ProductName; $disp = $r.DisplayVersion; $build = $r.CurrentBuildNumber; if (!$prod) { $wmi = Get-WmiObject Win32_OperatingSystem -ErrorAction SilentlyContinue; $prod = $wmi.Caption }; if ($build -ge 22000 -and $prod -notmatch '11') { $prod = $prod -replace 'Windows 10', 'Windows 11' } elseif ($build -lt 22000 -and $prod -notmatch '10') { $prod = $prod -replace 'Windows 11', 'Windows 10' }; if (!$prod) { $prod = 'Windows' }; Write-Output $prod; Write-Output '|||'; Write-Output ($disp + ' (Build ' + $build + ')')"`,
-      { shell: true, timeout: 10000 }
-    ),
-    execAsync(
-      `powershell -NoProfile -ExecutionPolicy Bypass -Command "$up = (Get-Date) - (Get-CimInstance Win32_OperatingSystem).LastBootUpTime; Write-Output ('{0}d {1}h {2}m' -f $up.Days, $up.Hours, $up.Minutes)"`,
-      { shell: true, timeout: 10000 }
-    ),
-    // 8: Power plan
-    execAsync(
-      `powershell -NoProfile -ExecutionPolicy Bypass -Command "(Get-CimInstance -Namespace root\\cimv2\\power -ClassName Win32_PowerPlan | Where-Object { $_.IsActive }).ElementName"`,
-      { shell: true, timeout: 10000 }
-    ),
-    // 9: Battery
-    execAsync(
-      `powershell -NoProfile -ExecutionPolicy Bypass -Command "$b = Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue; if ($b) { Write-Output 'true'; Write-Output '|||'; Write-Output ($b.EstimatedChargeRemaining); Write-Output '|||'; $st = switch($b.BatteryStatus) { 1 {'Discharging'} 2 {'AC Connected'} 3 {'Fully Charged'} 4 {'Low'} 5 {'Critical'} 6 {'Charging'} 7 {'Charging (High)'} 8 {'Charging (Low)'} 9 {'Charging (Critical)'} default {'Unknown'} }; Write-Output $st } else { Write-Output 'false' }"`,
-      { shell: true, timeout: 10000 }
-    ),
-    // 10: RAM usage in GB
-    execAsync(
-      `powershell -NoProfile -ExecutionPolicy Bypass -Command "$o = Get-CimInstance Win32_OperatingSystem; $totalGB = [math]::Round($o.TotalVisibleMemorySize/1MB, 1); $freeGB = [math]::Round($o.FreePhysicalMemory/1MB, 1); $usedGB = [math]::Round($totalGB - $freeGB, 1); Write-Output \\"$usedGB|||$totalGB\\""`,
-      { shell: true, timeout: 10000 }
-    ),
-    // 11: Disk C free space
-    execAsync(
-      `powershell -NoProfile -ExecutionPolicy Bypass -Command "$d = Get-CimInstance Win32_LogicalDisk -Filter \\"DeviceID='C:'\\" ; Write-Output ([math]::Round($d.FreeSpace/1GB,1))"`,
-      { shell: true, timeout: 10000 }
-    ),
+  // ── Consolidated into 3 parallel scripts + nvidia-smi (was 16+ separate processes) ──
+  // Group A: Hardware specs (CPU, GPU, RAM, Disk, Drives) — sections 0-4
+  // Group B: System info (Network, Windows, Uptime, Power, Battery, RAM GB, Disk free) — sections 5-11
+  // Group C: Board info (Motherboard, Serial fallback, Physical disks, BIOS) — sections 12-15
+  // Each group outputs sections separated by §§, fields within section by |||
+  // Multi-line sections (drives, physical disks) use ~~ as line separator
+  const [hwA, hwB, hwC, nvDriverR] = await Promise.allSettled([
+
+    // ── Group A: CPU, GPU, RAM, Disk, All drives ──
+    runPSScript(`
+$s0 = 'Unknown CPU|||0|||0|||0'
+try {
+  $cpu = Get-CimInstance Win32_Processor | Select-Object -First 1
+  $s0 = "$($cpu.Name)|||$($cpu.NumberOfCores)|||$($cpu.NumberOfLogicalProcessors)|||$($cpu.MaxClockSpeed)"
+} catch {}
+
+$s1 = 'Unknown GPU|||0|||N/A'
+try {
+  $gpu = Get-CimInstance Win32_VideoController | Where-Object { $_.Status -eq 'OK' -and $_.Name -notmatch '(Virtual|Dummy|Parsec|Remote|Generic)' } | Select-Object -First 1
+  if (-not $gpu) { $gpu = Get-CimInstance Win32_VideoController | Where-Object { $_.Status -eq 'OK' } | Select-Object -First 1 }
+  if ($gpu) { $s1 = "$($gpu.Name)|||$([math]::Round($gpu.AdapterRAM / 1GB, 1))|||$($gpu.DriverVersion)" }
+} catch {}
+
+$s2 = '0||||||||||'
+try {
+  $mem = Get-CimInstance Win32_PhysicalMemory
+  $totalGB = [math]::Round(($mem | Measure-Object -Property Capacity -Sum).Sum / 1GB)
+  $first = $mem | Select-Object -First 1
+  $s2 = "$totalGB|||$($first.Speed)|||$($first.ConfiguredClockSpeed)|||$($mem.Count) stick(s)|||$($first.Manufacturer)|||$($first.PartNumber)"
+} catch {}
+
+$s3 = '|||||||'
+try {
+  $d = Get-PhysicalDisk | Select-Object -First 1
+  if ($d) {
+    $s3 = "$($d.FriendlyName)|||$($d.MediaType)|||$($d.HealthStatus)|||$([math]::Round($d.Size/1GB))"
+  } else {
+    $d2 = Get-CimInstance Win32_DiskDrive | Select-Object -First 1
+    $s3 = "$($d2.Model)|||Unknown|||Unknown|||$([math]::Round($d2.Size/1GB))"
+  }
+} catch {}
+
+$s4 = ''
+try {
+  $drvs = Get-CimInstance Win32_LogicalDisk -Filter "DriveType=3" | ForEach-Object {
+    "$($_.DeviceID)|$([math]::Round($_.Size/1GB,1))|$([math]::Round($_.FreeSpace/1GB,1))|$($_.VolumeName)"
+  }
+  $s4 = ($drvs -join '~~')
+} catch {}
+
+Write-Output ($s0 + '@@' + $s1 + '@@' + $s2 + '@@' + $s3 + '@@' + $s4)
+    `, 15000),
+
+    // ── Group B: Network, Windows, Uptime, Power, Battery, RAM GB, Disk free ──
+    runPSScript(`
+$s5 = '||||||||||||||'
+try {
+  $a = Get-NetAdapter | Where-Object { $_.Status -eq 'Up' } | Select-Object -First 1
+  $ipv4 = (Get-NetIPAddress -InterfaceIndex $a.ifIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue | Select-Object -First 1).IPAddress
+  $ipv6 = (Get-NetIPAddress -InterfaceIndex $a.ifIndex -AddressFamily IPv6 -ErrorAction SilentlyContinue | Select-Object -First 1).IPAddress
+  $mac = $a.MacAddress
+  $gw = (Get-NetIPConfiguration -InterfaceIndex $a.ifIndex -ErrorAction SilentlyContinue).Ipv4DefaultGateway.NextHop
+  $dns = (Get-DnsClientServerAddress -InterfaceIndex $a.ifIndex -ErrorAction SilentlyContinue -AddressFamily IPv4 | Select-Object -First 1).ServerAddresses -join ','
+  $s5 = "$($a.Name) ($($a.InterfaceDescription))|||$ipv4|||$($a.LinkSpeed)|||$mac|||$ipv6|||$gw|||$dns"
+} catch {}
+
+$s6 = 'Windows|||'
+try {
+  $r = Get-ItemProperty 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion' -ErrorAction SilentlyContinue
+  $prod = $r.ProductName; $disp = $r.DisplayVersion; $build = $r.CurrentBuildNumber
+  if (-not $prod) { $wmi = Get-WmiObject Win32_OperatingSystem -ErrorAction SilentlyContinue; $prod = $wmi.Caption }
+  if ($build -ge 22000 -and $prod -notmatch '11') { $prod = $prod -replace 'Windows 10', 'Windows 11' }
+  elseif ($build -lt 22000 -and $prod -notmatch '10') { $prod = $prod -replace 'Windows 11', 'Windows 10' }
+  if (-not $prod) { $prod = 'Windows' }
+  $s6 = "$prod|||$disp (Build $build)"
+} catch {}
+
+$osObj = $null
+try { $osObj = Get-CimInstance Win32_OperatingSystem } catch {}
+
+$s7 = ''
+if ($osObj) { try { $up = (Get-Date) - $osObj.LastBootUpTime; $s7 = '{0}d {1}h {2}m' -f $up.Days, $up.Hours, $up.Minutes } catch {} }
+
+$s8 = ''
+try { $s8 = (Get-CimInstance -Namespace root\\cimv2\\power -ClassName Win32_PowerPlan | Where-Object { $_.IsActive }).ElementName } catch {}
+
+$s9 = 'false'
+try {
+  $b = Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue
+  if ($b) {
+    $st = switch($b.BatteryStatus) { 1 {'Discharging'} 2 {'AC Connected'} 3 {'Fully Charged'} 4 {'Low'} 5 {'Critical'} 6 {'Charging'} 7 {'Charging (High)'} 8 {'Charging (Low)'} 9 {'Charging (Critical)'} default {'Unknown'} }
+    $s9 = "true|||$($b.EstimatedChargeRemaining)|||$st"
+  }
+} catch {}
+
+$s10 = '0|||0'
+if ($osObj) {
+  try {
+    $totalGB = [math]::Round($osObj.TotalVisibleMemorySize/1MB, 1)
+    $freeGB = [math]::Round($osObj.FreePhysicalMemory/1MB, 1)
+    $usedGB = [math]::Round($totalGB - $freeGB, 1)
+    $s10 = "$usedGB|||$totalGB"
+  } catch {}
+}
+
+$s11 = '0'
+try { $dc = Get-CimInstance Win32_LogicalDisk -Filter "DeviceID='C:'"; $s11 = [math]::Round($dc.FreeSpace/1GB,1) } catch {}
+
+Write-Output ($s5 + '@@' + $s6 + '@@' + $s7 + '@@' + $s8 + '@@' + $s9 + '@@' + $s10 + '@@' + $s11)
+    `, 15000),
+
+    // ── Group C: Motherboard, Serial fallback, Physical disks, BIOS ──
+    runPSScript(`
+$s12 = '|||'
+try {
+  $bb = Get-CimInstance Win32_BaseBoard -ErrorAction SilentlyContinue | Select-Object -First 1
+  if ($bb) {
+    $prod = $bb.Product; if (-not $prod) { $prod = $bb.Name } if (-not $prod) { $prod = $bb.Caption }
+    $s12 = "$($bb.Manufacturer)|||$prod|||$($bb.SerialNumber)"
+  }
+} catch {}
+
+$s13 = ''
+try {
+  $enc = Get-CimInstance Win32_SystemEnclosure -ErrorAction SilentlyContinue | Select-Object -First 1
+  $s13 = $enc.SerialNumber
+  if (-not $s13) { $s13 = (Get-CimInstance Win32_ComputerSystemProduct -ErrorAction SilentlyContinue).IdentifyingNumber }
+} catch {}
+
+$s14 = ''
+try {
+  $pds = Get-CimInstance Win32_DiskDrive | ForEach-Object {
+    $m = ($_.Model -replace '\\n',' '); $sn = ($_.SerialNumber -replace '\\s',''); $fw = ($_.FirmwareRevision -replace '\\s',''); $size = [math]::Round($_.Size/1GB)
+    "$m|||$sn|||$fw|||$size"
+  }
+  $s14 = ($pds -join '~~')
+} catch {}
+
+$s15 = '|||'
+try {
+  $bio = Get-CimInstance Win32_BIOS -ErrorAction SilentlyContinue | Select-Object -First 1
+  if ($bio) {
+    $ver = $bio.SMBIOSBIOSVersion; if (-not $ver) { $ver = $bio.Version } if (-not $ver) { $ver = $bio.BIOSVersion -join ',' }
+    $date = ''; try { $date = ([Management.ManagementDateTimeConverter]::ToDateTime($bio.ReleaseDate).ToString('yyyy-MM-dd')) } catch {}
+    $s15 = "$ver|||$date"
+  }
+} catch {}
+
+Write-Output ($s12 + '@@' + $s13 + '@@' + $s14 + '@@' + $s15)
+    `, 15000),
+
+    // ── nvidia-smi for GPU driver version (separate binary, runs in parallel) ──
+    execFileAsync('nvidia-smi', ['--query-gpu=driver_version', '--format=csv,noheader,nounits'], { timeout: 3000, windowsHide: true })
+      .then(r => (r.stdout || '').trim().split('\n')[0].trim()).catch(() => ''),
   ]);
 
-  // Helper to extract settled value
-  const get = (i) => results[i].status === 'fulfilled' ? results[i].value.stdout.trim() : '';
-
-  // Additional hardware lookups (motherboard + BIOS) — run separately to avoid reshuffling the main results array
-  try {
-    const mb = await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "$b = Get-CimInstance Win32_BaseBoard -ErrorAction SilentlyContinue | Select-Object -First 1; if ($b) { $prod = $b.Product; if (-not $prod) { $prod = $b.Name } if (-not $prod) { $prod = $b.Caption } Write-Output ($b.Manufacturer + '|||' + $prod + '|||' + $b.SerialNumber) } else { Write-Output '|||' }"`, { shell: true, timeout: 8000 });
-    const mbRaw = (mb.stdout || '').trim();
-    if (mbRaw) {
-      const parts = mbRaw.split('|||').map(s => s.trim());
-      info.motherboardManufacturer = parts[0] || '';
-      info.motherboardProduct = parts[1] || '';
-
-      // Sanitize the motherboard serial: many OEMs return placeholders like "Default string" or "To be filled by OEM"
-      let rawSerial = (parts[2] || '').trim();
-      const invalidSerials = ['default string','to be filled by o.e.m.','to be filled by oem','system serial number','not specified','none','unknown','baseboard serial number'];
-      const serialLower = rawSerial.toLowerCase();
-      const isBad = !rawSerial || invalidSerials.includes(serialLower) || /^0+$/.test(rawSerial) || rawSerial.length < 3;
-
-      if (!isBad) {
-        info.motherboardSerial = rawSerial;
-      } else {
-        // Fallback: try alternative WMI classes (SystemEnclosure / ComputerSystemProduct)
-        try {
-          const fb = await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "($e = Get-CimInstance Win32_SystemEnclosure -ErrorAction SilentlyContinue | Select-Object -First 1).SerialNumber; if (-not $e) { $e = (Get-CimInstance Win32_ComputerSystemProduct -ErrorAction SilentlyContinue).IdentifyingNumber }; Write-Output ($e -ne $null ? $e : '')"`, { shell: true, timeout: 4000 });
-          const fbSerial = (fb.stdout || '').trim();
-          if (fbSerial && !/^0+$/.test(fbSerial) && fbSerial.length >= 3 && !invalidSerials.includes(fbSerial.toLowerCase())) {
-            info.motherboardSerial = fbSerial;
-          } else {
-            info.motherboardSerial = '';
-          }
-        } catch (e) {
-          info.motherboardSerial = '';
-        }
-      }
-    }
-  } catch (e) {
-    // ignore
-  }
-
-  // Physical disks: model, serial, firmware, size (GB)
-  try {
-    const pd = await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-CimInstance Win32_DiskDrive | ForEach-Object { $m = ($_.Model -replace '\\n',' '); $sn = ($_.SerialNumber -replace '\\s',''); $fw = ($_.FirmwareRevision -replace '\\s',''); $size = [math]::Round($_.Size/1GB); Write-Output ($m + '|||' + $sn + '|||' + $fw + '|||' + $size) }"`, { shell: true, timeout: 8000 });
-    const pdRaw = (pd.stdout || '').trim();
-    if (pdRaw) {
-      info.physicalDisks = pdRaw.split('\n').filter(l => l.trim()).map((line) => {
-        const parts = line.split('|||').map(s => s.trim());
-        return { model: parts[0] || '', serial: parts[1] || '', firmware: parts[2] || '', sizeGB: parseInt(parts[3]) || 0 };
-      });
-    }
-  } catch (e) {
-    // ignore
-  }
-
-  try {
-    const bio = await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "$bio = Get-CimInstance Win32_BIOS -ErrorAction SilentlyContinue | Select-Object -First 1; if ($bio) { $ver = $bio.SMBIOSBIOSVersion; if (-not $ver) { $ver = $bio.Version } if (-not $ver) { $ver = $bio.BIOSVersion -join ',' } $date = ''; try { $date = ([Management.ManagementDateTimeConverter]::ToDateTime($bio.ReleaseDate).ToString('yyyy-MM-dd')) } catch { $date = '' } Write-Output ($ver + '|||' + $date) } else { Write-Output '||' }"`, { shell: true, timeout: 8000 });
-    const bioRaw = (bio.stdout || '').trim();
-    if (bioRaw) {
-      const parts = bioRaw.split('|||').map(s => s.trim());
-      info.biosVersion = parts[0] || '';
-      info.biosDate = parts[1] || '';
-    }
-  } catch (e) {
-    // ignore
-  }
+  // ── Parse: split each group by @@ into sections ──
+  const valOf = (r) => r.status === 'fulfilled' ? (r.value || '') : '';
+  const sectionsA = valOf(hwA).split('@@');   // sections 0-4
+  const sectionsB = valOf(hwB).split('@@');   // sections 5-11 (mapped as 0-6)
+  const sectionsC = valOf(hwC).split('@@');   // sections 12-15 (mapped as 0-3)
+  const nvDriverVal = valOf(nvDriverR);
+  const get = (i) => {
+    if (i <= 4) return (sectionsA[i] || '').trim();
+    if (i <= 11) return (sectionsB[i - 5] || '').trim();
+    return (sectionsC[i - 12] || '').trim();
+  };
 
   // 0: CPU
   try {
@@ -676,15 +709,9 @@ ipcMain.handle('system:get-hardware-info', async () => {
     info.gpuName = parts[0] || 'Unknown GPU';
     info.gpuVramTotal = parts[1] && parts[1] !== '0' ? `${parts[1]} GB` : '';
 
-    // Prefer the NVIDIA "driver_version" from nvidia-smi (matches NVIDIA Control Panel/App).
+    // Prefer the NVIDIA "driver_version" from nvidia-smi (fetched in parallel above).
     // Fallback to Win32_VideoController.DriverVersion when nvidia-smi isn't present.
-    try {
-      const nv = await execAsync('nvidia-smi --query-gpu=driver_version --format=csv,noheader,nounits', { shell: true, timeout: 3000 });
-      const nvver = (nv.stdout || '').trim().split('\n')[0].trim();
-      info.gpuDriverVersion = nvver || (parts[2] || '');
-    } catch (e) {
-      info.gpuDriverVersion = parts[2] || '';
-    }
+    info.gpuDriverVersion = nvDriverVal || (parts[2] || '');
   } catch { info.gpuName = 'Unknown GPU'; }
 
   // Derive full RAM brand+series name from part number and manufacturer
@@ -804,7 +831,7 @@ ipcMain.handle('system:get-hardware-info', async () => {
   try {
     const drivesRaw = get(4);
     if (drivesRaw) {
-      info.allDrives = drivesRaw.split('\n').filter((l) => l.trim()).map((line) => {
+      info.allDrives = drivesRaw.split('~~').filter((l) => l.trim()).map((line) => {
         const [letter, totalGB, freeGB, label] = line.trim().split('|');
         return { letter: letter || '', totalGB: parseFloat(totalGB) || 0, freeGB: parseFloat(freeGB) || 0, label: label || '' };
       });
@@ -857,7 +884,7 @@ ipcMain.handle('system:get-hardware-info', async () => {
   // Fallback: some systems may not expose Win32_PowerPlan; try powercfg as a reliable fallback
   if (!info.powerPlan) {
     try {
-      const pc = await execAsync('powercfg /getactivescheme', { shell: true, timeout: 4000 });
+      const pc = await execFileAsync('powercfg', ['/getactivescheme'], { timeout: 4000, windowsHide: true });
       const out = (pc.stdout || '').trim();
       // Example output: Power Scheme GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c  (High performance)
       const m = out.match(/\(([^)]+)\)$/);
@@ -894,7 +921,51 @@ ipcMain.handle('system:get-hardware-info', async () => {
   // 11: Disk free
   try { info.diskFreeGB = parseFloat(get(11)) || 0; } catch {}
 
+  // 12: Motherboard
+  try {
+    const parts = get(12).split('|||').map(s => s.trim());
+    info.motherboardManufacturer = parts[0] || '';
+    info.motherboardProduct = parts[1] || '';
 
+    // Sanitize the motherboard serial: many OEMs return placeholders like "Default string" or "To be filled by OEM"
+    let rawSerial = (parts[2] || '').trim();
+    const invalidSerials = ['default string','to be filled by o.e.m.','to be filled by oem','system serial number','not specified','none','unknown','baseboard serial number'];
+    const serialLower = rawSerial.toLowerCase();
+    const isBad = !rawSerial || invalidSerials.includes(serialLower) || /^0+$/.test(rawSerial) || rawSerial.length < 3;
+
+    if (!isBad) {
+      info.motherboardSerial = rawSerial;
+    } else {
+      // 13: Serial fallback from SystemEnclosure/ComputerSystemProduct (pre-fetched in parallel)
+      const fbSerial = (get(13) || '').trim();
+      if (fbSerial && !/^0+$/.test(fbSerial) && fbSerial.length >= 3 && !invalidSerials.includes(fbSerial.toLowerCase())) {
+        info.motherboardSerial = fbSerial;
+      } else {
+        info.motherboardSerial = '';
+      }
+    }
+  } catch {}
+
+  // 14: Physical disks
+  try {
+    const pdRaw = get(14);
+    if (pdRaw) {
+      info.physicalDisks = pdRaw.split('~~').filter(l => l.trim()).map((line) => {
+        const parts = line.split('|||').map(s => s.trim());
+        return { model: parts[0] || '', serial: parts[1] || '', firmware: parts[2] || '', sizeGB: parseInt(parts[3]) || 0 };
+      });
+    }
+  } catch {}
+
+  // 15: BIOS
+  try {
+    const bioRaw = get(15);
+    if (bioRaw) {
+      const parts = bioRaw.split('|||').map(s => s.trim());
+      info.biosVersion = parts[0] || '';
+      info.biosDate = parts[1] || '';
+    }
+  } catch {}
 
   return info;
 });
@@ -933,14 +1004,26 @@ async function _getExtStatsImpl() {
     diskWriteSpeed: 0, processCount: 0, systemUptime: '', latencyMs: 0,
   };
 
-  // ── All PS queries use runPSScript (temp .ps1 file + -File flag) ──
-  // This avoids cmd.exe quoting issues that break -Command one-liners.
-  // We run 4 parallel tasks: fastCIM, counters, network, nvidia-smi.
+  // ── All PS queries consolidated into ONE script (was 3 separate processes). ──
+  // Output: 3 sections separated by @@
+  //   Section 0 (FastCIM):  clock|ramU|ramT|procs|uptime|latency
+  //   Section 1 (Counters): coreCSV|diskRead|diskWrite
+  //   Section 2 (Network):  up|down|ssid|signal
+  // nvidia-smi runs as a separate binary in parallel.
 
-  const [fastR, counterR, netR, gpuR] = await Promise.allSettled([
+  const [allR, gpuR] = await Promise.allSettled([
 
-    // ── Fast CIM queries (sub-second): clock, RAM, procCount, uptime, latency ──
+    // ── Single merged PS script: CIM + counters + network ──
     runPSScript(`
+# ── Network: snapshot BEFORE long operations (for throughput delta) ──
+$netAdapter = $null; $netBefore = $null
+try {
+  $netAdapter = Get-NetAdapter | Where-Object { $_.Status -eq 'Up' -and $_.Name -notmatch 'Virtual|vEthernet|Loopback|Microsoft|Container' } | Select-Object -First 1
+  if ($netAdapter) { $netBefore = Get-NetAdapterStatistics -Name $netAdapter.Name }
+} catch {}
+$sw = [System.Diagnostics.Stopwatch]::StartNew()
+
+# ── Fast CIM queries ──
 try { $clock = (Get-CimInstance Win32_Processor | Select-Object -First 1).CurrentClockSpeed } catch { $clock = 0 }
 try {
   $o = Get-CimInstance Win32_OperatingSystem
@@ -951,14 +1034,12 @@ try {
 } catch { $ramT = 0; $ramU = 0; $uptime = '' }
 try { $procs = (Get-Process).Count } catch { $procs = 0 }
 try {
-  $ping = Test-Connection -Count 1 -ComputerName 8.8.8.8 -ErrorAction SilentlyContinue
-  $lat = if ($ping) { $ping.ResponseTime } else { 0 }
+  $pinger = New-Object System.Net.NetworkInformation.Ping
+  $lat = $pinger.Send('8.8.8.8', 1000).RoundtripTime
 } catch { $lat = 0 }
-Write-Output "$clock|$ramU|$ramT|$procs|$uptime|$lat"
-    `, 6000),
 
-    // ── Get-Counter: per-core CPU + disk I/O (1-second sample) ──
-    runPSScript(`
+# ── Get-Counter: per-core CPU + disk I/O (1-second sample) ──
+$coreStr = ''; $dr = 0; $dw = 0
 try {
   $c = Get-Counter -Counter @(
     '\\Processor(*)\\% Processor Time',
@@ -970,24 +1051,22 @@ try {
   $coreStr = ($cores | ForEach-Object { [math]::Round($_.CookedValue, 1) }) -join ','
   $dr = ($s | Where-Object { $_.Path -like '*read*' }).CookedValue
   $dw = ($s | Where-Object { $_.Path -like '*write*' }).CookedValue
-  Write-Output ($coreStr + '|' + [math]::Round($dr) + '|' + [math]::Round($dw))
-} catch { Write-Output '|0|0' }
-    `, 6000),
+} catch {}
 
-    // ── Network: throughput delta + Wi-Fi + SSID ──
-    runPSScript(`
-try {
-  $a = Get-NetAdapter | Where-Object { $_.Status -eq 'Up' -and $_.Name -notmatch 'Virtual|vEthernet|Loopback|Microsoft|Container' } | Select-Object -First 1
-  if ($a) {
-    $n = $a.Name
-    $s1 = Get-NetAdapterStatistics -Name $n
-    Start-Sleep -Milliseconds 500
-    $s2 = Get-NetAdapterStatistics -Name $n
-    $up = [math]::Round(($s2.SentBytes - $s1.SentBytes) / 0.5)
-    $dn = [math]::Round(($s2.ReceivedBytes - $s1.ReceivedBytes) / 0.5)
-  } else { $up = 0; $dn = 0 }
-} catch { $up = 0; $dn = 0 }
+# ── Network: snapshot AFTER (elapsed covers CIM + Get-Counter = 1-2s) ──
+$netUp = 0; $netDn = 0
+if ($netAdapter -and $netBefore) {
+  try {
+    $netAfter = Get-NetAdapterStatistics -Name $netAdapter.Name
+    $elapsed = $sw.Elapsed.TotalSeconds
+    if ($elapsed -gt 0) {
+      $netUp = [math]::Round(($netAfter.SentBytes - $netBefore.SentBytes) / $elapsed)
+      $netDn = [math]::Round(($netAfter.ReceivedBytes - $netBefore.ReceivedBytes) / $elapsed)
+    }
+  } catch {}
+}
 
+# ── Wi-Fi info ──
 $ssid = ''; $sig = ''
 try {
   $w = netsh wlan show interfaces 2>$null
@@ -999,22 +1078,29 @@ try {
   }
 } catch {}
 
-Write-Output "$up|$dn|$ssid|$sig"
-    `, 5000),
+# ── Output: 3 sections separated by @@ ──
+Write-Output "$clock|$ramU|$ramT|$procs|$uptime|$lat@@$coreStr|$([math]::Round($dr))|$([math]::Round($dw))@@$netUp|$netDn|$ssid|$sig"
+    `, 8000),
 
-    // ── GPU via nvidia-smi (separate binary, fast) ──
-    execAsync(
-      'nvidia-smi --query-gpu=utilization.gpu,temperature.gpu,memory.used,memory.total --format=csv,noheader,nounits',
-      { shell: true, timeout: 3000 }
+    // ── GPU via nvidia-smi (separate binary, fast) — uses execFileAsync (no cmd.exe) ──
+    execFileAsync(
+      'nvidia-smi',
+      ['--query-gpu=utilization.gpu,temperature.gpu,memory.used,memory.total', '--format=csv,noheader,nounits'],
+      { timeout: 3000, windowsHide: true }
     ).then(r => (r.stdout || '').trim()).catch(() => ''),
   ]);
 
-  // ── Parse each result independently — each is a pipe-separated string ──
+  // ── Parse the merged result — split by @@ into 3 sections ──
   const val = (r) => r.status === 'fulfilled' ? (r.value || '') : '';
+  const allRaw = val(allR);
+  const sections = allRaw.split('@@');
+  const fastRaw = (sections[0] || '').trim();
+  const counterRaw = (sections[1] || '').trim();
+  const netRaw = (sections[2] || '').trim();
 
   // Fast CIM: clock|ramU|ramT|procs|uptime|latency
   try {
-    const parts = val(fastR).split('|');
+    const parts = fastRaw.split('|');
     if (parts.length >= 6) {
       ext.cpuClock = parseInt(parts[0]) || 0;
       ext.ramUsedGB = parseFloat(parts[1]) || 0;
@@ -1027,9 +1113,8 @@ Write-Output "$up|$dn|$ssid|$sig"
 
   // Counter: coreCSV|diskRead|diskWrite
   try {
-    const raw = val(counterR);
-    if (raw) {
-      const parts = raw.split('|');
+    if (counterRaw) {
+      const parts = counterRaw.split('|');
       if (parts.length >= 3) {
         if (parts[0]) {
           ext.perCoreCpu = parts[0].split(',').map(v => parseFloat(v)).filter(v => !isNaN(v));
@@ -1042,7 +1127,7 @@ Write-Output "$up|$dn|$ssid|$sig"
 
   // Network: up|down|ssid|signal
   try {
-    const parts = val(netR).split('|');
+    const parts = netRaw.split('|');
     if (parts.length >= 4) {
       ext.networkUp = parseInt(parts[0]) || 0;
       ext.networkDown = parseInt(parts[1]) || 0;
