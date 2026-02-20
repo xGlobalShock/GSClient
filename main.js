@@ -1053,7 +1053,6 @@ ipcMain.handle('cleaner:clear-apex-shaders', async () => {
       fs.rmSync(apexCachePath, { force: true });
       cleared = 1;
     } catch (e) {
-      // File might be in use
     }
 
     const sizeInMB = (sizeFreed / (1024 * 1024)).toFixed(2);
