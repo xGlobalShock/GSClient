@@ -1,138 +1,233 @@
-/* ═══════════════════════════════════════════
-   System Details — Premium Redesign
-═══════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════
+   System Details — Glassmorphic Bento HUD
+   Deep Space (#050505) · Electric Cyan (#00F2FF) · Neon Emerald
+═══════════════════════════════════════════════════════════════ */
 
-.sysdet-section {
+/* ── Section ── */
+.hud-section {
   padding: 0;
+  position: relative;
 }
 
-.sysdet-header {
+/* ── Section Header ── */
+.hud-section-header {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 20px;
-  color: rgba(255, 255, 255, 0.5);
+  margin-bottom: 22px;
 }
 
-.sysdet-title {
+.hud-section-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #00F2FF;
+  filter: drop-shadow(0 0 4px rgba(0, 242, 255, 0.4));
+}
+
+.hud-section-title {
   margin: 0;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 800;
   color: rgba(255, 255, 255, 0.6);
   text-transform: uppercase;
-  letter-spacing: 1.2px;
+  letter-spacing: 2px;
 }
 
-/* ── Grid ── */
-.sysdet-grid {
+.hud-section-line {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(0, 242, 255, 0.25), transparent);
+}
+
+/* ══════════════════════════════════════════════════════
+   BENTO GRID — CPU/GPU take 2 columns on wide screens
+══════════════════════════════════════════════════════ */
+.hud-bento-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 14px;
+  gap: 16px;
 }
+
+/* Large tiles span full row-height naturally; CPU & GPU get double-width on 3-col */
+/* We'll let them be 1fr each but placed first so they're prominent */
 
 @media (max-width: 1100px) {
-  .sysdet-grid { grid-template-columns: repeat(2, 1fr); }
+  .hud-bento-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
+
 @media (max-width: 680px) {
-  .sysdet-grid { grid-template-columns: 1fr; }
+  .hud-bento-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
-/* ══════════════════════════════════════
-   Card
-══════════════════════════════════════ */
-.sysdet-box {
+/* ══════════════════════════════════════════════════════
+   BENTO CARD — Glassmorphic container
+══════════════════════════════════════════════════════ */
+.hud-bento-card {
   position: relative;
-  background: rgba(13, 17, 30, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.055);
-  border-radius: 18px;
+  background: rgba(8, 10, 18, 0.65);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(0, 242, 255, 0.08);
+  border-radius: 16px;
   overflow: hidden;
-  transition: transform 0.2s ease, border-color 0.25s ease, box-shadow 0.25s ease;
-  box-shadow: 0 2px 20px rgba(0, 0, 0, 0.35);
+  transition: transform 0.25s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+  box-shadow:
+    0 2px 24px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(0, 242, 255, 0.04);
 }
 
-.sysdet-box::before {
+/* Subtle gradient sheen */
+.hud-bento-card::before {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(140deg, rgba(16, 185, 129, 0.03) 0%, transparent 55%);
+  background: linear-gradient(145deg, rgba(0, 242, 255, 0.03) 0%, transparent 50%, rgba(0, 255, 136, 0.015) 100%);
   pointer-events: none;
   border-radius: inherit;
 }
 
-.sysdet-box:hover {
+.hud-bento-card:hover {
   transform: translateY(-2px);
-  border-color: rgba(16, 185, 129, 0.2);
-  box-shadow: 0 10px 36px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(16, 185, 129, 0.07);
+  border-color: rgba(0, 242, 255, 0.18);
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(0, 242, 255, 0.06),
+    0 0 30px rgba(0, 242, 255, 0.04);
 }
 
-/* ── Accent bar at top (usage fill) ── */
-.sysdet-card-bar {
+/* ── Scanline overlay for HUD feel ── */
+.hud-scanline-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 242, 255, 0.008) 2px,
+    rgba(0, 242, 255, 0.008) 4px
+  );
+  border-radius: inherit;
+}
+
+/* ── Corner accent marks ── */
+.hud-corner {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.hud-corner-tl {
+  top: 0; left: 0;
+  border-top: 1px solid rgba(0, 242, 255, 0.3);
+  border-left: 1px solid rgba(0, 242, 255, 0.3);
+  border-radius: 16px 0 0 0;
+}
+
+.hud-corner-tr {
+  top: 0; right: 0;
+  border-top: 1px solid rgba(0, 242, 255, 0.3);
+  border-right: 1px solid rgba(0, 242, 255, 0.3);
+  border-radius: 0 16px 0 0;
+}
+
+.hud-corner-bl {
+  bottom: 0; left: 0;
+  border-bottom: 1px solid rgba(0, 242, 255, 0.15);
+  border-left: 1px solid rgba(0, 242, 255, 0.15);
+  border-radius: 0 0 0 16px;
+}
+
+.hud-corner-br {
+  bottom: 0; right: 0;
+  border-bottom: 1px solid rgba(0, 242, 255, 0.15);
+  border-right: 1px solid rgba(0, 242, 255, 0.15);
+  border-radius: 0 0 16px 0;
+}
+
+/* ── Top accent line (usage fill) ── */
+.hud-card-accent-line {
   height: 2px;
   width: 100%;
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(0, 242, 255, 0.04);
   position: relative;
 }
 
-.sysdet-card-bar-fill {
+.hud-card-accent-fill {
   height: 100%;
-  background: linear-gradient(90deg, #10b981, #06b6d4);
+  background: linear-gradient(90deg, #00F2FF, #00FF88);
   border-radius: 0 2px 2px 0;
   transition: width 0.9s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 0 10px rgba(16, 185, 129, 0.6);
+  box-shadow: 0 0 12px rgba(0, 242, 255, 0.5), 0 0 4px rgba(0, 255, 136, 0.3);
 }
 
 /* ── Card inner padding ── */
-.sysdet-card-inner {
+.hud-card-inner {
   padding: 16px 18px 18px;
+  position: relative;
+  z-index: 2;
 }
 
-/* ── Card header: icon + title + gauge ── */
-.sysdet-card-head {
+/* ══════════════════════════════════════════════════════
+   Card Header: icon + title + gauge
+══════════════════════════════════════════════════════ */
+.hud-card-head {
   display: flex;
   align-items: center;
   gap: 10px;
   margin-bottom: 14px;
 }
 
-.sysdet-card-icon {
+.hud-card-icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
   border-radius: 10px;
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.14), rgba(6, 182, 212, 0.07));
-  border: 1px solid rgba(16, 185, 129, 0.14);
-  color: #10b981;
+  background: rgba(0, 242, 255, 0.06);
+  border: 1px solid rgba(0, 242, 255, 0.12);
+  color: #00F2FF;
   flex-shrink: 0;
+  filter: drop-shadow(0 0 3px rgba(0, 242, 255, 0.3));
 }
 
-.sysdet-card-title-group {
+.hud-card-title-group {
   flex: 1;
   min-width: 0;
 }
 
-.sysdet-card-title {
+.hud-card-title {
   font-size: 12px;
   font-weight: 800;
   color: rgba(255, 255, 255, 0.92);
   text-transform: uppercase;
-  letter-spacing: 1px;
+  letter-spacing: 1.5px;
   line-height: 1;
   margin-bottom: 4px;
 }
 
-.sysdet-card-subtitle {
+.hud-card-subtitle {
   font-size: 10px;
-  color: rgba(255, 255, 255, 0.28);
+  color: rgba(0, 242, 255, 0.35);
   font-weight: 400;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-/* ── Arc gauge ── */
-.sysdet-arc-gauge {
+/* ══════════════════════════════════════════════════════
+   Radial Gauge
+══════════════════════════════════════════════════════ */
+.hud-radial-gauge {
   position: relative;
   display: flex;
   align-items: center;
@@ -140,25 +235,11 @@
   flex-shrink: 0;
 }
 
-.sysdet-arc-gauge svg {
+.hud-radial-gauge svg {
   overflow: visible;
 }
 
-.sysdet-arc-bg {
-  fill: none;
-  stroke: rgba(255, 255, 255, 0.06);
-  stroke-linecap: round;
-}
-
-.sysdet-arc-fill {
-  fill: none;
-  stroke: url(#arcGrad);
-  stroke-linecap: round;
-  transition: stroke-dashoffset 0.9s cubic-bezier(0.4, 0, 0.2, 1);
-  filter: drop-shadow(0 0 5px rgba(16, 185, 129, 0.55));
-}
-
-.sysdet-arc-text {
+.hud-radial-text {
   position: absolute;
   text-align: center;
   display: flex;
@@ -168,54 +249,55 @@
   pointer-events: none;
 }
 
-.sysdet-arc-val {
-  font-size: 16px;
+.hud-radial-val {
+  font-size: 17px;
   font-weight: 800;
-  color: #10b981;
   line-height: 1;
   letter-spacing: -0.5px;
+  /* color set inline by component */
 }
 
-.sysdet-arc-unit {
+.hud-radial-unit {
   font-size: 8px;
-  color: rgba(255, 255, 255, 0.3);
-  font-weight: 500;
+  color: rgba(255, 255, 255, 0.25);
+  font-weight: 600;
   margin-top: 2px;
+  text-transform: lowercase;
 }
 
-/* ══════════════════════════════════════
-   Info rows
-══════════════════════════════════════ */
-.sysdet-body {
+/* ══════════════════════════════════════════════════════
+   Info Rows
+══════════════════════════════════════════════════════ */
+.hud-card-body {
   display: flex;
   flex-direction: column;
 }
 
-.sysdet-row {
+.hud-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 8px;
   padding: 5px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.025);
 }
 
-.sysdet-row:last-child {
+.hud-row:last-child {
   border-bottom: none;
 }
 
-.sysdet-label {
+.hud-label {
   font-size: 11px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.33);
+  color: rgba(255, 255, 255, 0.3);
   white-space: nowrap;
   flex-shrink: 0;
 }
 
-.sysdet-value {
+.hud-value {
   font-size: 11px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.75);
+  color: rgba(255, 255, 255, 0.78);
   text-align: right;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -223,189 +305,173 @@
   max-width: 62%;
 }
 
-/* ── Inline value loader (shimmer bar while data is loading) ── */
-.sysdet-value-loader {
+.hud-accent {
+  color: #00F2FF !important;
+  font-weight: 700 !important;
+  text-shadow: 0 0 8px rgba(0, 242, 255, 0.3);
+}
+
+/* ── Shimmer loader ── */
+.hud-value-loader {
   display: inline-block;
   width: 60px;
   height: 10px;
   border-radius: 4px;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(0, 242, 255, 0.04);
 }
-.sysdet-value-loader-bar {
+
+.hud-value-loader-bar {
   display: block;
   width: 100%;
   height: 100%;
   border-radius: 4px;
   background: linear-gradient(
     90deg,
-    rgba(16, 185, 129, 0.08) 0%,
-    rgba(6, 182, 212, 0.22) 50%,
-    rgba(16, 185, 129, 0.08) 100%
+    rgba(0, 242, 255, 0.06) 0%,
+    rgba(0, 242, 255, 0.18) 50%,
+    rgba(0, 242, 255, 0.06) 100%
   );
   background-size: 200% 100%;
-  animation: sysdet-shimmer 1.4s ease-in-out infinite;
+  animation: hud-shimmer 1.4s ease-in-out infinite;
 }
-@keyframes sysdet-shimmer {
+
+@keyframes hud-shimmer {
   0%   { background-position: 200% 0; }
   100% { background-position: -200% 0; }
 }
 
-/* wrapper for value + IO badges when passed as JSX */
-.sysdet-value-with-io {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 6px;
-  min-width: 140px;
-  max-width: 260px;
-}
-.sysdet-value-with-io .sysdet-value-text {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: 5px;
-  color: rgba(255,255,255,0.85);
-  font-weight: 600;
-}
-.sysdet-value-with-io .sysdet-io-badges-wrap {
-  padding-top: 0;
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
-}
-
-/* compact IO badges for label/value rows (smaller) */
-.sysdet-io-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  padding: 1px 5px;
-  border-radius: 5px;
-  font-size: 5px;
-  font-weight: 600;
-  min-width: 40px;
-}
-
-@media (max-width: 680px) {
-  .sysdet-value-with-io { min-width: 70px; max-width: 120px; }
-  .sysdet-io-badge { padding: 1px 5px; font-size: 5px; min-width: 36px; }
-}
-
-.sysdet-accent { color: #10b981; font-weight: 700; }
-.sysdet-warn   { color: #f59e0b; font-weight: 700; }
-
-.sysdet-note {
-  font-size: 10px;
-  color: rgba(255, 255, 255, 0.2);
-  font-style: italic;
-  padding-top: 4px;
-}
-
-/* ══════════════════════════════════════
-   Usage bar inside card
-══════════════════════════════════════ */
-.sysdet-bar-row {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
+/* ══════════════════════════════════════════════════════
+   Neon Bar Gauge
+══════════════════════════════════════════════════════ */
+.hud-neon-bar-wrap {
   padding: 6px 0 2px;
 }
 
-.sysdet-bar-label-row {
+.hud-neon-bar-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  margin-bottom: 5px;
 }
 
-.sysdet-minibar {
-  height: 5px;
-  background: rgba(255, 255, 255, 0.05);
+.hud-neon-bar-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.hud-neon-bar-display {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.hud-neon-bar-track {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.04);
   border-radius: 999px;
   overflow: hidden;
+  position: relative;
 }
 
-.sysdet-minibar-fill {
+.hud-neon-bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, #10b981, #06b6d4);
   border-radius: 999px;
   transition: width 0.9s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
 }
 
-/* ══════════════════════════════════════
-   Per-core bars
-══════════════════════════════════════ */
-.sysdet-cores-wrap {
+/* Glow pulse on high values */
+.hud-neon-bar-fill::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: -2px;
+  width: 6px;
+  height: 8px;
+  border-radius: 50%;
+  background: inherit;
+  filter: blur(3px);
+  opacity: 0.7;
+}
+
+/* ══════════════════════════════════════════════════════
+   Per-Core Heat Map
+══════════════════════════════════════════════════════ */
+.hud-heatmap-wrap {
   padding-top: 10px;
 }
 
-.sysdet-cores-label {
+.hud-heatmap-label {
   font-size: 10px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.28);
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.22);
   text-transform: uppercase;
-  letter-spacing: 0.8px;
-  margin-bottom: 7px;
+  letter-spacing: 1.2px;
+  margin-bottom: 8px;
 }
 
-.sysdet-core-bars {
+.hud-heatmap-grid {
   display: flex;
   gap: 3px;
-  align-items: flex-end;
-  height: 34px;
+  flex-wrap: wrap;
 }
 
-.sysdet-core {
-  flex: 1;
-  min-width: 5px;
-  max-width: 14px;
-  height: 100%;
-  background: rgba(255, 255, 255, 0.04);
-  border-radius: 3px 3px 0 0;
+.hud-heatmap-cell {
+  width: 16px;
+  height: 22px;
+  border-radius: 3px;
+  background: rgba(0, 242, 255, 0.06);
+  transition: background 0.4s ease, box-shadow 0.4s ease;
+  cursor: default;
   position: relative;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  overflow: hidden;
 }
 
-.sysdet-core-fill {
-  width: 100%;
-  background: linear-gradient(180deg, #10b981, #06b6d4);
-  border-radius: 3px 3px 0 0;
-  transition: height 0.6s ease;
-  min-height: 1px;
+.hud-heatmap-cell::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  pointer-events: none;
 }
 
-.sysdet-core-shimmer {
+.hud-heatmap-shimmer {
   background: linear-gradient(
-    180deg,
-    rgba(16, 185, 129, 0.06) 0%,
-    rgba(6, 182, 212, 0.15) 50%,
-    rgba(16, 185, 129, 0.06) 100%
+    135deg,
+    rgba(0, 242, 255, 0.04) 0%,
+    rgba(0, 242, 255, 0.12) 50%,
+    rgba(0, 242, 255, 0.04) 100%
   );
-  background-size: 100% 200%;
-  animation: sysdet-core-pulse 1.4s ease-in-out infinite;
-}
-@keyframes sysdet-core-pulse {
-  0%   { background-position: 0 200%; }
-  100% { background-position: 0 -200%; }
+  background-size: 200% 200%;
+  animation: hud-heat-pulse 1.6s ease-in-out infinite;
 }
 
-/* ══════════════════════════════════════
-   IO speed badges
-══════════════════════════════════════ */
-.sysdet-io-strip {
+@keyframes hud-heat-pulse {
+  0%   { background-position: 200% 200%; }
+  100% { background-position: -200% -200%; }
+}
+
+/* ══════════════════════════════════════════════════════
+   IO Speed Badges
+══════════════════════════════════════════════════════ */
+.hud-io-strip {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
 }
 
-.sysdet-io-badge {
+.hud-io-inline {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.hud-io-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 3px;
   height: 20px;
   line-height: 20px;
   min-width: 56px;
@@ -415,100 +481,134 @@
   white-space: nowrap;
 }
 
-.sysdet-io-badge.up {
-  background: rgba(245, 158, 11, 0.09);
-  border: 1px solid rgba(245, 158, 11, 0.18);
-  color: #f59e0b;
+.hud-io-badge.up {
+  background: rgba(255, 168, 0, 0.08);
+  border: 1px solid rgba(255, 168, 0, 0.2);
+  color: #FFA800;
 }
 
-.sysdet-io-badge.down {
-  background: rgba(6, 182, 212, 0.07);
-  border: 1px solid rgba(6, 182, 212, 0.15);
-  color: #06b6d4;
+.hud-io-badge.down {
+  background: rgba(0, 242, 255, 0.06);
+  border: 1px solid rgba(0, 242, 255, 0.15);
+  color: #00F2FF;
 }
 
-/* ══════════════════════════════════════
-   Drive list
-══════════════════════════════════════ */
-.sysdet-drives {
+/* ══════════════════════════════════════════════════════
+   Drive List
+══════════════════════════════════════════════════════ */
+.hud-drives-section {
   padding-top: 8px;
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
-.sysdet-drives-title {
+.hud-drives-title {
   font-size: 10px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.28);
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.22);
   text-transform: uppercase;
-  letter-spacing: 0.8px;
+  letter-spacing: 1.2px;
   margin-bottom: 2px;
 }
 
-.sysdet-drive-row {
+.hud-drive-row {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.sysdet-drive-letter {
-  font-size: 10.5px;
+.hud-drive-letter {
+  font-size: 11px;
   font-weight: 800;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(0, 242, 255, 0.5);
   width: 22px;
   flex-shrink: 0;
 }
 
-.sysdet-drive-bar { flex: 1; }
+.hud-drive-bar-track {
+  flex: 1;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 999px;
+  overflow: hidden;
+}
 
-.sysdet-drive-info {
-  font-size: 9.5px;
-  color: rgba(255, 255, 255, 0.28);
+.hud-drive-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #00F2FF00, #00F2FF);
+  box-shadow: 0 0 6px rgba(0, 242, 255, 0.35);
+  border-radius: 999px;
+  transition: width 0.9s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hud-drive-info {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.25);
   white-space: nowrap;
   flex-shrink: 0;
   min-width: 56px;
   text-align: right;
 }
 
-/* ══════════════════════════════════════
-   Status chip
-══════════════════════════════════════ */
-.sysdet-chip {
+/* ══════════════════════════════════════════════════════
+   Status Chip
+══════════════════════════════════════════════════════ */
+.hud-chip {
   display: inline-flex;
   align-items: center;
-  padding: 2px 8px;
+  padding: 2px 10px;
   border-radius: 999px;
   font-size: 10px;
   font-weight: 700;
+  letter-spacing: 0.5px;
 }
 
-.sysdet-chip.green {
-  background: rgba(16, 185, 129, 0.1);
-  border: 1px solid rgba(16, 185, 129, 0.22);
-  color: #10b981;
+.hud-chip.green {
+  background: rgba(0, 255, 136, 0.08);
+  border: 1px solid rgba(0, 255, 136, 0.25);
+  color: #00FF88;
+  text-shadow: 0 0 6px rgba(0, 255, 136, 0.3);
 }
 
-.sysdet-chip.yellow {
-  background: rgba(245, 158, 11, 0.1);
-  border: 1px solid rgba(245, 158, 11, 0.22);
-  color: #f59e0b;
+.hud-chip.yellow {
+  background: rgba(255, 214, 0, 0.08);
+  border: 1px solid rgba(255, 214, 0, 0.25);
+  color: #FFD600;
+  text-shadow: 0 0 6px rgba(255, 214, 0, 0.3);
 }
 
-/* ══════════════════════════════════════
-   Inline icon rows (wifi / power / battery)
-══════════════════════════════════════ */
-.sysdet-inline-row {
+/* ══════════════════════════════════════════════════════
+   Inline icon rows (Wi-Fi / Battery)
+══════════════════════════════════════════════════════ */
+.hud-inline-row {
   display: flex;
   align-items: center;
   gap: 6px;
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.45);
   padding: 4px 0;
 }
 
-.sysdet-inline-row svg { flex-shrink: 0; }
-.sysdet-inline-row.power svg { color: #f59e0b; }
-.sysdet-inline-row.wifi  svg { color: #06b6d4; }
-.sysdet-inline-row.batt  svg { color: #10b981; }
+.hud-inline-row svg {
+  flex-shrink: 0;
+}
+
+.hud-inline-row.wifi svg {
+  color: #00F2FF;
+  filter: drop-shadow(0 0 3px rgba(0, 242, 255, 0.4));
+}
+
+.hud-inline-row.batt svg {
+  color: #00FF88;
+  filter: drop-shadow(0 0 3px rgba(0, 255, 136, 0.4));
+}
+
+/* ── Note ── */
+.hud-note {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.18);
+  font-style: italic;
+  padding-top: 4px;
+}
 

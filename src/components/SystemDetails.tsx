@@ -3,19 +3,27 @@ import { motion } from 'framer-motion';
 import {
   Cpu, MonitorSpeaker, MemoryStick, HardDrive,
   Network, Wifi, Zap, Battery, Monitor, Server,
-  ArrowUp, ArrowDown,
+  ArrowUp, ArrowDown, Activity, Gauge,
 } from 'lucide-react';
 import type { HardwareInfo, ExtendedStats } from '../App';
 import '../styles/SystemDetails.css';
 
+/* ═══════════════════════════════════════════
+   Types
+═══════════════════════════════════════════ */
 interface SystemDetailsProps {
-  systemStats?: { cpu: number; ram: number; disk: number; temperature: number;
+  systemStats?: {
+    cpu: number; ram: number; disk: number; temperature: number;
     lhmReady?: boolean;
-    gpuTemp?: number; gpuUsage?: number; gpuVramUsed?: number; gpuVramTotal?: number; };
+    gpuTemp?: number; gpuUsage?: number; gpuVramUsed?: number; gpuVramTotal?: number;
+  };
   hardwareInfo?: HardwareInfo;
   extendedStats?: ExtendedStats;
 }
 
+/* ═══════════════════════════════════════════
+   Formatters
+═══════════════════════════════════════════ */
 const fmt = (n: number): string => {
   if (n <= 0) return '0 B/s';
   if (n < 1024) return `${Math.round(n)} B/s`;
@@ -24,319 +32,440 @@ const fmt = (n: number): string => {
   return `${(n / 1073741824).toFixed(2)} GB/s`;
 };
 
-// Format bytes/sec as megabits/sec for network realtime badges (one decimal)
 const fmtMbps = (bytesPerSec?: number) => {
   if (!bytesPerSec || bytesPerSec <= 0) return '0 Mbps';
   const mbps = (bytesPerSec * 8) / (1024 * 1024);
   return mbps >= 100 ? `${Math.round(mbps)} Mbps` : `${mbps.toFixed(1)} Mbps`;
 };
 
-// Convert MiB (nvidia-smi) to GB for UI display (show 1 decimal unless whole number)
 const formatMiBtoGB = (mb?: number | null): string => {
   if (!mb || mb <= 0) return '—';
   const gb = mb / 1024;
   return gb % 1 === 0 ? `${gb.toFixed(0)} GB` : `${gb.toFixed(1)} GB`;
 };
 
-/* ─── Shared gradient def ─── */
-const GradDef: React.FC = () => (
-  <svg width="0" height="0" style={{ position: 'absolute' }}>
-    <defs>
-      <linearGradient id="arcGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-        <stop offset="0%" stopColor="#10b981" />
-        <stop offset="100%" stopColor="#06b6d4" />
-      </linearGradient>
-    </defs>
-  </svg>
-);
-
-/* ─── Arc gauge ─── */
-const ArcGauge: React.FC<{ value: number; unit?: string; displayValue?: string | number }> = ({ value, unit = '%', displayValue }) => {
-  const r = 22;
-  const circ = 2 * Math.PI * r;
-  const pct = Math.max(0, Math.min(value, 100));
-  const arcLen = circ * 0.75;
-  const offset = arcLen - (pct / 100) * arcLen;
-  const rotation = 135;
-
-  return (
-    <div className="sysdet-arc-gauge">
-      <svg width="58" height="58" viewBox="0 0 58 58">
-        <circle cx="29" cy="29" r={r} className="sysdet-arc-bg"
-          strokeDasharray={`${arcLen} ${circ}`}
-          strokeDashoffset={0}
-          strokeWidth={3}
-          transform={`rotate(${rotation} 29 29)`}
-        />
-        <circle cx="29" cy="29" r={r} className="sysdet-arc-fill"
-          strokeDasharray={`${arcLen} ${circ}`}
-          strokeDashoffset={offset}
-          strokeWidth={3}
-          transform={`rotate(${rotation} 29 29)`}
-        />
-      </svg>
-      <div className="sysdet-arc-text">
-        <span className="sysdet-arc-val">{displayValue ?? Math.round(value)}</span>
-        <span className="sysdet-arc-unit">{unit}</span>
-      </div>
-    </div>
-  );
-};
-
-/* ─── Inline value shimmer (replaces '—' while data loads) ─── */
-const ValueLoader: React.FC = () => (
-  <span className="sysdet-value-loader"><span className="sysdet-value-loader-bar" /></span>
-);
-
-/* ─── Info row ─── */
-const Row: React.FC<{ label: string; value?: React.ReactNode; accent?: boolean; chip?: 'green' | 'yellow'; loading?: boolean }> = ({ label, value, accent, chip, loading }) => (
-  <div className="sysdet-row">
-    <span className="sysdet-label">{label}</span>
-    {loading ? (
-      <ValueLoader />
-    ) : chip ? (
-      <span className={`sysdet-chip ${chip}`}>{value ?? '—'}</span>
-    ) : (
-      <div className={`sysdet-value${accent ? ' sysdet-accent' : ''}`}>{value ?? '—'}</div>
-    )}
-  </div>
-);
-
-/* ─── Usage bar row ─── */
-const BarRow: React.FC<{ label: string; pct: number; display: string }> = ({ label, pct, display }) => (
-  <div className="sysdet-bar-row">
-    <div className="sysdet-bar-label-row">
-      <span className="sysdet-label">{label}</span>
-      <span className="sysdet-value sysdet-accent">{display}</span>
-    </div>
-    <div className="sysdet-minibar">
-      <div className="sysdet-minibar-fill" style={{ width: `${Math.min(pct, 100)}%` }} />
-    </div>
-  </div>
-);
-
-/* ─── IO badges ─── */
-const IOStrip: React.FC<{ up: string; down: string }> = ({ up, down }) => (
-  <div className="sysdet-io-strip">
-    <span className="sysdet-io-badge up"><ArrowUp size={9} />{up}</span>
-    <span className="sysdet-io-badge down"><ArrowDown size={9} />{down}</span>
-  </div>
-);
-
-/* ─── Card ─── */
-const Card: React.FC<{
-  icon: React.ReactNode;
-  title: string;
-  subtitle?: string;
-  gaugeValue?: number;
-  gaugeUnit?: string;
-  gaugeDisplay?: string | number;
-  barPct?: number;
-  delay?: number;
-  children: React.ReactNode;
-}> = ({ icon, title, subtitle, gaugeValue, gaugeUnit, gaugeDisplay, barPct, delay = 0, children }) => (
-  <motion.div
-    className="sysdet-box"
-    initial={{ opacity: 0, y: 14 }}
-    animate={{ opacity: 1, y: 0 }}
-    transition={{ duration: 0.38, delay, ease: [0.22, 1, 0.36, 1] }}
-  >
-    {/* top usage accent bar */}
-    <div className="sysdet-card-bar">
-      <div className="sysdet-card-bar-fill" style={{ width: `${barPct ?? gaugeValue ?? 0}%` }} />
-    </div>
-
-    <div className="sysdet-card-inner">
-      {/* header */}
-      <div className="sysdet-card-head">
-        <div className="sysdet-card-icon">{icon}</div>
-        <div className="sysdet-card-title-group">
-          <div className="sysdet-card-title">{title}</div>
-          {subtitle && <div className="sysdet-card-subtitle" title={subtitle}>{subtitle}</div>}
-        </div>
-        {gaugeValue !== undefined && <ArcGauge value={gaugeValue} unit={gaugeUnit} displayValue={gaugeDisplay} />}
-      </div>
-
-      {/* body */}
-      <div className="sysdet-body">{children}</div>
-    </div>
-  </motion.div>
-);
-
-/* ═══════════════════════════════════════════
-   Main component
-═══════════════════════════════════════════ */
-
-// Clean motherboard/product name for display (remove parenthetical SKU/codes)
 const cleanBoardName = (name?: string) => {
   if (!name) return '';
-  // remove parenthetical content and trailing codes like " - something"
   return name.replace(/\s*\(.*?\)\s*/g, '').replace(/\s*-\s*.*/g, '').trim();
 };
 
-// Treat common placeholder/invalid serial strings as empty so UI shows "—"
 const isPlaceholderSerial = (s?: string) => {
   if (!s) return true;
   const v = s.trim().toLowerCase();
-  const invalid = ['default string','to be filled by o.e.m.','to be filled by oem','system serial number','not specified','none','unknown','baseboard serial number'];
+  const invalid = ['default string', 'to be filled by o.e.m.', 'to be filled by oem', 'system serial number', 'not specified', 'none', 'unknown', 'baseboard serial number'];
   if (invalid.includes(v)) return true;
   if (/^0+$/.test(s)) return true;
   if (s.trim().length < 3) return true;
   return false;
 };
 
-// Mask disk serials for privacy (show last 4 chars if available)
-const maskSerial = (s?: string) => {
-  if (!s) return '—';
-  const t = s.trim();
-  if (t.length <= 4) return `••••${t}`;
-  return `••••${t.slice(-4)}`;
-};
-
-// Parse strings like "1 Gbps", "100 Mbps" or numeric bps to Mbps (returns number in Mbps)
 const parseLinkSpeedStr = (s?: string): number | undefined => {
   if (!s) return undefined;
   const str = String(s).trim();
-  // common patterns: "1 Gbps", "100 Mbps", "1000 Mb/s"
   const m = str.match(/([0-9]+(?:\.[0-9]+)?)\s*(g|m)/i);
   if (m) {
     const val = parseFloat(m[1]);
     const unit = m[2].toLowerCase();
     return unit === 'g' ? val * 1000 : val;
   }
-  // numeric fallback: could be bps or Mbps
   const num = parseFloat(str.replace(/[^0-9\.]/g, ''));
   if (!isNaN(num)) {
-    // if number is large assume it's in bps (e.g. 1000000000)
     if (num > 10000) return Math.round(num / 1000000);
-    return num; // assume Mbps already
+    return num;
   }
   return undefined;
 };
 
+/* ═══════════════════════════════════════════
+   SVG Gradient Definitions
+═══════════════════════════════════════════ */
+const HudGradients: React.FC = () => (
+  <svg width="0" height="0" style={{ position: 'absolute' }}>
+    <defs>
+      <linearGradient id="hud-cyan-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" stopColor="#00F2FF" />
+        <stop offset="100%" stopColor="#00D4AA" />
+      </linearGradient>
+      <linearGradient id="hud-emerald-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" stopColor="#00FF88" />
+        <stop offset="100%" stopColor="#00F2FF" />
+      </linearGradient>
+      <linearGradient id="hud-heat-low" x1="0%" y1="100%" x2="0%" y2="0%">
+        <stop offset="0%" stopColor="#00F2FF" />
+        <stop offset="100%" stopColor="#00D4AA" />
+      </linearGradient>
+      <linearGradient id="hud-heat-mid" x1="0%" y1="100%" x2="0%" y2="0%">
+        <stop offset="0%" stopColor="#00F2FF" />
+        <stop offset="100%" stopColor="#FFD600" />
+      </linearGradient>
+      <linearGradient id="hud-heat-high" x1="0%" y1="100%" x2="0%" y2="0%">
+        <stop offset="0%" stopColor="#FF6B00" />
+        <stop offset="100%" stopColor="#FF2D55" />
+      </linearGradient>
+    </defs>
+  </svg>
+);
+
+/* ═══════════════════════════════════════════
+   Radial Gauge — glowing circular indicator
+═══════════════════════════════════════════ */
+const RadialGauge: React.FC<{
+  value: number; unit?: string; displayValue?: string | number; size?: number;
+}> = ({ value, unit = '%', displayValue, size = 64 }) => {
+  const r = (size / 2) - 6;
+  const circ = 2 * Math.PI * r;
+  const pct = Math.max(0, Math.min(value, 100));
+  const arcLen = circ * 0.75;
+  const offset = arcLen - (pct / 100) * arcLen;
+  const rotation = 135;
+  const center = size / 2;
+  const color = pct > 80 ? '#FF2D55' : pct > 60 ? '#FFD600' : '#00F2FF';
+
+  return (
+    <div className="hud-radial-gauge">
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        {/* bg track */}
+        <circle cx={center} cy={center} r={r}
+          fill="none" stroke="rgba(0,242,255,0.08)" strokeWidth={3} strokeLinecap="round"
+          strokeDasharray={`${arcLen} ${circ}`} strokeDashoffset={0}
+          transform={`rotate(${rotation} ${center} ${center})`}
+        />
+        {/* active arc */}
+        <circle cx={center} cy={center} r={r}
+          fill="none" stroke={color} strokeWidth={3} strokeLinecap="round"
+          strokeDasharray={`${arcLen} ${circ}`} strokeDashoffset={offset}
+          transform={`rotate(${rotation} ${center} ${center})`}
+          style={{
+            transition: 'stroke-dashoffset 0.9s cubic-bezier(0.4,0,0.2,1), stroke 0.5s ease',
+            filter: `drop-shadow(0 0 6px ${color}88)`,
+          }}
+        />
+      </svg>
+      <div className="hud-radial-text">
+        <span className="hud-radial-val" style={{ color }}>{displayValue ?? Math.round(value)}</span>
+        <span className="hud-radial-unit">{unit}</span>
+      </div>
+    </div>
+  );
+};
+
+/* ═══════════════════════════════════════════
+   Neon Bar Gauge — thin glowing horizontal bar
+═══════════════════════════════════════════ */
+const NeonBar: React.FC<{ pct: number; label?: string; display?: string; color?: string }> = ({
+  pct, label, display, color = '#00F2FF',
+}) => (
+  <div className="hud-neon-bar-wrap">
+    {(label || display) && (
+      <div className="hud-neon-bar-header">
+        {label && <span className="hud-neon-bar-label">{label}</span>}
+        {display && <span className="hud-neon-bar-display" style={{ color }}>{display}</span>}
+      </div>
+    )}
+    <div className="hud-neon-bar-track">
+      <div
+        className="hud-neon-bar-fill"
+        style={{
+          width: `${Math.min(pct, 100)}%`,
+          background: `linear-gradient(90deg, ${color}00, ${color})`,
+          boxShadow: `0 0 8px ${color}66, 0 0 2px ${color}44`,
+        }}
+      />
+    </div>
+  </div>
+);
+
+/* ═══════════════════════════════════════════
+   Shimmer Loader
+═══════════════════════════════════════════ */
+const ValueLoader: React.FC = () => (
+  <span className="hud-value-loader"><span className="hud-value-loader-bar" /></span>
+);
+
+/* ═══════════════════════════════════════════
+   Info Row
+═══════════════════════════════════════════ */
+const Row: React.FC<{
+  label: string; value?: React.ReactNode; accent?: boolean;
+  chip?: 'green' | 'yellow'; loading?: boolean;
+}> = ({ label, value, accent, chip, loading }) => (
+  <div className="hud-row">
+    <span className="hud-label">{label}</span>
+    {loading ? (
+      <ValueLoader />
+    ) : chip ? (
+      <span className={`hud-chip ${chip}`}>{value ?? '—'}</span>
+    ) : (
+      <div className={`hud-value${accent ? ' hud-accent' : ''}`}>{value ?? '—'}</div>
+    )}
+  </div>
+);
+
+/* ═══════════════════════════════════════════
+   IO Speed Badges
+═══════════════════════════════════════════ */
+const IOStrip: React.FC<{ up: string; down: string }> = ({ up, down }) => (
+  <div className="hud-io-strip">
+    <span className="hud-io-badge up"><ArrowUp size={9} />{up}</span>
+    <span className="hud-io-badge down"><ArrowDown size={9} />{down}</span>
+  </div>
+);
+
+/* ═══════════════════════════════════════════
+   Per-Core Heat Map
+═══════════════════════════════════════════ */
+const CoreHeatMap: React.FC<{ cores: number[]; threadCount?: number; loading?: boolean }> = ({
+  cores, threadCount, loading,
+}) => {
+  const getHeatColor = (pct: number) => {
+    if (pct < 25) return '#00F2FF';
+    if (pct < 50) return '#00D4AA';
+    if (pct < 75) return '#FFD600';
+    return '#FF2D55';
+  };
+
+  if (loading) {
+    return (
+      <div className="hud-heatmap-wrap">
+        <div className="hud-heatmap-label">PER-CORE</div>
+        <div className="hud-heatmap-grid">
+          {Array.from({ length: threadCount || 8 }).map((_, i) => (
+            <div key={i} className="hud-heatmap-cell hud-heatmap-shimmer" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="hud-heatmap-wrap">
+      <div className="hud-heatmap-label">PER-CORE</div>
+      <div className="hud-heatmap-grid">
+        {cores.map((pct, i) => {
+          const color = getHeatColor(pct);
+          return (
+            <div
+              key={i}
+              className="hud-heatmap-cell"
+              title={`Core ${i}: ${pct}%`}
+              style={{
+                background: `${color}${Math.max(Math.round(pct * 2.55), 18).toString(16).padStart(2, '0')}`,
+                boxShadow: pct > 50 ? `0 0 6px ${color}44` : 'none',
+              }}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+/* ═══════════════════════════════════════════
+   Bento Card — Glassmorphic container
+═══════════════════════════════════════════ */
+const BentoCard: React.FC<{
+  icon: React.ReactNode;
+  title: string;
+  subtitle?: string;
+  gaugeValue?: number;
+  gaugeUnit?: string;
+  gaugeDisplay?: string | number;
+  className?: string;
+  delay?: number;
+  children: React.ReactNode;
+}> = ({ icon, title, subtitle, gaugeValue, gaugeUnit, gaugeDisplay, className = '', delay = 0, children }) => (
+  <motion.div
+    className={`hud-bento-card ${className}`}
+    initial={{ opacity: 0, y: 20, scale: 0.97 }}
+    animate={{ opacity: 1, y: 0, scale: 1 }}
+    transition={{ duration: 0.5, delay, ease: [0.22, 1, 0.36, 1] }}
+  >
+    {/* Scanline overlay */}
+    <div className="hud-scanline-overlay" />
+    {/* Corner accents */}
+    <div className="hud-corner hud-corner-tl" />
+    <div className="hud-corner hud-corner-tr" />
+    <div className="hud-corner hud-corner-bl" />
+    <div className="hud-corner hud-corner-br" />
+
+    {/* Top accent line */}
+    <div className="hud-card-accent-line">
+      <div className="hud-card-accent-fill" style={{ width: `${gaugeValue ?? 0}%` }} />
+    </div>
+
+    <div className="hud-card-inner">
+      {/* Header */}
+      <div className="hud-card-head">
+        <div className="hud-card-icon">{icon}</div>
+        <div className="hud-card-title-group">
+          <div className="hud-card-title">{title}</div>
+          {subtitle && <div className="hud-card-subtitle" title={subtitle}>{subtitle}</div>}
+        </div>
+        {gaugeValue !== undefined && (
+          <RadialGauge value={gaugeValue} unit={gaugeUnit} displayValue={gaugeDisplay} />
+        )}
+      </div>
+
+      {/* Body */}
+      <div className="hud-card-body">{children}</div>
+    </div>
+  </motion.div>
+);
+
+/* ═══════════════════════════════════════════
+   Main SystemDetails Component
+═══════════════════════════════════════════ */
 const SystemDetails: React.FC<SystemDetailsProps> = ({ systemStats, hardwareInfo, extendedStats }) => {
   const hw = hardwareInfo;
   const ext = extendedStats;
   const s = systemStats;
-  // GPU data available from basic stats (LHM, instant) or extended stats (PS, 2-5s delay)
+
   const gpuUsage = ext?.gpuUsage != null && ext.gpuUsage >= 0 ? ext.gpuUsage : (s?.gpuUsage ?? -1);
   const gpuTemp = ext?.gpuTemp != null && ext.gpuTemp >= 0 ? ext.gpuTemp : (s?.gpuTemp ?? -1);
   const gpuVramUsed = ext?.gpuVramUsed != null && ext.gpuVramUsed >= 0 ? ext.gpuVramUsed : (s?.gpuVramUsed ?? -1);
   const gpuVramTotal = ext?.gpuVramTotal != null && ext.gpuVramTotal > 0 ? ext.gpuVramTotal : (s?.gpuVramTotal ?? -1);
-  const hasGpu = gpuUsage >= 0;
+  // hasGpu: true if ANY live GPU metric is available (usage, temp, or VRAM)
+  const hasGpu = gpuUsage >= 0 || gpuTemp >= 0 || gpuVramUsed >= 0 || gpuVramTotal > 0;
+  // gpuInitializing: LHM + nvidia-smi haven't provided data yet (show shimmers, not "no drivers")
+  const gpuInitializing = !hasGpu && (!s?.lhmReady || !ext);
 
-  // Loading flags — true when we're still waiting for data
   const lhmLoading = !s?.lhmReady;
   const hwLoading = !hw;
   const extLoading = !ext;
 
   return (
-    <motion.section className="sysdet-section" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.35 }}>
-      <GradDef />
-      <div className="sysdet-header">
-        <Server size={15} />
-        <h3 className="sysdet-title">System Details</h3>
+    <motion.section
+      className="hud-section"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.4 }}
+    >
+      <HudGradients />
+
+      {/* Section Header */}
+      <div className="hud-section-header">
+        <div className="hud-section-icon"><Server size={16} /></div>
+        <h3 className="hud-section-title">SYSTEM DETAILS</h3>
+        <div className="hud-section-line" />
       </div>
 
-      <div className="sysdet-grid">
+      {/* Bento Grid */}
+      <div className="hud-bento-grid">
 
-        {/* ── CPU ── */}
-        <Card icon={<Cpu size={17} />} title="Processor"
+        {/* ── PROCESSOR (large tile) ── */}
+        <BentoCard
+          icon={<Cpu size={18} />}
+          title="PROCESSOR"
           subtitle={hw?.cpuName}
-          gaugeValue={s?.cpu} gaugeUnit="%"
-          delay={0.04}
+          gaugeValue={gpuTemp >= 0 ? gpuTemp : undefined}
+          gaugeUnit="°C"
+          gaugeDisplay={gpuTemp >= 0 ? Math.trunc(gpuTemp) : '—'}
+          className="hud-tile-cpu"
+          delay={0.05}
         >
           <Row label="Cores / Threads" value={hw ? `${hw.cpuCores}C / ${hw.cpuThreads}T` : undefined} loading={hwLoading} />
           <Row label="Max Clock" value={hw?.cpuMaxClock} loading={hwLoading} />
-          <Row label="CPU Temp" value={s?.temperature > 0 ? `${Math.trunc(s.temperature)}°C` : undefined} accent />
-          {ext && ext.cpuClock > 0 && (
-            <Row label="Current Clock" value={`${(ext.cpuClock / 1000).toFixed(2)} GHz`} accent />
+          {ext && ext.cpuClock > 0 ? (
+            <NeonBar
+              pct={ext.cpuClock > 0 ? Math.min((ext.cpuClock / (parseFloat(hw?.cpuMaxClock || '5') * 1000)) * 100, 100) : 0}
+              label="Current Clock"
+              display={`${(ext.cpuClock / 1000).toFixed(2)} GHz`}
+            />
+          ) : extLoading ? (
+            <Row label="Current Clock" loading />
+          ) : null}
+          {ext?.perCoreCpu && ext.perCoreCpu.length > 0 ? (
+            <CoreHeatMap cores={ext.perCoreCpu} />
+          ) : (
+            <CoreHeatMap cores={[]} threadCount={hw?.cpuThreads || 8} loading={extLoading} />
           )}
-          {!ext && extLoading && <Row label="Current Clock" loading />}
-          {ext && ext.perCoreCpu && ext.perCoreCpu.length > 0 ? (
-            <div className="sysdet-cores-wrap">
-              <div className="sysdet-cores-label">Per-Core</div>
-              <div className="sysdet-core-bars">
-                {ext.perCoreCpu.map((pct, i) => (
-                  <div key={i} className="sysdet-core" title={`Core ${i}: ${pct}%`}>
-                    <div className="sysdet-core-fill" style={{ height: `${Math.min(pct, 100)}%` }} />
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : extLoading && (
-            <div className="sysdet-cores-wrap">
-              <div className="sysdet-cores-label">Per-Core</div>
-              <div className="sysdet-core-bars">
-                {Array.from({ length: hw?.cpuThreads || 8 }).map((_, i) => (
-                  <div key={i} className="sysdet-core sysdet-core-shimmer" />
-                ))}
-              </div>
-            </div>
-          )}
-        </Card>
+        </BentoCard>
 
-        {/* ── GPU ── */}
-        <Card icon={<MonitorSpeaker size={17} />} title="Graphics"
+        {/* ── GRAPHICS (large tile) ── */}
+        <BentoCard
+          icon={<MonitorSpeaker size={18} />}
+          title="GRAPHICS"
           subtitle={hw?.gpuName}
-          gaugeValue={hasGpu ? gpuUsage : 0} gaugeUnit="%"
-          delay={0.08}
+          gaugeValue={hasGpu ? gpuUsage : 0}
+          gaugeUnit="%"
+          className="hud-tile-gpu"
+          delay={0.1}
         >
           {gpuVramTotal > 0 ? (
             <Row label="VRAM" value={formatMiBtoGB(gpuVramTotal)} />
+          ) : hw?.gpuVramTotal ? (
+            <Row label="VRAM" value={hw.gpuVramTotal} />
           ) : (
-            hw?.gpuVramTotal ? <Row label="VRAM" value={hw.gpuVramTotal} /> : <Row label="VRAM" loading={lhmLoading} />
+            <Row label="VRAM" loading={gpuInitializing} />
           )}
-          {hw?.gpuDriverVersion ? <Row label="Driver" value={hw.gpuDriverVersion} /> : <Row label="Driver" loading={hwLoading} />}
+          {hw?.gpuDriverVersion ? (
+            <Row label="Driver" value={hw.gpuDriverVersion} />
+          ) : (
+            <Row label="Driver" loading={hwLoading} />
+          )}
           {hasGpu ? (
             <>
-              <Row label="GPU Temp" value={gpuTemp >= 0 ? `${Math.trunc(gpuTemp)}°C` : undefined} accent loading={gpuTemp < 0 && lhmLoading} />
-              {gpuVramUsed >= 0 && gpuVramTotal > 0 && (
-                <BarRow
-                  label="VRAM Used"
+              <Row label="GPU Temp" value={gpuTemp >= 0 ? `${Math.trunc(gpuTemp)}°C` : undefined} accent loading={gpuTemp < 0} />
+              {gpuVramUsed >= 0 && gpuVramTotal > 0 ? (
+                <NeonBar
                   pct={(gpuVramUsed / gpuVramTotal) * 100}
+                  label="VRAM Used"
                   display={`${formatMiBtoGB(gpuVramUsed)} / ${formatMiBtoGB(gpuVramTotal)}`}
+                  color="#00D4AA"
                 />
+              ) : (
+                <Row label="VRAM Used" loading />
               )}
             </>
-          ) : lhmLoading ? (
+          ) : gpuInitializing ? (
             <>
               <Row label="GPU Temp" loading />
               <Row label="VRAM Used" loading />
             </>
           ) : (
-            <div className="sysdet-note">Live stats require NVIDIA drivers</div>
+            <div className="hud-note">Live stats require NVIDIA drivers</div>
           )}
-        </Card>
+        </BentoCard>
 
-        {/* ── RAM ── */}
-        <Card icon={<MemoryStick size={17} />} title="Memory"
+        {/* ── MEMORY ── */}
+        <BentoCard
+          icon={<MemoryStick size={18} />}
+          title="MEMORY"
           subtitle={hw?.ramBrand || hw?.ramInfo}
-          gaugeValue={s?.ram} gaugeUnit="%"
-          delay={0.12}
+          gaugeValue={s?.ram}
+          gaugeUnit="%"
+          className="hud-tile-mem"
+          delay={0.15}
         >
           {hw?.ramInfo ? <Row label="Config" value={hw.ramInfo} /> : <Row label="Config" loading={hwLoading} />}
           {hw?.ramPartNumber ? <Row label="Part Number" value={hw.ramPartNumber} /> : hwLoading && <Row label="Part Number" loading />}
           {hw?.ramSticks ? <Row label="Sticks" value={hw.ramSticks} /> : hwLoading && <Row label="Sticks" loading />}
           {ext && ext.ramTotalGB > 0 ? (
-            <BarRow
-              label="Used"
+            <NeonBar
               pct={(ext.ramUsedGB / ext.ramTotalGB) * 100}
+              label="Used"
               display={`${ext.ramUsedGB.toFixed(1)} / ${ext.ramTotalGB.toFixed(1)} GB`}
+              color="#00F2FF"
             />
           ) : (
             <Row label="Used" loading={extLoading} />
           )}
-        </Card>
+        </BentoCard>
 
-        {/* ── Storage ── */}
-        <Card icon={<HardDrive size={17} />} title="Storage"
+        {/* ── STORAGE ── */}
+        <BentoCard
+          icon={<HardDrive size={18} />}
+          title="STORAGE"
           subtitle={hw?.diskName}
-          gaugeValue={s?.disk} gaugeUnit="%"
-          delay={0.16}
+          gaugeValue={s?.disk}
+          gaugeUnit="%"
+          className="hud-tile-storage"
+          delay={0.2}
         >
           <Row label="Type" value={hw?.diskType} loading={hwLoading} />
-          <Row label="Health" value={hw?.diskHealth}
+          <Row
+            label="Health"
+            value={hw?.diskHealth}
             chip={hw?.diskHealth?.toLowerCase() === 'healthy' ? 'green' : 'yellow'}
             loading={hwLoading}
           />
@@ -344,47 +473,49 @@ const SystemDetails: React.FC<SystemDetailsProps> = ({ systemStats, hardwareInfo
             label="Read/Write"
             loading={extLoading}
             value={ext ? (
-              <div className="sysdet-value-with-io">
-                <div className="sysdet-io-badges-wrap">
-                  <IOStrip up={fmt(ext.diskWriteSpeed || 0)} down={fmt(ext.diskReadSpeed || 0)} />
-                </div>
+              <div className="hud-io-inline">
+                <IOStrip up={fmt(ext.diskWriteSpeed || 0)} down={fmt(ext.diskReadSpeed || 0)} />
               </div>
             ) : undefined}
           />
-          {hw && hw.allDrives && hw.allDrives.length > 1 && (
-            <div className="sysdet-drives">
-              <div className="sysdet-drives-title">All Drives</div>
+          {hw?.allDrives && hw.allDrives.length > 0 && (
+            <div className="hud-drives-section">
+              <div className="hud-drives-title">ALL DRIVES</div>
               {hw.allDrives.map((d) => (
-                <div key={d.letter} className="sysdet-drive-row">
-                  <span className="sysdet-drive-letter">{d.letter}</span>
-                  <div className="sysdet-minibar sysdet-drive-bar">
-                    <div className="sysdet-minibar-fill"
-                      style={{ width: `${d.totalGB > 0 ? Math.min(((d.totalGB - d.freeGB) / d.totalGB) * 100, 100) : 0}%` }}
+                <div key={d.letter} className="hud-drive-row">
+                  <span className="hud-drive-letter">{d.letter}</span>
+                  <div className="hud-drive-bar-track">
+                    <div
+                      className="hud-drive-bar-fill"
+                      style={{
+                        width: `${d.totalGB > 0 ? Math.min(((d.totalGB - d.freeGB) / d.totalGB) * 100, 100) : 0}%`,
+                      }}
                     />
                   </div>
-                  <span className="sysdet-drive-info">{d.freeGB} GB free</span>
+                  <span className="hud-drive-info">{d.freeGB} GB free</span>
                 </div>
               ))}
             </div>
           )}
-        </Card>
+        </BentoCard>
 
-        {/* ── Network ── */}
-        <Card icon={<Network size={17} />} title="Network"
+        {/* ── NETWORK ── */}
+        <BentoCard
+          icon={<Network size={18} />}
+          title="NETWORK"
           subtitle={hw?.networkAdapter}
-          // show arc relative to the link speed (or 1Gbps fallback); display center shows Mbps
           gaugeValue={(() => {
             const up = ext?.networkUp ?? 0;
             const down = ext?.networkDown ?? 0;
-            const bytes = up + down; // bytes/sec
-            const mbps = Math.round(((bytes * 8) / (1024 * 1024)) * 10) / 10; // Mbit/s (one decimal)
-            const link = parseLinkSpeedStr(hw?.networkLinkSpeed) ?? 1000; // Mbps fallback to 1Gbps
-            const pct = link > 0 ? Math.min((mbps / link) * 100, 100) : 0;
-            return pct;
+            const bytes = up + down;
+            const mbps = Math.round(((bytes * 8) / (1024 * 1024)) * 10) / 10;
+            const link = parseLinkSpeedStr(hw?.networkLinkSpeed) ?? 1000;
+            return link > 0 ? Math.min((mbps / link) * 100, 100) : 0;
           })()}
-          gaugeDisplay={(() => Math.round(((ext?.networkUp ?? 0) + (ext?.networkDown ?? 0)) * 8 / (1024 * 1024)))()}
+          gaugeDisplay={Math.round(((ext?.networkUp ?? 0) + (ext?.networkDown ?? 0)) * 8 / (1024 * 1024))}
           gaugeUnit="Mbps"
-          delay={0.20}
+          className="hud-tile-net"
+          delay={0.25}
         >
           {hw?.ipAddress ? <Row label="Local IP Address" value={hw.ipAddress} /> : <Row label="Local IP Address" loading={hwLoading} />}
           {hw?.macAddress ? <Row label="MAC" value={hw.macAddress} /> : hwLoading && <Row label="MAC" loading />}
@@ -392,7 +523,14 @@ const SystemDetails: React.FC<SystemDetailsProps> = ({ systemStats, hardwareInfo
           {hw?.dns ? <Row label="DNS" value={hw.dns} /> : hwLoading && <Row label="DNS" loading />}
           {ext?.ssid && <Row label="Wi‑Fi SSID" value={ext.ssid} />}
           {ext ? (
-            ext.latencyMs > 0 && <Row label="Ping/Latency" value={`${ext.latencyMs} ms`} />
+            ext.latencyMs != null && ext.latencyMs > 0 ? (
+              <NeonBar
+                pct={Math.min(ext.latencyMs / 200 * 100, 100)}
+                label="Ping/Latency"
+                display={`${ext.latencyMs} ms`}
+                color={ext.latencyMs < 30 ? '#00FF88' : ext.latencyMs < 80 ? '#FFD600' : '#FF2D55'}
+              />
+            ) : null
           ) : (
             <Row label="Ping/Latency" loading />
           )}
@@ -401,10 +539,8 @@ const SystemDetails: React.FC<SystemDetailsProps> = ({ systemStats, hardwareInfo
             <Row
               label="Realtime Speed"
               value={(ext.networkUp > 0 || ext.networkDown > 0) ? (
-                <div className="sysdet-value-with-io">
-                  <div className="sysdet-io-badges-wrap">
-                    <IOStrip up={fmtMbps(ext.networkUp)} down={fmtMbps(ext.networkDown)} />
-                  </div>
+                <div className="hud-io-inline">
+                  <IOStrip up={fmtMbps(ext.networkUp)} down={fmtMbps(ext.networkDown)} />
                 </div>
               ) : '—'}
             />
@@ -412,34 +548,37 @@ const SystemDetails: React.FC<SystemDetailsProps> = ({ systemStats, hardwareInfo
             <Row label="Realtime Speed" loading />
           )}
           {ext && ext.wifiSignal > 0 && (
-            <div className="sysdet-inline-row wifi">
+            <div className="hud-inline-row wifi">
               <Wifi size={13} />
               <span>Wi-Fi Signal: {ext.wifiSignal}%</span>
             </div>
           )}
-        </Card>
+        </BentoCard>
 
-        {/* ── System ── */}
-        <Card icon={<Monitor size={17} />} title="System"
+        {/* ── SYSTEM ── */}
+        <BentoCard
+          icon={<Monitor size={18} />}
+          title="SYSTEM"
           subtitle={hw?.windowsVersion}
           gaugeValue={ext && ext.processCount > 0 ? Math.min((ext.processCount / 500) * 100, 100) : 0}
           gaugeUnit="proc"
           gaugeDisplay={ext?.processCount ?? 0}
-          delay={0.24}
+          className="hud-tile-sys"
+          delay={0.3}
         >
           <Row label="Build" value={hw?.windowsBuild} loading={hwLoading} />
           <Row label="Motherboard" value={hw?.motherboardProduct ? cleanBoardName(hw.motherboardProduct) : hw?.motherboardManufacturer} loading={hwLoading} />
           <Row label="BIOS" value={(hw?.biosVersion || hw?.biosDate) ? `${hw?.biosVersion || 'Unknown'}${hw?.biosDate ? ' — ' + hw.biosDate : ''}` : undefined} loading={hwLoading} />
           <Row label="Board S/N" value={!isPlaceholderSerial(hw?.motherboardSerial) ? hw?.motherboardSerial : (hw ? '—' : undefined)} loading={hwLoading} />
-          <Row label="Uptime" value={ext?.systemUptime ?? hw?.systemUptime} loading={!(ext?.systemUptime || hw?.systemUptime) && (extLoading || hwLoading)} />
+          <Row label="Uptime" value={ext?.systemUptime ?? hw?.systemUptime} accent loading={!(ext?.systemUptime || hw?.systemUptime) && (extLoading || hwLoading)} />
           <Row label="Power Plan" value={hw?.powerPlan ?? (hw ? '—' : undefined)} loading={hwLoading} />
           {hw?.hasBattery && (
-            <div className="sysdet-inline-row batt">
+            <div className="hud-inline-row batt">
               <Battery size={13} />
               <span>{hw.batteryPercent}% — {hw.batteryStatus}</span>
             </div>
           )}
-        </Card>
+        </BentoCard>
 
       </div>
     </motion.section>

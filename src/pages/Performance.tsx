@@ -11,6 +11,16 @@ declare global {
     electron?: {
       ipcRenderer: {
         invoke: (channel: string, ...args: any[]) => Promise<any>;
+        on: (channel: string, func: (...args: any[]) => void) => (() => void);
+        once: (channel: string, func: (...args: any[]) => void) => void;
+        removeAllListeners: (channel: string) => void;
+      };
+      windowControls?: {
+        minimize: () => void;
+        maximize: () => void;
+        close: () => void;
+        isMaximized: () => Promise<boolean>;
+        onMaximizedChange: (callback: (isMaximized: boolean) => void) => (() => void);
       };
     };
   }

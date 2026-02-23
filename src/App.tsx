@@ -10,6 +10,7 @@ import GameLibrary from './pages/GameLibrary';
 import OBSPresets from './pages/OBSPresets';
 import { ToastProvider } from './contexts/ToastContext';
 import { ToastContainer } from './components/ToastContainer';
+import { useRealtimeHardware } from './hooks/useRealtimeHardware';
 import './App.css';
 
 export interface HardwareInfo {
@@ -77,28 +78,41 @@ export interface ExtendedStats {
 function App() {
     const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState('dashboard');
-  const [systemStats, setSystemStats] = useState({
-    cpu: 0,
-    ram: 0,
-    disk: 0,
-    temperature: 0,
-  });
-  // track whether we've received at least one stats update
-  const [statsLoaded, setStatsLoaded] = useState(false);
-  const [extLoaded, setExtLoaded] = useState(false);
   const [hardwareInfo, setHardwareInfo] = useState<HardwareInfo | undefined>(undefined);
-  const [extendedStats, setExtendedStats] = useState<ExtendedStats | undefined>(undefined);
 
-  // Dismiss the loader as soon as basic stats arrive.
-  // Cards render immediately with inline shimmer loaders for pending values.
+  // ── Real-Time Push: subscribe to hardware metrics from main process ──
+  // The hook listens for 'realtime-hw-update' events pushed via webContents.send
+  // at 1000ms intervals. Uses useRef internally to avoid re-rendering on every push;
+  // state is flushed once per animation frame for smooth batched UI updates.
+  const shouldStream = isLoading || currentPage === 'dashboard' || currentPage === 'performance';
+  const { systemStats, extendedStats, connected } = useRealtimeHardware({ enabled: shouldStream });
+
+  // Dismiss the loader as soon as the first real-time push arrives
   useEffect(() => {
-    if (isLoading && statsLoaded) {
+    if (isLoading && connected) {
       setIsLoading(false);
     }
-  }, [isLoading, statsLoaded]);
+  }, [isLoading, connected]);
+
+  // Fallback: if real-time push hasn't connected within 5s, try a single poll
+  // to unblock the loader (covers dev mode without Electron)
+  useEffect(() => {
+    if (!isLoading) return;
+    const timer = setTimeout(async () => {
+      if (!connected && window.electron?.ipcRenderer) {
+        try {
+          await window.electron.ipcRenderer.invoke('system:get-stats');
+          setIsLoading(false);
+        } catch {}
+      }
+      // If no electron at all (browser dev), just dismiss after timeout
+      if (!window.electron) setIsLoading(false);
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [isLoading, connected]);
 
   useEffect(() => {
-    // Fetch hardware info once
+    // Fetch hardware info once (static data, cached on disk for 7 days)
     const fetchHardwareInfo = async () => {
       if (window.electron?.ipcRenderer) {
         try {
@@ -112,71 +126,6 @@ function App() {
     fetchHardwareInfo();
   }, []);
 
-  useEffect(() => {
-    // Poll system stats when loading or when Dashboard/Performance is visible
-    if (isLoading || currentPage === 'dashboard' || currentPage === 'performance') {
-      let statsBusy = false;
-      let extBusy = false;
-      let cancelled = false;
-
-      // Get real system stats — with overlap guard
-      const fetchSystemStats = async () => {
-        if (statsBusy || cancelled) return;
-        statsBusy = true;
-        try {
-          if (window.electron?.ipcRenderer) {
-            const stats = await window.electron.ipcRenderer.invoke('system:get-stats');
-            if (!cancelled) {
-              setSystemStats(stats);
-              if (!statsLoaded) setStatsLoaded(true);
-            }
-          }
-        } catch (error) {
-          console.error('Error fetching system stats:', error);
-        } finally {
-          statsBusy = false;
-        }
-      };
-
-      // Fetch extended stats (live metrics) — with overlap guard
-      const fetchExtendedStats = async () => {
-        if (extBusy || cancelled) return;
-        extBusy = true;
-        try {
-          if (window.electron?.ipcRenderer) {
-            const ext = await window.electron.ipcRenderer.invoke('system:get-extended-stats');
-            if (!cancelled && ext) {
-              setExtendedStats(ext);
-              if (!extLoaded) setExtLoaded(true);
-            }
-          }
-        } catch (error) {
-          console.error('Error fetching extended stats:', error);
-        } finally {
-          extBusy = false;
-        }
-      };
-
-      // Initial fetch — both start immediately
-      fetchSystemStats();
-      fetchExtendedStats();
-
-      // Basic stats are instant (LHM + Node.js, no PS spawn), poll every 1.5s
-      const interval = setInterval(fetchSystemStats, 1500);
-      // Extended stats (per-core, network, disk I/O etc.) take ~4s, poll every 5s
-      // to avoid always hitting the overlap guard
-      const extInterval = setInterval(fetchExtendedStats, 5000);
-
-      return () => {
-        cancelled = true;
-        clearInterval(interval);
-        clearInterval(extInterval);
-      };
-    }
-    // If not dashboard/performance and not loading, do not poll
-    return undefined;
-  }, [isLoading, currentPage]);
-
   const renderPage = () => {
     return (
       <>
@@ -185,7 +134,7 @@ function App() {
             systemStats={systemStats}
             hardwareInfo={hardwareInfo}
             extendedStats={extendedStats}
-            statsLoaded={statsLoaded}
+            statsLoaded={connected}
           />
         </div>
         <div style={{ display: currentPage === 'performance' ? 'block' : 'none' }}>

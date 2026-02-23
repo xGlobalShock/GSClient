@@ -4,6 +4,7 @@ const fs = require('fs');
 const { exec, execFile, spawn } = require('child_process');
 const { promisify } = require('util');
 const os = require('os');
+const si = require('systeminformation');
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -133,6 +134,7 @@ function createWindow() {
     height: 900,
     minWidth: 1000,
     minHeight: 700,
+    frame: false,
     autoHideMenuBar: true,
     webPreferences: {
       preload: isDev
@@ -147,6 +149,22 @@ function createWindow() {
   });
 
   mainWindow.setMenuBarVisibility(false);
+
+  // Custom window control IPC handlers
+  ipcMain.on('window-minimize', () => mainWindow?.minimize());
+  ipcMain.on('window-maximize', () => {
+    if (mainWindow?.isMaximized()) {
+      mainWindow.unmaximize();
+    } else {
+      mainWindow?.maximize();
+    }
+  });
+  ipcMain.on('window-close', () => mainWindow?.close());
+  ipcMain.handle('window-is-maximized', () => mainWindow?.isMaximized());
+
+  // Notify renderer when maximize state changes
+  mainWindow.on('maximize', () => mainWindow?.webContents.send('window-maximized-changed', true));
+  mainWindow.on('unmaximize', () => mainWindow?.webContents.send('window-maximized-changed', false));
 
   // Block all keyboard shortcuts that could open developer tools
   mainWindow.webContents.on('before-input-event', (event, input) => {
@@ -178,14 +196,21 @@ function createWindow() {
 app.on('ready', () => {
   // Start LHM first (longest startup time) — runs in parallel with window creation
   startLHMService();
+  // Start standalone perf counter service (CPU usage + clock speed, no LHM dependency)
+  _startPerfCounterService();
   _startDiskRefresh();
   // Pre-fetch hardware info (loads from disk cache instantly, refreshes in background)
   _initHardwareInfo();
   createWindow();
+  // Start real-time hardware push after window is created (1000ms interval)
+  // Small delay to let the renderer attach its IPC listener
+  setTimeout(() => _startRealtimePush(), 1500);
 });
 
 app.on('window-all-closed', () => {
+  _stopRealtimePush();
   stopLHMService();
+  _stopPerfCounterService();
   if (_diskRefreshTimer) { clearInterval(_diskRefreshTimer); _diskRefreshTimer = null; }
   if (process.platform !== 'darwin') {
     app.quit();
@@ -303,6 +328,10 @@ let _lhmGpuTemp = -1;       // latest GPU temp from LHM
 let _lhmGpuUsage = -1;      // latest GPU load % from LHM
 let _lhmGpuVramUsed = -1;   // GPU VRAM used (MiB)
 let _lhmGpuVramTotal = -1;  // GPU VRAM total (MiB)
+let _lhmDiskRead = 0;       // disk read bytes/sec from perf counter
+let _lhmDiskWrite = 0;      // disk write bytes/sec from perf counter
+let _lhmProcessCount = 0;   // running process count from perf counter
+let _lhmCpuClock = -1;      // CPU max core clock (MHz) from LHM MSR sensors
 let _lhmAvailable = false;  // true once we get a valid CPU reading
 let _lhmCacheTimer = null;  // periodic save timer
 
@@ -348,9 +377,10 @@ function _startLhmCacheTimer() {
 }
 
 function startLHMService() {
-  // Restore last-known sensor readings from cache (instant, <1ms)
-  _loadLhmCache();
-  // Start periodic cache saves
+  // [BYPASS CACHE] Do NOT restore stale sensor values — always start fresh
+  // _loadLhmCache();  // DISABLED: real-time metrics must come from live hardware reads
+  console.log('[LHM] Cache bypass active — waiting for live sensor data');
+  // Start periodic cache saves (still useful for crash recovery)
   _startLhmCacheTimer();
 
   const dllPath = path.join(__dirname, 'lib', 'LibreHardwareMonitorLib.dll');
@@ -367,13 +397,14 @@ function startLHMService() {
     '$computer.IsCpuEnabled = $true',
     '$computer.IsGpuEnabled = $true',
     '$computer.Open()',
-    '# Use % Processor Utility (same counter Task Manager uses — accounts for frequency scaling)',
-    'try { $cpuCounter = New-Object System.Diagnostics.PerformanceCounter("Processor Information", "% Processor Utility", "_Total") ; $cpuCounter.NextValue() | Out-Null } catch { $cpuCounter = $null }',
+    '# Disk I/O perf counters (bytes/sec, delta-based)',
+    'try { $diskReadCounter = New-Object System.Diagnostics.PerformanceCounter("PhysicalDisk", "Disk Read Bytes/sec", "_Total") ; $diskReadCounter.NextValue() | Out-Null } catch { $diskReadCounter = $null }',
+    'try { $diskWriteCounter = New-Object System.Diagnostics.PerformanceCounter("PhysicalDisk", "Disk Write Bytes/sec", "_Total") ; $diskWriteCounter.NextValue() | Out-Null } catch { $diskWriteCounter = $null }',
+    '# Process count perf counter',
+    'try { $procCounter = New-Object System.Diagnostics.PerformanceCounter("System", "Processes") } catch { $procCounter = $null }',
     'while ($true) {',
     '  try {',
-    '    $cpuTemp = $null; $cpuLoad = $null; $gpuTemp = $null; $gpuLoad = $null; $gpuVramUsed = $null; $gpuVramTotal = $null',
-    '    # CPU usage from Windows performance counter (matches Task Manager exactly)',
-    '    if ($cpuCounter) { try { $cpuLoad = $cpuCounter.NextValue() } catch {} }',
+    '    $cpuTemp = $null; $cpuMaxClock = $null; $gpuTemp = $null; $gpuLoad = $null; $gpuVramUsed = $null; $gpuVramTotal = $null',
     '    foreach ($hw in $computer.Hardware) {',
     '      $hw.Update()',
     '      $hwType = $hw.HardwareType.ToString()',
@@ -385,8 +416,10 @@ function startLHMService() {
     '            if ($sensor.Name -eq "Core Average" -and $cpuTemp -eq $null) { $cpuTemp = $sensor.Value.Value }',
     '            if ($sensor.Name -eq "Core Max" -and $cpuTemp -eq $null) { $cpuTemp = $sensor.Value.Value }',
     '          }',
-    '          # Fallback to LHM load if performance counter unavailable',
-    '          if ($cpuLoad -eq $null -and $sensor.SensorType -eq [LibreHardwareMonitor.Hardware.SensorType]::Load -and $sensor.Name -eq "CPU Total") { $cpuLoad = $sensor.Value.Value }',
+    '          # CPU clock from LHM MSR sensors (most accurate real-time boost frequency)',
+    '          if ($sensor.SensorType -eq [LibreHardwareMonitor.Hardware.SensorType]::Clock -and $sensor.Name -match "^Core #") {',
+    '            if ($cpuMaxClock -eq $null -or $sensor.Value.Value -gt $cpuMaxClock) { $cpuMaxClock = $sensor.Value.Value }',
+    '          }',
     '        }',
     '      }',
     '      if ($hwType -match "Gpu") {',
@@ -403,10 +436,16 @@ function startLHMService() {
     '    $parts = @()',
     '    if ($cpuTemp -ne $null) { $parts += "CPUT:" + [math]::Round($cpuTemp, 1) }',
     '    if ($cpuLoad -ne $null) { $parts += "CPUL:" + [math]::Round($cpuLoad, 1) }',
+    '    if ($cpuMaxClock -ne $null) { $parts += "CPUCLK:" + [math]::Round($cpuMaxClock, 0) }',
     '    if ($gpuTemp -ne $null) { $parts += "GPUT:" + [math]::Round($gpuTemp, 1) }',
     '    if ($gpuLoad -ne $null) { $parts += "GPUL:" + [math]::Round($gpuLoad, 1) }',
     '    if ($gpuVramUsed -ne $null) { $parts += "GPUVRU:" + [math]::Round($gpuVramUsed) }',
     '    if ($gpuVramTotal -ne $null) { $parts += "GPUVRT:" + [math]::Round($gpuVramTotal) }',
+    '    # Disk I/O bytes/sec (immediate delta from perf counter)',
+    '    if ($diskReadCounter) { try { $parts += "DR:" + [math]::Round($diskReadCounter.NextValue()) } catch {} }',
+    '    if ($diskWriteCounter) { try { $parts += "DW:" + [math]::Round($diskWriteCounter.NextValue()) } catch {} }',
+    '    # Process count',
+    '    if ($procCounter) { try { $parts += "PROCS:" + [math]::Round($procCounter.NextValue()) } catch {} }',
     '    if ($parts.Count -gt 0) {',
     '      [Console]::Out.WriteLine($parts -join "|")',
     '      [Console]::Out.Flush()',
@@ -441,10 +480,14 @@ function startLHMService() {
         switch (key) {
           case 'CPUT': if (v > 0 && v < 150) { _lhmTemp = Math.round(v * 10) / 10; _lhmAvailable = true; } break;
           case 'CPUL': if (v >= 0 && v <= 100) _lhmCpuLoad = Math.round(v * 10) / 10; break;
+          case 'CPUCLK': if (v > 0 && v < 10000) _lhmCpuClock = Math.round(v); break;
           case 'GPUT': if (v > 0 && v < 150) _lhmGpuTemp = Math.round(v); break;
           case 'GPUL': if (v >= 0 && v <= 100) _lhmGpuUsage = Math.round(v); break;
           case 'GPUVRU': if (v >= 0) _lhmGpuVramUsed = Math.round(v); break;
           case 'GPUVRT': if (v > 0) _lhmGpuVramTotal = Math.round(v); break;
+          case 'DR': if (v >= 0) _lhmDiskRead = Math.round(v); break;
+          case 'DW': if (v >= 0) _lhmDiskWrite = Math.round(v); break;
+          case 'PROCS': if (v > 0) _lhmProcessCount = Math.round(v); break;
         }
       }
     }
@@ -474,6 +517,107 @@ function stopLHMService() {
   }
   // Clean up temp script
   const tmpFile = path.join(os.tmpdir(), `gs_lhm_service_${process.pid}.ps1`);
+  try { fs.unlinkSync(tmpFile); } catch {}
+}
+
+// ──────────────────────────────────────────────────────
+// Standalone Performance Counter Service
+// Reads % Processor Utility (matches Task Manager) and
+// % Processor Performance (for real-time clock speed).
+// Does NOT require LHM — works on any Windows system.
+// ──────────────────────────────────────────────────────
+let _perfCounterProcess = null;
+let _perfCpuUtility = -1;     // % Processor Utility (matches Task Manager)
+let _perfCpuPerfPct = -1;     // % Processor Performance (current/base ratio × 100)
+
+function _startPerfCounterService() {
+  if (_perfCounterProcess) return;
+
+  const scriptContent = [
+    '$ErrorActionPreference = "SilentlyContinue"',
+    '',
+    '# ── Method 1: PerformanceCounter API (fastest, ~0ms per read) ──',
+    'try { $cpuU = New-Object System.Diagnostics.PerformanceCounter("Processor Information", "% Processor Utility", "_Total") } catch { $cpuU = $null }',
+    'try { $cpuP = New-Object System.Diagnostics.PerformanceCounter("Processor Information", "% Processor Performance", "_Total") } catch { $cpuP = $null }',
+    '',
+    '# ── Method 2: WMI fallback (locale-independent, ~50-100ms per read) ──',
+    '# Win32_PerfFormattedData_Counters_ProcessorInformation.PercentProcessorUtility',
+    '# is NOT localized — works on every Windows 10/11 language.',
+    '$useWmi = ($cpuU -eq $null)',
+    'if ($useWmi) { [Console]::Error.WriteLine("[PerfCtr] PerformanceCounter unavailable, using WMI fallback") }',
+    '',
+    '# Prime perf counters (first delta read is always 0)',
+    'if ($cpuU) { $cpuU.NextValue() | Out-Null }',
+    'if ($cpuP) { $cpuP.NextValue() | Out-Null }',
+    'Start-Sleep -Milliseconds 500',
+    '',
+    'while ($true) {',
+    '  $parts = @()',
+    '  if ($cpuU) {',
+    '    try { $v = $cpuU.NextValue(); if ($v -gt 100) { $v = 100 }; $parts += "CPUU:" + [math]::Round($v, 1) } catch {}',
+    '  } elseif ($useWmi) {',
+    '    try {',
+    '      $wmiObj = Get-CimInstance Win32_PerfFormattedData_Counters_ProcessorInformation -Filter "Name=\'_Total\'" -ErrorAction Stop',
+    '      if ($wmiObj -and $wmiObj.PercentProcessorUtility -ne $null) {',
+    '        $v = [double]$wmiObj.PercentProcessorUtility; if ($v -gt 100) { $v = 100 }',
+    '        $parts += "CPUU:" + [math]::Round($v, 1)',
+    '      }',
+    '    } catch {}',
+    '  }',
+    '  if ($cpuP) { try { $parts += "CPUP:" + [math]::Round($cpuP.NextValue(), 1) } catch {} }',
+    '  if ($parts.Count -gt 0) {',
+    '    [Console]::Out.WriteLine($parts -join "|")',
+    '    [Console]::Out.Flush()',
+    '  }',
+    '  Start-Sleep -Milliseconds 1000',
+    '}',
+  ].join('\n');
+
+  const tmpFile = path.join(os.tmpdir(), `gs_perfctr_${process.pid}.ps1`);
+  fs.writeFileSync(tmpFile, scriptContent, 'utf8');
+
+  _perfCounterProcess = spawn('powershell', [
+    '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', tmpFile
+  ], { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+
+  let buffer = '';
+  _perfCounterProcess.stdout.on('data', (data) => {
+    buffer += data.toString();
+    const lines = buffer.split('\n');
+    buffer = lines.pop();
+    for (const line of lines) {
+      const tokens = line.trim().split('|');
+      for (const token of tokens) {
+        const [key, valStr] = token.split(':');
+        const v = parseFloat(valStr);
+        if (isNaN(v)) continue;
+        switch (key) {
+          case 'CPUU': if (v >= 0 && v <= 100) _perfCpuUtility = Math.round(v * 10) / 10; break;
+          case 'CPUP': if (v > 0) _perfCpuPerfPct = Math.round(v * 10) / 10; break;
+        }
+      }
+    }
+  });
+
+  _perfCounterProcess.on('exit', (code) => {
+    console.log(`[PerfCtr] Service exited with code ${code}`);
+    _perfCounterProcess = null;
+  });
+
+  _perfCounterProcess.on('error', (err) => {
+    console.warn('[PerfCtr] Service error:', err.message);
+    _perfCounterProcess = null;
+  });
+
+  console.log('[PerfCtr] Performance counter service started (PID:', _perfCounterProcess.pid, ')');
+}
+
+function _stopPerfCounterService() {
+  if (_perfCounterProcess) {
+    try { _perfCounterProcess.kill(); } catch {}
+    _perfCounterProcess = null;
+  }
+  const tmpFile = path.join(os.tmpdir(), `gs_perfctr_${process.pid}.ps1`);
   try { fs.unlinkSync(tmpFile); } catch {}
 }
 
@@ -509,9 +653,9 @@ function _getStatsImpl() {
 
   let cpu = 0, ram = 0, disk = _cachedDiskPct, temperature = 0;
 
-  // CPU — from LHM (real-time, matches Task Manager)
-  if (_lhmCpuLoad >= 0) {
-    cpu = _lhmCpuLoad;
+  // CPU — standalone perf counter service reads % Processor Utility (matches Task Manager)
+  if (_perfCpuUtility >= 0) {
+    cpu = _perfCpuUtility;
   }
 
   // RAM — instant Node.js kernel call
@@ -536,16 +680,252 @@ function _getStatsImpl() {
 
   _lastStats = {
     cpu, ram, disk, temperature,
-    // True once LHM has produced its first valid reading (tells frontend to stop showing shimmers)
-    lhmReady: _lhmAvailable,
-    // GPU data from LHM — available instantly (500ms), no need to wait for extended stats
-    gpuTemp: _lhmGpuTemp >= 0 ? _lhmGpuTemp : -1,
-    gpuUsage: _lhmGpuUsage >= 0 ? _lhmGpuUsage : -1,
-    gpuVramUsed: _lhmGpuVramUsed >= 0 ? _lhmGpuVramUsed : -1,
-    gpuVramTotal: _lhmGpuVramTotal > 0 ? _lhmGpuVramTotal : -1,
+    // True once LHM or perf counter service has produced a valid reading
+    lhmReady: _lhmAvailable || _perfCpuUtility >= 0,
+    // GPU data — prefer LHM, fallback to nvidia-smi poll values
+    gpuTemp: _lhmGpuTemp >= 0 ? _lhmGpuTemp : (_nvGpuTemp >= 0 ? _nvGpuTemp : -1),
+    gpuUsage: _lhmGpuUsage >= 0 ? _lhmGpuUsage : (_nvGpuUsage >= 0 ? _nvGpuUsage : -1),
+    gpuVramUsed: _lhmGpuVramUsed >= 0 ? _lhmGpuVramUsed : (_nvGpuVramUsed >= 0 ? _nvGpuVramUsed : -1),
+    gpuVramTotal: _lhmGpuVramTotal > 0 ? _lhmGpuVramTotal : (_nvGpuVramTotal > 0 ? _nvGpuVramTotal : -1),
   };
   return _lastStats;
 }
+
+// ──────────────────────────────────────────────────────
+// Real-Time Hardware Push System
+// Uses systeminformation (SI) + LHM for high-frequency metrics.
+// Pushes merged stats to frontend via webContents.send every 1000ms.
+// SI provides delta-based per-core CPU, clock speed, network throughput.
+// LHM provides temperatures and GPU data (500ms refresh).
+// ──────────────────────────────────────────────────────
+let _realtimeTimer = null;
+let _realtimeLatencyTimer = null;
+let _realtimeWifiTimer = null;
+let _realtimeNvGpuTimer = null;
+let _rtLastLatency = 0;
+let _rtLastSsid = '';
+let _rtLastWifiSignal = -1;
+let _rtPrimed = false;
+
+// nvidia-smi GPU fallback — provides GPU metrics when LHM hasn't detected the GPU yet
+let _nvGpuUsage = -1;
+let _nvGpuTemp = -1;
+let _nvGpuVramUsed = -1;
+let _nvGpuVramTotal = -1;
+
+function _formatUptimeSeconds(seconds) {
+  const d = Math.floor(seconds / 86400);
+  const h = Math.floor((seconds % 86400) / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  return `${d}d ${h}h ${m}m`;
+}
+
+// Latency ping — separate timer (every 5s) to avoid blocking the main push
+function _startLatencyPoll() {
+  const doPing = async () => {
+    try {
+      _rtLastLatency = Math.round(await si.inetLatency('8.8.8.8'));
+    } catch { _rtLastLatency = 0; }
+  };
+  doPing();
+  _realtimeLatencyTimer = setInterval(doPing, 5000);
+}
+
+// Wi-Fi info — separate timer (every 10s)
+function _startWifiPoll() {
+  const fetchWifi = async () => {
+    try {
+      const conns = await si.wifiConnections();
+      if (conns && conns.length > 0) {
+        _rtLastSsid = conns[0].ssid || '';
+        _rtLastWifiSignal = conns[0].quality ?? -1;
+      }
+    } catch {}
+  };
+  fetchWifi();
+  _realtimeWifiTimer = setInterval(fetchWifi, 10000);
+}
+
+// nvidia-smi GPU poll — runs every 3s, skips if LHM is already providing GPU data
+function _startNvGpuPoll() {
+  const poll = async () => {
+    // Skip GPU poll if LHM is already providing all GPU data
+    if (_lhmGpuUsage >= 0 && _lhmGpuTemp >= 0 && _lhmGpuVramTotal > 0) return;
+    try {
+      const { stdout } = await execFileAsync('nvidia-smi',
+        ['--query-gpu=utilization.gpu,temperature.gpu,memory.used,memory.total',
+         '--format=csv,noheader,nounits'],
+        { timeout: 3000, windowsHide: true });
+      const parts = (stdout || '').trim().split(',').map(s => parseFloat(s.trim()));
+      if (parts.length >= 4) {
+        if (!isNaN(parts[0])) _nvGpuUsage = Math.round(parts[0]);
+        if (!isNaN(parts[1])) _nvGpuTemp = Math.round(parts[1]);
+        if (!isNaN(parts[2])) _nvGpuVramUsed = Math.round(parts[2]);
+        if (!isNaN(parts[3])) _nvGpuVramTotal = Math.round(parts[3]);
+      }
+    } catch {}
+  };
+  poll(); // immediate first call
+  _realtimeNvGpuTimer = setInterval(poll, 3000);
+}
+
+function _startRealtimePush() {
+  if (_realtimeTimer) return;
+
+  // Prime SI's internal delta counters (first call returns baseline, not delta)
+  if (!_rtPrimed) {
+    Promise.allSettled([
+      si.currentLoad(),
+      si.networkStats('*'),
+    ]).then(() => {
+      _rtPrimed = true;
+      console.log('[RT] SI delta counters primed');
+    });
+  }
+
+  // Start ancillary polls
+  _startLatencyPoll();
+  _startWifiPoll();
+  _startNvGpuPoll();
+
+  _realtimeTimer = setInterval(async () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+
+    try {
+      // All SI calls run in parallel — each uses immediate delta, not time-averaged snapshots
+      const [loadData, memData, netData, tempData] = await Promise.allSettled([
+        si.currentLoad(),           // Per-core CPU load (delta since last call)
+        si.mem(),                   // Memory usage (instant kernel call)
+        si.networkStats('*'),       // Network throughput per interface (delta-based tx_sec/rx_sec)
+        si.cpuTemperature(),        // CPU temp from ACPI/WMI (fallback when LHM unavailable)
+      ]);
+
+      const load = loadData.status === 'fulfilled' ? loadData.value : null;
+      const mem = memData.status === 'fulfilled' ? memData.value : null;
+      const net = netData.status === 'fulfilled' ? netData.value : null;
+      const siTemp = tempData.status === 'fulfilled' ? tempData.value : null;
+
+      // ── Compute real-time CPU clock from perf counter ──
+      // % Processor Performance = (current_freq / base_freq) × 100
+      // e.g. base 3700 MHz, boost 5090 MHz → perfPct ≈ 137.6 → 3700 × 1.376 = 5091 MHz
+      const baseClock = os.cpus()[0]?.speed || 0; // base clock in MHz from Node.js
+      let resolvedClock = 0;
+      if (_lhmCpuClock > 0) {
+        // LHM MSR sensor: most accurate, direct per-core max clock
+        resolvedClock = _lhmCpuClock;
+      } else if (_perfCpuPerfPct > 0 && baseClock > 0) {
+        // Perf counter ratio × base clock
+        resolvedClock = Math.round(baseClock * (_perfCpuPerfPct / 100));
+      }
+
+      // ── Resolve CPU usage (priority: PerfCounter → SI fallback) ──
+      // PerfCounter reads % Processor Utility — matches Task Manager exactly.
+      // SI's currentLoad() uses tick-based % Processor Time which inflates on
+      // modern CPUs with frequency scaling (can show 60%+ when TM says 15%).
+      let resolvedCpu = 0;
+      if (_perfCpuUtility >= 0) {
+        resolvedCpu = _perfCpuUtility;
+      } else if (load) {
+        resolvedCpu = Math.round(load.currentLoad * 10) / 10;
+      }
+
+      // ── Resolve temperature (priority: LHM → SI ACPI → estimation) ──
+      let resolvedTemp = 0;
+      if (_lhmAvailable && _lhmTemp > 0) {
+        resolvedTemp = _lhmTemp;
+      } else if (siTemp && siTemp.main > 0 && siTemp.main < 150) {
+        resolvedTemp = Math.round(siTemp.main * 10) / 10;
+      } else {
+        // Estimation fallback (same as _getStatsImpl)
+        const jitter = Math.sin(Date.now() / 5000) * 1.5;
+        resolvedTemp = Math.round((38 + resolvedCpu * 0.45 + jitter) * 10) / 10;
+        if (resolvedTemp < 30) resolvedTemp = 30;
+        if (resolvedTemp > 95) resolvedTemp = 95;
+      }
+
+      // ── Build unified payload (replaces both system:get-stats + system:get-extended-stats) ──
+      const payload = {
+        // CPU — % Processor Utility from perf counter service (matches Task Manager)
+        cpu: resolvedCpu,
+        // Per-core utilization from SI (immediate delta, not time-averaged)
+        perCoreCpu: load ? load.cpus.map(c => Math.round(c.load * 10) / 10) : [],
+        // Current clock speed — real-time boost from LHM or perf counter
+        cpuClock: resolvedClock,
+
+        // Temperature — resolved with fallback chain
+        temperature: resolvedTemp,
+        lhmReady: _lhmAvailable || _perfCpuUtility >= 0,
+
+        // GPU — prefer LHM (500ms refresh), fallback to nvidia-smi (3s poll)
+        gpuTemp: _lhmGpuTemp >= 0 ? _lhmGpuTemp : (_nvGpuTemp >= 0 ? _nvGpuTemp : -1),
+        gpuUsage: _lhmGpuUsage >= 0 ? _lhmGpuUsage : (_nvGpuUsage >= 0 ? _nvGpuUsage : -1),
+        gpuVramUsed: _lhmGpuVramUsed >= 0 ? _lhmGpuVramUsed : (_nvGpuVramUsed >= 0 ? _nvGpuVramUsed : -1),
+        gpuVramTotal: _lhmGpuVramTotal > 0 ? _lhmGpuVramTotal : (_nvGpuVramTotal > 0 ? _nvGpuVramTotal : -1),
+
+        // Memory — from SI (active memory, not just "used" which includes cache)
+        ram: mem ? Math.round((mem.active / mem.total) * 1000) / 10 : 0,
+        ramUsedGB: mem ? Math.round(mem.active / (1024 * 1024 * 1024) * 10) / 10 : 0,
+        ramTotalGB: mem ? Math.round(mem.total / (1024 * 1024 * 1024) * 10) / 10 : 0,
+
+        // Disk — percentage from background cache, I/O from LHM perf counters (500ms delta)
+        disk: _cachedDiskPct,
+        diskReadSpeed: _lhmDiskRead,
+        diskWriteSpeed: _lhmDiskWrite,
+
+        // Network — from SI (delta-based bytes/sec, summed across all active interfaces)
+        networkUp: 0,
+        networkDown: 0,
+
+        // Ancillary (slower polls)
+        latencyMs: _rtLastLatency,
+        ssid: _rtLastSsid,
+        wifiSignal: _rtLastWifiSignal,
+        processCount: _lhmProcessCount,
+        systemUptime: _formatUptimeSeconds(os.uptime()),
+
+        _ts: Date.now(),
+      };
+
+      // Network: sum throughput across all active interfaces (all: true)
+      if (net && net.length > 0) {
+        let totalUp = 0, totalDown = 0;
+        for (const iface of net) {
+          if (iface.operstate === 'up') {
+            totalUp += (iface.tx_sec || 0);
+            totalDown += (iface.rx_sec || 0);
+          }
+        }
+        payload.networkUp = Math.round(totalUp);
+        payload.networkDown = Math.round(totalDown);
+      }
+
+      mainWindow.webContents.send('realtime-hw-update', payload);
+    } catch (err) {
+      console.warn('[RT] Push error:', err.message?.substring(0, 100));
+    }
+  }, 1000);
+
+  console.log('[RT] Real-time hardware push started (1000ms interval)');
+}
+
+function _stopRealtimePush() {
+  if (_realtimeTimer) { clearInterval(_realtimeTimer); _realtimeTimer = null; }
+  if (_realtimeLatencyTimer) { clearInterval(_realtimeLatencyTimer); _realtimeLatencyTimer = null; }
+  if (_realtimeWifiTimer) { clearInterval(_realtimeWifiTimer); _realtimeWifiTimer = null; }
+  if (_realtimeNvGpuTimer) { clearInterval(_realtimeNvGpuTimer); _realtimeNvGpuTimer = null; }
+  console.log('[RT] Real-time push stopped');
+}
+
+// IPC: frontend can request start/stop of real-time push
+ipcMain.handle('system:start-realtime', () => {
+  _startRealtimePush();
+  return { success: true };
+});
+
+ipcMain.handle('system:stop-realtime', () => {
+  _stopRealtimePush();
+  return { success: true };
+});
 
 // ──────────────────────────────────────────────────────
 // Hardware Info — cached to disk for instant subsequent launches.
@@ -800,8 +1180,8 @@ try {
 Write-Output ($s12 + '@@' + $s13 + '@@' + $s14 + '@@' + $s15)
     `, 15000),
 
-    // ── nvidia-smi for GPU driver version (separate binary, runs in parallel) ──
-    execFileAsync('nvidia-smi', ['--query-gpu=driver_version', '--format=csv,noheader,nounits'], { timeout: 3000, windowsHide: true })
+    // ── nvidia-smi for GPU driver version + accurate VRAM total (separate binary, runs in parallel) ──
+    execFileAsync('nvidia-smi', ['--query-gpu=driver_version,memory.total', '--format=csv,noheader,nounits'], { timeout: 3000, windowsHide: true })
       .then(r => (r.stdout || '').trim().split('\n')[0].trim()).catch(() => ''),
   ]);
 
@@ -810,7 +1190,11 @@ Write-Output ($s12 + '@@' + $s13 + '@@' + $s14 + '@@' + $s15)
   const sectionsA = valOf(hwA).split('@@');   // sections 0-4
   const sectionsB = valOf(hwB).split('@@');   // sections 5-11 (mapped as 0-6)
   const sectionsC = valOf(hwC).split('@@');   // sections 12-15 (mapped as 0-3)
-  const nvDriverVal = valOf(nvDriverR);
+  // Parse nvidia-smi result: "driver_version, memory_total_mib" e.g. "546.33, 8192"
+  const nvRaw = valOf(nvDriverR);
+  const nvParts = nvRaw.split(',').map(s => s.trim());
+  const nvDriverVal = nvParts[0] || '';
+  const nvVramMiB = nvParts.length >= 2 ? parseInt(nvParts[1]) : 0;
   const get = (i) => {
     if (i <= 4) return (sectionsA[i] || '').trim();
     if (i <= 11) return (sectionsB[i - 5] || '').trim();
@@ -830,7 +1214,15 @@ Write-Output ($s12 + '@@' + $s13 + '@@' + $s14 + '@@' + $s15)
   try {
     const parts = get(1).split('|||').map((s) => s.trim());
     info.gpuName = parts[0] || 'Unknown GPU';
-    info.gpuVramTotal = parts[1] && parts[1] !== '0' ? `${parts[1]} GB` : '';
+
+    // VRAM: prefer nvidia-smi memory.total (accurate for >4GB GPUs).
+    // Win32_VideoController.AdapterRAM is a uint32 — overflows/caps at ~4 GB.
+    if (nvVramMiB > 0) {
+      const gb = nvVramMiB / 1024;
+      info.gpuVramTotal = gb % 1 === 0 ? `${gb.toFixed(0)} GB` : `${gb.toFixed(1)} GB`;
+    } else {
+      info.gpuVramTotal = parts[1] && parts[1] !== '0' ? `${parts[1]} GB` : '';
+    }
 
     // Prefer the NVIDIA "driver_version" from nvidia-smi (fetched in parallel above).
     // Fallback to Win32_VideoController.DriverVersion when nvidia-smi isn't present.

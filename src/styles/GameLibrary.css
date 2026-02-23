@@ -47,9 +47,12 @@
   position: relative;
   padding: 1.5rem 1.75rem 1.25rem;
   margin-bottom: 1.5rem;
-  border: 1px solid rgba(0,255,255,0.12);
+  border: 1px solid rgba(0, 242, 255, 0.1);
   border-radius: 14px;
   overflow: hidden;
+  background: rgba(8, 10, 18, 0.65);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .gl-hero__scanline {
@@ -92,7 +95,7 @@
   font-weight: 900;
   margin: 0 0 0.35rem;
   letter-spacing: 1.5px;
-  background: linear-gradient(135deg, #ffffff 0%, #00ffff 60%, #c89b3c 100%);
+  background: linear-gradient(135deg, #ffffff 0%, #00F2FF 60%, #00FF88 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -251,11 +254,13 @@
   border-radius: 12px;
   overflow: hidden;
   cursor: pointer;
-  border: 1px solid rgba(0,255,255,0.08);
+  border: 1px solid rgba(0, 242, 255, 0.08);
   transition: border-color 0.25s, box-shadow 0.25s, transform 0.25s;
   will-change: transform;
   transform: translate3d(0,0,0);
-  background: rgba(8,14,28,0.6);
+  background: rgba(8, 10, 18, 0.65);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .gl-card:hover {
@@ -409,9 +414,11 @@
   gap: 0.85rem;
   padding: 0.65rem 1rem;
   margin-bottom: 1rem;
-  border: 1px solid rgba(0,255,255,0.12);
+  border: 1px solid rgba(0, 242, 255, 0.1);
   border-radius: 10px;
-  background: rgba(8,14,28,0.5);
+  background: rgba(8, 10, 18, 0.65);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .gl-dash__back {
@@ -690,9 +697,9 @@
     */
 .gl-launch-combined {
   padding: 0.75rem 1rem;
-  border: 1px solid rgba(200,155,60,0.2);
+  border: 1px solid rgba(0, 242, 255, 0.12);
   border-radius: 8px;
-  background: rgba(200,155,60,0.03);
+  background: rgba(0, 242, 255, 0.03);
   margin-bottom: 1rem;
 }
 
@@ -708,7 +715,7 @@
 .gl-launch-combined__header span {
   font-size: 0.72rem;
   font-weight: 700;
-  color: #c89b3c;
+  color: #00F2FF;
   letter-spacing: 0.5px;
 }
 
@@ -722,9 +729,9 @@
   display: block;
   padding: 0.55rem 0.75rem;
   background: rgba(0,0,0,0.35);
-  border: 1px solid rgba(200,155,60,0.12);
+  border: 1px solid rgba(0, 242, 255, 0.1);
   border-radius: 6px;
-  color: #c89b3c;
+  color: #00F2FF;
   font-family: 'Courier New', monospace;
   font-size: 0.7rem;
   word-break: break-all;
@@ -759,14 +766,14 @@
 }
 
 .gl-cmd-btn--info {
-  background: rgba(200,155,60,0.06);
-  border-color: rgba(200,155,60,0.2);
-  color: #c89b3c;
+  background: rgba(0, 242, 255, 0.06);
+  border-color: rgba(0, 242, 255, 0.2);
+  color: #00F2FF;
 }
 
 .gl-cmd-btn--info:hover {
-  background: rgba(200,155,60,0.12);
-  border-color: rgba(200,155,60,0.5);
+  background: rgba(0, 242, 255, 0.12);
+  border-color: rgba(0, 242, 255, 0.5);
 }
 
 /* Launch items list */
@@ -876,15 +883,17 @@
 .gl-sys-card {
   position: relative;
   padding: 0.85rem 1rem;
-  border: 1px solid rgba(200,155,60,0.12);
+  border: 1px solid rgba(0, 242, 255, 0.08);
   border-radius: 8px;
-  background: rgba(200,155,60,0.02);
+  background: rgba(8, 10, 18, 0.65);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   overflow: hidden;
   transition: border-color 0.2s, transform 0.2s;
 }
 
 .gl-sys-card:hover {
-  border-color: rgba(200,155,60,0.3);
+  border-color: rgba(0, 242, 255, 0.25);
   transform: translateY(-2px);
 }
 
@@ -904,10 +913,10 @@
 
 .gl-sys-card__val {
   padding: 0.15rem 0.5rem;
-  background: rgba(200,155,60,0.1);
-  border: 1px solid rgba(200,155,60,0.2);
+  background: rgba(0, 242, 255, 0.08);
+  border: 1px solid rgba(0, 242, 255, 0.15);
   border-radius: 4px;
-  color: #c89b3c;
+  color: #00F2FF;
   font-size: 0.65rem;
   font-weight: 700;
 }
@@ -925,7 +934,7 @@
   left: 0;
   width: 100%;
   height: 1.5px;
-  background: linear-gradient(90deg, #c89b3c, transparent);
+  background: linear-gradient(90deg, #00F2FF, transparent);
   opacity: 0;
   transition: opacity 0.3s;
 }
@@ -950,14 +959,14 @@
 }
 
 .gl-modal {
-  background: rgba(10,16,30,0.97);
-  border: 1px solid rgba(0,255,255,0.25);
+  background: rgba(8, 10, 18, 0.97);
+  border: 1px solid rgba(0, 242, 255, 0.2);
   border-radius: 14px;
   max-width: 660px;
   width: 100%;
   max-height: 82vh;
   overflow: hidden;
-  box-shadow: 0 0 60px rgba(0,255,255,0.08);
+  box-shadow: 0 0 60px rgba(0, 242, 255, 0.06);
   display: flex;
   flex-direction: column;
 }
