@@ -89,12 +89,13 @@ function App() {
   const [hardwareInfo, setHardwareInfo] = useState<HardwareInfo | undefined>(undefined);
   const [extendedStats, setExtendedStats] = useState<ExtendedStats | undefined>(undefined);
 
-  // Dismiss the loader as soon as both basic stats and hardware info arrive
+  // Dismiss the loader as soon as basic stats arrive.
+  // Cards render immediately with inline shimmer loaders for pending values.
   useEffect(() => {
-    if (isLoading && statsLoaded && hardwareInfo) {
+    if (isLoading && statsLoaded) {
       setIsLoading(false);
     }
-  }, [isLoading, statsLoaded, hardwareInfo]);
+  }, [isLoading, statsLoaded]);
 
   useEffect(() => {
     // Fetch hardware info once
@@ -144,7 +145,7 @@ function App() {
         try {
           if (window.electron?.ipcRenderer) {
             const ext = await window.electron.ipcRenderer.invoke('system:get-extended-stats');
-            if (!cancelled) {
+            if (!cancelled && ext) {
               setExtendedStats(ext);
               if (!extLoaded) setExtLoaded(true);
             }

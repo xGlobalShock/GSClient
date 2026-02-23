@@ -176,10 +176,12 @@ function createWindow() {
 }
 
 app.on('ready', () => {
-  createWindow();
-  // Start LibreHardwareMonitor sensor service + disk background refresh
+  // Start LHM first (longest startup time) — runs in parallel with window creation
   startLHMService();
   _startDiskRefresh();
+  // Pre-fetch hardware info (loads from disk cache instantly, refreshes in background)
+  _initHardwareInfo();
+  createWindow();
 });
 
 app.on('window-all-closed', () => {
@@ -302,8 +304,55 @@ let _lhmGpuUsage = -1;      // latest GPU load % from LHM
 let _lhmGpuVramUsed = -1;   // GPU VRAM used (MiB)
 let _lhmGpuVramTotal = -1;  // GPU VRAM total (MiB)
 let _lhmAvailable = false;  // true once we get a valid CPU reading
+let _lhmCacheTimer = null;  // periodic save timer
+
+// ── LHM sensor cache: restore last-known readings for instant startup ──
+function _getLhmCachePath() {
+  try { return path.join(app.getPath('userData'), 'gs_lhm_cache.json'); }
+  catch { return path.join(os.tmpdir(), 'gs_lhm_cache.json'); }
+}
+
+function _loadLhmCache() {
+  try {
+    const raw = fs.readFileSync(_getLhmCachePath(), 'utf8');
+    const c = JSON.parse(raw);
+    // Cache valid for 24 hours (values are ballpark-reasonable for initial display)
+    if (c && Date.now() - (c._ts || 0) < 86400000) {
+      if (c.cpuTemp > 0 && c.cpuTemp < 150)   { _lhmTemp = c.cpuTemp; _lhmAvailable = true; }
+      if (c.cpuLoad >= 0 && c.cpuLoad <= 100)  _lhmCpuLoad = c.cpuLoad;
+      if (c.gpuTemp > 0 && c.gpuTemp < 150)    _lhmGpuTemp = c.gpuTemp;
+      if (c.gpuUsage >= 0 && c.gpuUsage <= 100) _lhmGpuUsage = c.gpuUsage;
+      if (c.gpuVramUsed >= 0)   _lhmGpuVramUsed = c.gpuVramUsed;
+      if (c.gpuVramTotal > 0)   _lhmGpuVramTotal = c.gpuVramTotal;
+      console.log('[LHM] Restored cached sensor values');
+    }
+  } catch {}
+}
+
+function _saveLhmCache() {
+  // Only save if we have real data
+  if (!_lhmAvailable) return;
+  try {
+    fs.writeFileSync(_getLhmCachePath(), JSON.stringify({
+      _ts: Date.now(),
+      cpuTemp: _lhmTemp, cpuLoad: _lhmCpuLoad,
+      gpuTemp: _lhmGpuTemp, gpuUsage: _lhmGpuUsage,
+      gpuVramUsed: _lhmGpuVramUsed, gpuVramTotal: _lhmGpuVramTotal
+    }), 'utf8');
+  } catch {}
+}
+
+function _startLhmCacheTimer() {
+  // Save sensor cache every 30 seconds while running
+  _lhmCacheTimer = setInterval(_saveLhmCache, 30000);
+}
 
 function startLHMService() {
+  // Restore last-known sensor readings from cache (instant, <1ms)
+  _loadLhmCache();
+  // Start periodic cache saves
+  _startLhmCacheTimer();
+
   const dllPath = path.join(__dirname, 'lib', 'LibreHardwareMonitorLib.dll');
   if (!fs.existsSync(dllPath)) {
     console.log('[LHM] DLL not found at', dllPath);
@@ -416,6 +465,9 @@ function startLHMService() {
 }
 
 function stopLHMService() {
+  // Save final sensor readings to cache for next launch
+  _saveLhmCache();
+  if (_lhmCacheTimer) { clearInterval(_lhmCacheTimer); _lhmCacheTimer = null; }
   if (_lhmProcess) {
     try { _lhmProcess.kill(); } catch {}
     _lhmProcess = null;
@@ -482,12 +534,82 @@ function _getStatsImpl() {
     if (temperature > 95) temperature = 95;
   }
 
-  _lastStats = { cpu, ram, disk, temperature };
+  _lastStats = {
+    cpu, ram, disk, temperature,
+    // True once LHM has produced its first valid reading (tells frontend to stop showing shimmers)
+    lhmReady: _lhmAvailable,
+    // GPU data from LHM — available instantly (500ms), no need to wait for extended stats
+    gpuTemp: _lhmGpuTemp >= 0 ? _lhmGpuTemp : -1,
+    gpuUsage: _lhmGpuUsage >= 0 ? _lhmGpuUsage : -1,
+    gpuVramUsed: _lhmGpuVramUsed >= 0 ? _lhmGpuVramUsed : -1,
+    gpuVramTotal: _lhmGpuVramTotal > 0 ? _lhmGpuVramTotal : -1,
+  };
   return _lastStats;
 }
 
-// Hardware Info IPC Handler - fetches PC part names + static system info (called once on startup)
+// ──────────────────────────────────────────────────────
+// Hardware Info — cached to disk for instant subsequent launches.
+// On first launch: 3 parallel PS scripts + nvidia-smi (~5-8s).
+// On subsequent launches: returns disk cache (<10ms), refreshes in background.
+// ──────────────────────────────────────────────────────
+let _hwInfoResult = null;    // resolved HardwareInfo object (from cache or fresh fetch)
+let _hwInfoPromise = null;   // pending fetch promise (so IPC handler can await if no cache)
+
+function _getHwCachePath() {
+  try { return path.join(app.getPath('userData'), 'gs_hw_cache.json'); }
+  catch { return path.join(os.tmpdir(), 'gs_hw_cache.json'); }
+}
+
+function _loadHwCache() {
+  try {
+    const raw = fs.readFileSync(_getHwCachePath(), 'utf8');
+    const obj = JSON.parse(raw);
+    // Cache valid for 7 days (hardware rarely changes)
+    if (obj.data && Date.now() - (obj._ts || 0) < 7 * 86400000) {
+      return obj.data;
+    }
+  } catch {}
+  return null;
+}
+
+function _saveHwCache(data) {
+  try {
+    fs.writeFileSync(_getHwCachePath(), JSON.stringify({ _ts: Date.now(), data }), 'utf8');
+  } catch (e) {
+    console.warn('[HW] Cache write failed:', e.message);
+  }
+}
+
+// Pre-fetch: called from app.on('ready') to overlap with window/React loading
+function _initHardwareInfo() {
+  // 1. Load from disk cache (synchronous, <1ms)
+  const cached = _loadHwCache();
+  if (cached) {
+    _hwInfoResult = cached;
+    console.log('[HW] Loaded hardware info from cache');
+  }
+
+  // 2. Always start a fresh fetch in background (updates cache for next time)
+  _hwInfoPromise = _fetchHardwareInfoImpl().then(info => {
+    _hwInfoResult = info;
+    _saveHwCache(info);
+    console.log('[HW] Fresh hardware info fetched and cached');
+    return info;
+  }).catch(err => {
+    console.error('[HW] Fetch error:', err.message);
+    return _hwInfoResult; // return stale cache if available
+  });
+}
+
+// IPC handler: returns cached data instantly, or awaits pending fetch
 ipcMain.handle('system:get-hardware-info', async () => {
+  if (_hwInfoResult) return _hwInfoResult;
+  if (_hwInfoPromise) return _hwInfoPromise;
+  // Shouldn't reach here, but fallback to direct fetch
+  return _fetchHardwareInfoImpl();
+});
+
+async function _fetchHardwareInfoImpl() {
   const info = {
     cpuName: '',
     gpuName: '',
@@ -648,12 +770,13 @@ try {
   }
 } catch {}
 
-$s13 = ''
-try {
-  $enc = Get-CimInstance Win32_SystemEnclosure -ErrorAction SilentlyContinue | Select-Object -First 1
-  $s13 = $enc.SerialNumber
-  if (-not $s13) { $s13 = (Get-CimInstance Win32_ComputerSystemProduct -ErrorAction SilentlyContinue).IdentifyingNumber }
-} catch {}
+# Collect ALL possible serial sources (pipe-separated) — JS picks the first valid one.
+# Previously only tried SystemEnclosure, and if it returned a placeholder the fallback never ran.
+$serials = @()
+try { $v = (Get-CimInstance Win32_SystemEnclosure -ErrorAction SilentlyContinue | Select-Object -First 1).SerialNumber; if ($v) { $serials += $v } } catch {}
+try { $v = (Get-CimInstance Win32_ComputerSystemProduct -ErrorAction SilentlyContinue).IdentifyingNumber; if ($v) { $serials += $v } } catch {}
+try { $v = (Get-CimInstance Win32_BIOS -ErrorAction SilentlyContinue | Select-Object -First 1).SerialNumber; if ($v) { $serials += $v } } catch {}
+$s13 = $serials -join '|||'
 
 $s14 = ''
 try {
@@ -936,13 +1059,11 @@ Write-Output ($s12 + '@@' + $s13 + '@@' + $s14 + '@@' + $s15)
     if (!isBad) {
       info.motherboardSerial = rawSerial;
     } else {
-      // 13: Serial fallback from SystemEnclosure/ComputerSystemProduct (pre-fetched in parallel)
-      const fbSerial = (get(13) || '').trim();
-      if (fbSerial && !/^0+$/.test(fbSerial) && fbSerial.length >= 3 && !invalidSerials.includes(fbSerial.toLowerCase())) {
-        info.motherboardSerial = fbSerial;
-      } else {
-        info.motherboardSerial = '';
-      }
+      // 13: Fallback serials from SystemEnclosure, ComputerSystemProduct, BIOS (pipe-separated)
+      // Pick the first one that passes validation
+      const candidates = (get(13) || '').split('|||').map(s => s.trim());
+      const validFb = candidates.find(s => s && s.length >= 3 && !/^0+$/.test(s) && !invalidSerials.includes(s.toLowerCase()));
+      info.motherboardSerial = validFb || '';
     }
   } catch {}
 
@@ -968,16 +1089,10 @@ Write-Output ($s12 + '@@' + $s13 + '@@' + $s14 + '@@' + $s15)
   } catch {}
 
   return info;
-});
+}
 
-// ──────────────────────────────────────────────────────
-// Extended Stats IPC Handler — consolidated into 2 calls:
-//   1) One big PowerShell script via -EncodedCommand
-//      (per-core CPU, clock, network, RAM GB, disk I/O,
-//       process count, uptime, Wi-Fi, latency)
-//   2) nvidia-smi (separate binary, fast, only if NVIDIA GPU)
-// ──────────────────────────────────────────────────────
 let _extInFlight = false;
+let _extHasResult = false;
 let _lastExt = {
   cpuClock: 0, perCoreCpu: [], gpuUsage: -1, gpuTemp: -1,
   gpuVramUsed: -1, gpuVramTotal: -1, networkUp: 0, networkDown: 0,
@@ -986,8 +1101,7 @@ let _lastExt = {
 };
 
 ipcMain.handle('system:get-extended-stats', async () => {
-  // Overlap guard
-  if (_extInFlight) return _lastExt;
+  if (_extInFlight) return _extHasResult ? _lastExt : null;
   _extInFlight = true;
   try {
     return await _getExtStatsImpl();
@@ -1004,16 +1118,8 @@ async function _getExtStatsImpl() {
     diskWriteSpeed: 0, processCount: 0, systemUptime: '', latencyMs: 0,
   };
 
-  // ── All PS queries consolidated into ONE script (was 3 separate processes). ──
-  // Output: 3 sections separated by @@
-  //   Section 0 (FastCIM):  clock|ramU|ramT|procs|uptime|latency
-  //   Section 1 (Counters): coreCSV|diskRead|diskWrite
-  //   Section 2 (Network):  up|down|ssid|signal
-  // nvidia-smi runs as a separate binary in parallel.
-
   const [allR, gpuR] = await Promise.allSettled([
 
-    // ── Single merged PS script: CIM + counters + network ──
     runPSScript(`
 # ── Network: snapshot BEFORE long operations (for throughput delta) ──
 $netAdapter = $null; $netBefore = $null
@@ -1081,8 +1187,7 @@ try {
 # ── Output: 3 sections separated by @@ ──
 Write-Output "$clock|$ramU|$ramT|$procs|$uptime|$lat@@$coreStr|$([math]::Round($dr))|$([math]::Round($dw))@@$netUp|$netDn|$ssid|$sig"
     `, 8000),
-
-    // ── GPU via nvidia-smi (separate binary, fast) — uses execFileAsync (no cmd.exe) ──
+    
     execFileAsync(
       'nvidia-smi',
       ['--query-gpu=utilization.gpu,temperature.gpu,memory.used,memory.total', '--format=csv,noheader,nounits'],
@@ -1157,6 +1262,7 @@ Write-Output "$clock|$ramU|$ramT|$procs|$uptime|$lat@@$coreStr|$([math]::Round($
   } catch {}
 
   _lastExt = ext;
+  _extHasResult = true;
   return ext;
 }
 

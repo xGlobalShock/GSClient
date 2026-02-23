@@ -223,6 +223,34 @@
   max-width: 62%;
 }
 
+/* ── Inline value loader (shimmer bar while data is loading) ── */
+.sysdet-value-loader {
+  display: inline-block;
+  width: 60px;
+  height: 10px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.06);
+}
+.sysdet-value-loader-bar {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 4px;
+  background: linear-gradient(
+    90deg,
+    rgba(16, 185, 129, 0.08) 0%,
+    rgba(6, 182, 212, 0.22) 50%,
+    rgba(16, 185, 129, 0.08) 100%
+  );
+  background-size: 200% 100%;
+  animation: sysdet-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes sysdet-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
 /* wrapper for value + IO badges when passed as JSX */
 .sysdet-value-with-io {
   display: flex;
@@ -348,6 +376,21 @@
   border-radius: 3px 3px 0 0;
   transition: height 0.6s ease;
   min-height: 1px;
+}
+
+.sysdet-core-shimmer {
+  background: linear-gradient(
+    180deg,
+    rgba(16, 185, 129, 0.06) 0%,
+    rgba(6, 182, 212, 0.15) 50%,
+    rgba(16, 185, 129, 0.06) 100%
+  );
+  background-size: 100% 200%;
+  animation: sysdet-core-pulse 1.4s ease-in-out infinite;
+}
+@keyframes sysdet-core-pulse {
+  0%   { background-position: 0 200%; }
+  100% { background-position: 0 -200%; }
 }
 
 /* ══════════════════════════════════════

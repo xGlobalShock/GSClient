@@ -9,7 +9,9 @@ import type { HardwareInfo, ExtendedStats } from '../App';
 import '../styles/SystemDetails.css';
 
 interface SystemDetailsProps {
-  systemStats?: { cpu: number; ram: number; disk: number; temperature: number };
+  systemStats?: { cpu: number; ram: number; disk: number; temperature: number;
+    lhmReady?: boolean;
+    gpuTemp?: number; gpuUsage?: number; gpuVramUsed?: number; gpuVramTotal?: number; };
   hardwareInfo?: HardwareInfo;
   extendedStats?: ExtendedStats;
 }
@@ -81,11 +83,18 @@ const ArcGauge: React.FC<{ value: number; unit?: string; displayValue?: string |
   );
 };
 
+/* ─── Inline value shimmer (replaces '—' while data loads) ─── */
+const ValueLoader: React.FC = () => (
+  <span className="sysdet-value-loader"><span className="sysdet-value-loader-bar" /></span>
+);
+
 /* ─── Info row ─── */
-const Row: React.FC<{ label: string; value?: React.ReactNode; accent?: boolean; chip?: 'green' | 'yellow' }> = ({ label, value, accent, chip }) => (
+const Row: React.FC<{ label: string; value?: React.ReactNode; accent?: boolean; chip?: 'green' | 'yellow'; loading?: boolean }> = ({ label, value, accent, chip, loading }) => (
   <div className="sysdet-row">
     <span className="sysdet-label">{label}</span>
-    {chip ? (
+    {loading ? (
+      <ValueLoader />
+    ) : chip ? (
       <span className={`sysdet-chip ${chip}`}>{value ?? '—'}</span>
     ) : (
       <div className={`sysdet-value${accent ? ' sysdet-accent' : ''}`}>{value ?? '—'}</div>
@@ -209,7 +218,17 @@ const SystemDetails: React.FC<SystemDetailsProps> = ({ systemStats, hardwareInfo
   const hw = hardwareInfo;
   const ext = extendedStats;
   const s = systemStats;
-  const hasGpu = ext != null && ext.gpuUsage >= 0;
+  // GPU data available from basic stats (LHM, instant) or extended stats (PS, 2-5s delay)
+  const gpuUsage = ext?.gpuUsage != null && ext.gpuUsage >= 0 ? ext.gpuUsage : (s?.gpuUsage ?? -1);
+  const gpuTemp = ext?.gpuTemp != null && ext.gpuTemp >= 0 ? ext.gpuTemp : (s?.gpuTemp ?? -1);
+  const gpuVramUsed = ext?.gpuVramUsed != null && ext.gpuVramUsed >= 0 ? ext.gpuVramUsed : (s?.gpuVramUsed ?? -1);
+  const gpuVramTotal = ext?.gpuVramTotal != null && ext.gpuVramTotal > 0 ? ext.gpuVramTotal : (s?.gpuVramTotal ?? -1);
+  const hasGpu = gpuUsage >= 0;
+
+  // Loading flags — true when we're still waiting for data
+  const lhmLoading = !s?.lhmReady;
+  const hwLoading = !hw;
+  const extLoading = !ext;
 
   return (
     <motion.section className="sysdet-section" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.35 }}>
@@ -227,13 +246,14 @@ const SystemDetails: React.FC<SystemDetailsProps> = ({ systemStats, hardwareInfo
           gaugeValue={s?.cpu} gaugeUnit="%"
           delay={0.04}
         >
-          <Row label="Cores / Threads" value={hw ? `${hw.cpuCores}C / ${hw.cpuThreads}T` : undefined} />
-          <Row label="Max Clock" value={hw?.cpuMaxClock} />
+          <Row label="Cores / Threads" value={hw ? `${hw.cpuCores}C / ${hw.cpuThreads}T` : undefined} loading={hwLoading} />
+          <Row label="Max Clock" value={hw?.cpuMaxClock} loading={hwLoading} />
           <Row label="CPU Temp" value={s?.temperature > 0 ? `${Math.trunc(s.temperature)}°C` : undefined} accent />
           {ext && ext.cpuClock > 0 && (
             <Row label="Current Clock" value={`${(ext.cpuClock / 1000).toFixed(2)} GHz`} accent />
           )}
-          {ext && ext.perCoreCpu && ext.perCoreCpu.length > 0 && (
+          {!ext && extLoading && <Row label="Current Clock" loading />}
+          {ext && ext.perCoreCpu && ext.perCoreCpu.length > 0 ? (
             <div className="sysdet-cores-wrap">
               <div className="sysdet-cores-label">Per-Core</div>
               <div className="sysdet-core-bars">
@@ -244,31 +264,45 @@ const SystemDetails: React.FC<SystemDetailsProps> = ({ systemStats, hardwareInfo
                 ))}
               </div>
             </div>
+          ) : extLoading && (
+            <div className="sysdet-cores-wrap">
+              <div className="sysdet-cores-label">Per-Core</div>
+              <div className="sysdet-core-bars">
+                {Array.from({ length: hw?.cpuThreads || 8 }).map((_, i) => (
+                  <div key={i} className="sysdet-core sysdet-core-shimmer" />
+                ))}
+              </div>
+            </div>
           )}
         </Card>
 
         {/* ── GPU ── */}
         <Card icon={<MonitorSpeaker size={17} />} title="Graphics"
           subtitle={hw?.gpuName}
-          gaugeValue={hasGpu ? ext.gpuUsage : 0} gaugeUnit="%"
+          gaugeValue={hasGpu ? gpuUsage : 0} gaugeUnit="%"
           delay={0.08}
         >
-          {(ext && ext.gpuVramTotal > 0) ? (
-            <Row label="VRAM" value={formatMiBtoGB(ext.gpuVramTotal)} />
+          {gpuVramTotal > 0 ? (
+            <Row label="VRAM" value={formatMiBtoGB(gpuVramTotal)} />
           ) : (
-            hw?.gpuVramTotal && <Row label="VRAM" value={hw.gpuVramTotal} />
+            hw?.gpuVramTotal ? <Row label="VRAM" value={hw.gpuVramTotal} /> : <Row label="VRAM" loading={lhmLoading} />
           )}
-          {hw?.gpuDriverVersion && <Row label="Driver" value={hw.gpuDriverVersion} />}
+          {hw?.gpuDriverVersion ? <Row label="Driver" value={hw.gpuDriverVersion} /> : <Row label="Driver" loading={hwLoading} />}
           {hasGpu ? (
             <>
-              <Row label="GPU Temp" value={ext.gpuTemp >= 0 ? `${Math.trunc(ext.gpuTemp)}°C` : undefined} accent />
-              {ext.gpuVramUsed >= 0 && ext.gpuVramTotal > 0 && (
+              <Row label="GPU Temp" value={gpuTemp >= 0 ? `${Math.trunc(gpuTemp)}°C` : undefined} accent loading={gpuTemp < 0 && lhmLoading} />
+              {gpuVramUsed >= 0 && gpuVramTotal > 0 && (
                 <BarRow
                   label="VRAM Used"
-                  pct={(ext.gpuVramUsed / ext.gpuVramTotal) * 100}
-                  display={`${formatMiBtoGB(ext.gpuVramUsed)} / ${formatMiBtoGB(ext.gpuVramTotal)}`}
+                  pct={(gpuVramUsed / gpuVramTotal) * 100}
+                  display={`${formatMiBtoGB(gpuVramUsed)} / ${formatMiBtoGB(gpuVramTotal)}`}
                 />
               )}
+            </>
+          ) : lhmLoading ? (
+            <>
+              <Row label="GPU Temp" loading />
+              <Row label="VRAM Used" loading />
             </>
           ) : (
             <div className="sysdet-note">Live stats require NVIDIA drivers</div>
@@ -281,15 +315,17 @@ const SystemDetails: React.FC<SystemDetailsProps> = ({ systemStats, hardwareInfo
           gaugeValue={s?.ram} gaugeUnit="%"
           delay={0.12}
         >
-          {hw?.ramInfo && <Row label="Config" value={hw.ramInfo} />}
-          {hw?.ramPartNumber && <Row label="Part Number" value={hw.ramPartNumber} />}
-          {hw?.ramSticks && <Row label="Sticks" value={hw.ramSticks} />}
-          {ext && ext.ramTotalGB > 0 && (
+          {hw?.ramInfo ? <Row label="Config" value={hw.ramInfo} /> : <Row label="Config" loading={hwLoading} />}
+          {hw?.ramPartNumber ? <Row label="Part Number" value={hw.ramPartNumber} /> : hwLoading && <Row label="Part Number" loading />}
+          {hw?.ramSticks ? <Row label="Sticks" value={hw.ramSticks} /> : hwLoading && <Row label="Sticks" loading />}
+          {ext && ext.ramTotalGB > 0 ? (
             <BarRow
               label="Used"
               pct={(ext.ramUsedGB / ext.ramTotalGB) * 100}
               display={`${ext.ramUsedGB.toFixed(1)} / ${ext.ramTotalGB.toFixed(1)} GB`}
             />
+          ) : (
+            <Row label="Used" loading={extLoading} />
           )}
         </Card>
 
@@ -299,19 +335,21 @@ const SystemDetails: React.FC<SystemDetailsProps> = ({ systemStats, hardwareInfo
           gaugeValue={s?.disk} gaugeUnit="%"
           delay={0.16}
         >
-          <Row label="Type" value={hw?.diskType} />
+          <Row label="Type" value={hw?.diskType} loading={hwLoading} />
           <Row label="Health" value={hw?.diskHealth}
             chip={hw?.diskHealth?.toLowerCase() === 'healthy' ? 'green' : 'yellow'}
+            loading={hwLoading}
           />
           <Row
             label="Read/Write"
+            loading={extLoading}
             value={ext ? (
               <div className="sysdet-value-with-io">
                 <div className="sysdet-io-badges-wrap">
                   <IOStrip up={fmt(ext.diskWriteSpeed || 0)} down={fmt(ext.diskReadSpeed || 0)} />
                 </div>
               </div>
-            ) : '—'}
+            ) : undefined}
           />
           {hw && hw.allDrives && hw.allDrives.length > 1 && (
             <div className="sysdet-drives">
@@ -348,23 +386,31 @@ const SystemDetails: React.FC<SystemDetailsProps> = ({ systemStats, hardwareInfo
           gaugeUnit="Mbps"
           delay={0.20}
         >
-          {hw?.ipAddress && <Row label="Local IP Address" value={hw.ipAddress} />}
-          {hw?.macAddress && <Row label="MAC" value={hw.macAddress} />}
-          {hw?.gateway && <Row label="Gateway" value={hw.gateway} />}
-          {hw?.dns && <Row label="DNS" value={hw.dns} />}
+          {hw?.ipAddress ? <Row label="Local IP Address" value={hw.ipAddress} /> : <Row label="Local IP Address" loading={hwLoading} />}
+          {hw?.macAddress ? <Row label="MAC" value={hw.macAddress} /> : hwLoading && <Row label="MAC" loading />}
+          {hw?.gateway ? <Row label="Gateway" value={hw.gateway} /> : hwLoading && <Row label="Gateway" loading />}
+          {hw?.dns ? <Row label="DNS" value={hw.dns} /> : hwLoading && <Row label="DNS" loading />}
           {ext?.ssid && <Row label="Wi‑Fi SSID" value={ext.ssid} />}
-          {ext && ext.latencyMs > 0 && <Row label="Ping/Latency" value={`${ext.latencyMs} ms`} />}
-          {hw?.networkLinkSpeed && <Row label="Link Speed" value={hw.networkLinkSpeed} />}
-          <Row
-            label="Realtime Speed"
-            value={ext && (ext.networkUp > 0 || ext.networkDown > 0) ? (
-              <div className="sysdet-value-with-io">
-                <div className="sysdet-io-badges-wrap">
-                  <IOStrip up={fmtMbps(ext.networkUp)} down={fmtMbps(ext.networkDown)} />
+          {ext ? (
+            ext.latencyMs > 0 && <Row label="Ping/Latency" value={`${ext.latencyMs} ms`} />
+          ) : (
+            <Row label="Ping/Latency" loading />
+          )}
+          {hw?.networkLinkSpeed ? <Row label="Link Speed" value={hw.networkLinkSpeed} /> : <Row label="Link Speed" loading={hwLoading} />}
+          {ext ? (
+            <Row
+              label="Realtime Speed"
+              value={(ext.networkUp > 0 || ext.networkDown > 0) ? (
+                <div className="sysdet-value-with-io">
+                  <div className="sysdet-io-badges-wrap">
+                    <IOStrip up={fmtMbps(ext.networkUp)} down={fmtMbps(ext.networkDown)} />
+                  </div>
                 </div>
-              </div>
-            ) : '—'}
-          />
+              ) : '—'}
+            />
+          ) : (
+            <Row label="Realtime Speed" loading />
+          )}
           {ext && ext.wifiSignal > 0 && (
             <div className="sysdet-inline-row wifi">
               <Wifi size={13} />
@@ -381,12 +427,12 @@ const SystemDetails: React.FC<SystemDetailsProps> = ({ systemStats, hardwareInfo
           gaugeDisplay={ext?.processCount ?? 0}
           delay={0.24}
         >
-          <Row label="Build" value={hw?.windowsBuild} />
-          <Row label="Motherboard" value={hw?.motherboardProduct ? cleanBoardName(hw.motherboardProduct) : hw?.motherboardManufacturer} />
-          <Row label="BIOS" value={(hw?.biosVersion || hw?.biosDate) ? `${hw?.biosVersion || 'Unknown'}${hw?.biosDate ? ' — ' + hw.biosDate : ''}` : undefined} />
-          <Row label="Board S/N" value={!isPlaceholderSerial(hw?.motherboardSerial) ? hw?.motherboardSerial : '—'} />
-          <Row label="Uptime" value={ext?.systemUptime ?? hw?.systemUptime} />
-          <Row label="Power Plan" value={hw?.powerPlan ?? '—'} />
+          <Row label="Build" value={hw?.windowsBuild} loading={hwLoading} />
+          <Row label="Motherboard" value={hw?.motherboardProduct ? cleanBoardName(hw.motherboardProduct) : hw?.motherboardManufacturer} loading={hwLoading} />
+          <Row label="BIOS" value={(hw?.biosVersion || hw?.biosDate) ? `${hw?.biosVersion || 'Unknown'}${hw?.biosDate ? ' — ' + hw.biosDate : ''}` : undefined} loading={hwLoading} />
+          <Row label="Board S/N" value={!isPlaceholderSerial(hw?.motherboardSerial) ? hw?.motherboardSerial : (hw ? '—' : undefined)} loading={hwLoading} />
+          <Row label="Uptime" value={ext?.systemUptime ?? hw?.systemUptime} loading={!(ext?.systemUptime || hw?.systemUptime) && (extLoading || hwLoading)} />
+          <Row label="Power Plan" value={hw?.powerPlan ?? (hw ? '—' : undefined)} loading={hwLoading} />
           {hw?.hasBattery && (
             <div className="sysdet-inline-row batt">
               <Battery size={13} />
