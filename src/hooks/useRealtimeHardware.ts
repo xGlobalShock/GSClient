@@ -1,15 +1,5 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 
-// ──────────────────────────────────────────────────────
-// Real-Time Hardware Hook
-// Listens for 'realtime-hw-update' push events from the
-// Main process (1000ms interval via webContents.send).
-// Uses useRef to store latest data without triggering
-// re-renders on every push. Batches state updates via
-// requestAnimationFrame for smooth UI.
-// ──────────────────────────────────────────────────────
-
-// Extend the Window electron API types for the push channel
 declare global {
   interface Window {
     electron?: {
@@ -35,7 +25,7 @@ export interface RealtimeHWPayload {
   // CPU
   cpu: number;
   perCoreCpu: number[];
-  cpuClock: number;           // MHz (immediate WMI read)
+  cpuClock: number;
   temperature: number;
   lhmReady: boolean;
 
