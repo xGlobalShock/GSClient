@@ -354,6 +354,126 @@
   text-shadow: 0 0 8px rgba(0, 242, 255, 0.3);
 }
 
+/* ══════════════════════════════════════════════════════
+   SKELETON LOADING STATE
+══════════════════════════════════════════════════════ */
+
+/* Status bar */
+.hud-skel-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 18px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: rgba(0, 242, 255, 0.45);
+}
+
+.hud-skel-status-icon {
+  animation: hud-skel-blink 1s ease-in-out infinite;
+}
+
+.hud-skel-dots::after {
+  content: '';
+  animation: hud-skel-dots-anim 1.5s steps(3, end) infinite;
+}
+
+@keyframes hud-skel-dots-anim {
+  0%   { content: ''; }
+  33%  { content: '.'; }
+  66%  { content: '..'; }
+  100% { content: '...'; }
+}
+
+@keyframes hud-skel-blink {
+  0%, 100% { opacity: 0.4; }
+  50%      { opacity: 1; }
+}
+
+/* Skeleton card overrides */
+.hud-skel-card {
+  overflow: hidden;
+}
+
+.hud-skel-dim {
+  opacity: 0.3;
+}
+
+/* Scanning line — sweeps vertically down the card */
+.hud-skel-scan-line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(0, 242, 255, 0.35) 40%,
+    rgba(0, 242, 255, 0.5) 50%,
+    rgba(0, 242, 255, 0.35) 60%,
+    transparent 100%);
+  box-shadow: 0 0 12px rgba(0, 242, 255, 0.3);
+  animation: hud-skel-scan 2.4s ease-in-out infinite;
+  z-index: 10;
+}
+
+@keyframes hud-skel-scan {
+  0%   { top: 0%;   opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+
+/* Ghost subtitle bar */
+.hud-skel-subtitle-bar {
+  height: 8px;
+  width: 80%;
+  border-radius: 4px;
+  background: rgba(0, 242, 255, 0.06);
+  animation: hud-skel-pulse 1.6s ease-in-out infinite;
+}
+
+/* Ghost gauge circle */
+.hud-skel-gauge {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  border: 2px solid rgba(0, 242, 255, 0.08);
+  flex-shrink: 0;
+  animation: hud-skel-pulse 1.6s ease-in-out infinite;
+}
+
+/* Skeleton rows */
+.hud-skel-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.hud-skel-row-label {
+  height: 8px;
+  width: 35%;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.04);
+  animation: hud-skel-pulse 1.6s ease-in-out infinite;
+}
+
+.hud-skel-row-value {
+  height: 8px;
+  width: 45%;
+  border-radius: 4px;
+  background: rgba(0, 242, 255, 0.06);
+  animation: hud-skel-pulse 1.6s ease-in-out infinite 0.3s;
+}
+
+@keyframes hud-skel-pulse {
+  0%, 100% { opacity: 0.4; }
+  50%      { opacity: 1; }
+}
+
 /* ── Shimmer loader ── */
 .hud-value-loader {
   display: inline-block;

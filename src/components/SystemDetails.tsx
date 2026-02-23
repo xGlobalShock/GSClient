@@ -183,6 +183,87 @@ const ValueLoader: React.FC = () => (
 );
 
 /* ═══════════════════════════════════════════
+   Skeleton Loading Screen  —  shown while
+   the first batch of hardware data arrives
+═══════════════════════════════════════════ */
+const SKELETON_CARDS = [
+  { cls: 'hud-tile-cpu',     icon: <Cpu size={18} />,            title: 'PROCESSOR',  rows: 4 },
+  { cls: 'hud-tile-gpu',     icon: <MonitorSpeaker size={18} />, title: 'GRAPHICS',   rows: 3 },
+  { cls: 'hud-tile-mem',     icon: <MemoryStick size={18} />,    title: 'MEMORY',     rows: 3 },
+  { cls: 'hud-tile-storage', icon: <HardDrive size={18} />,      title: 'STORAGE',    rows: 3 },
+  { cls: 'hud-tile-net',     icon: <Network size={18} />,        title: 'NETWORK',    rows: 4 },
+  { cls: 'hud-tile-sys',     icon: <Monitor size={18} />,        title: 'SYSTEM',     rows: 4 },
+];
+
+const SkeletonLoading: React.FC = () => (
+  <motion.section
+    className="hud-section"
+    initial={{ opacity: 0 }}
+    animate={{ opacity: 1 }}
+    transition={{ duration: 0.35 }}
+  >
+    {/* Header */}
+    <div className="hud-section-header">
+      <div className="hud-section-icon"><Server size={16} /></div>
+      <h3 className="hud-section-title">SYSTEM DETAILS</h3>
+      <div className="hud-section-line" />
+    </div>
+
+    {/* Skeleton status bar */}
+    <div className="hud-skel-status">
+      <Activity size={13} className="hud-skel-status-icon" />
+      <span>Initializing hardware monitors…</span>
+      <span className="hud-skel-dots" />
+    </div>
+
+    {/* Skeleton bento grid */}
+    <div className="hud-bento-grid">
+      {SKELETON_CARDS.map((card, i) => (
+        <motion.div
+          key={card.cls}
+          className={`hud-bento-card hud-skel-card ${card.cls}`}
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: i * 0.06, ease: [0.22, 1, 0.36, 1] }}
+        >
+          {/* Scanning line animation */}
+          <div className="hud-skel-scan-line" />
+
+          {/* Corner accents (reuse existing classes) */}
+          <div className="hud-corner hud-corner-tl" />
+          <div className="hud-corner hud-corner-tr" />
+          <div className="hud-corner hud-corner-bl" />
+          <div className="hud-corner hud-corner-br" />
+
+          <div className="hud-card-inner">
+            {/* Header skeleton */}
+            <div className="hud-card-head">
+              <div className="hud-card-icon hud-skel-dim">{card.icon}</div>
+              <div className="hud-card-title-group">
+                <div className="hud-card-title">{card.title}</div>
+                <div className="hud-skel-subtitle-bar" />
+              </div>
+              {/* Ghost gauge */}
+              <div className="hud-skel-gauge" />
+            </div>
+
+            {/* Row skeletons */}
+            <div className="hud-card-body">
+              {Array.from({ length: card.rows }).map((_, ri) => (
+                <div key={ri} className="hud-row hud-skel-row">
+                  <span className="hud-skel-row-label" />
+                  <span className="hud-skel-row-value" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </motion.div>
+      ))}
+    </div>
+  </motion.section>
+);
+
+/* ═══════════════════════════════════════════
    Info Row
 ═══════════════════════════════════════════ */
 const Row: React.FC<{
@@ -323,6 +404,10 @@ const SystemDetails: React.FC<SystemDetailsProps> = ({ systemStats, hardwareInfo
   const hw = hardwareInfo;
   const ext = extendedStats;
   const s = systemStats;
+
+  // ── Show skeleton while no meaningful data has arrived ──
+  const hasAnyData = (s && s.cpu > 0) || hw || ext;
+  if (!hasAnyData) return <SkeletonLoading />;
 
   const gpuUsage = ext?.gpuUsage != null && ext.gpuUsage >= 0 ? ext.gpuUsage : (s?.gpuUsage ?? -1);
   const gpuTemp = ext?.gpuTemp != null && ext.gpuTemp >= 0 ? ext.gpuTemp : (s?.gpuTemp ?? -1);
