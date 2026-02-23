@@ -100,6 +100,49 @@
     0 0 30px rgba(0, 242, 255, 0.04);
 }
 
+/* ── Breathing pulse for high-load cards ── */
+.hud-bento-card.hud-pulse {
+  animation: hudBreath 2.5s ease-in-out infinite;
+}
+
+@keyframes hudBreath {
+  0%, 100% {
+    border-color: rgba(255, 45, 85, 0.2);
+    box-shadow:
+      0 2px 24px rgba(0, 0, 0, 0.5),
+      0 0 20px rgba(255, 45, 85, 0.06),
+      inset 0 1px 0 rgba(255, 45, 85, 0.04);
+  }
+  50% {
+    border-color: rgba(255, 45, 85, 0.4);
+    box-shadow:
+      0 2px 24px rgba(0, 0, 0, 0.5),
+      0 0 35px rgba(255, 45, 85, 0.12),
+      inset 0 1px 0 rgba(255, 45, 85, 0.08);
+  }
+}
+
+.hud-bento-card.hud-pulse-warn {
+  animation: hudBreathWarn 3s ease-in-out infinite;
+}
+
+@keyframes hudBreathWarn {
+  0%, 100% {
+    border-color: rgba(255, 214, 0, 0.15);
+    box-shadow:
+      0 2px 24px rgba(0, 0, 0, 0.5),
+      0 0 16px rgba(255, 214, 0, 0.04),
+      inset 0 1px 0 rgba(255, 214, 0, 0.03);
+  }
+  50% {
+    border-color: rgba(255, 214, 0, 0.3);
+    box-shadow:
+      0 2px 24px rgba(0, 0, 0, 0.5),
+      0 0 28px rgba(255, 214, 0, 0.08),
+      inset 0 1px 0 rgba(255, 214, 0, 0.06);
+  }
+}
+
 /* ── Scanline overlay for HUD feel ── */
 .hud-scanline-overlay {
   position: absolute;

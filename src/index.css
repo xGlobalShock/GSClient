@@ -5,10 +5,10 @@
   --color-good: #00FF88;
   --color-warning: #FFD600;
   --color-critical: #FF2D55;
-  --bg-dark: #050505;
-  --bg-darker: #020202;
-  --bg-card: rgba(8, 10, 18, 0.65);
-  --border-color: rgba(0, 242, 255, 0.08);
+  --bg-dark: #020606;
+  --bg-darker: #010404;
+  --bg-card: rgba(6, 14, 14, 0.55);
+  --border-color: rgba(0, 242, 255, 0.06);
   --text-primary: #ffffff;
   --text-secondary: rgba(255, 255, 255, 0.7);
   --text-muted: rgba(255, 255, 255, 0.35);
@@ -28,10 +28,7 @@ html, body, #root {
 
 body {
   font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background: 
-    radial-gradient(circle at 15% 25%, rgba(0, 242, 255, 0.04) 0%, transparent 50%),
-    radial-gradient(circle at 85% 75%, rgba(0, 255, 136, 0.025) 0%, transparent 50%),
-    #050505;
+  background: #020606;
   color: var(--text-primary);
 }
 
@@ -39,10 +36,26 @@ body {
   display: flex;
   width: 100%;
   height: 100vh;
-  background: 
-    radial-gradient(circle at 15% 25%, rgba(0, 242, 255, 0.04) 0%, transparent 50%),
-    radial-gradient(circle at 85% 75%, rgba(0, 255, 136, 0.025) 0%, transparent 50%),
-    #050505;
+  position: relative;
+  /* ─── Unified Global Canvas ─── */
+  background:
+    radial-gradient(ellipse 70% 60% at 55% 45%, #081a1a 0%, transparent 100%),
+    radial-gradient(ellipse 40% 35% at 30% 30%, rgba(0, 242, 255, 0.025) 0%, transparent 100%),
+    #020606;
+}
+
+/* ── Film-Grain Overlay — prevents banding, adds cinematic depth ── */
+.app-container::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0.018;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 180px 180px;
 }
 
 .main-content {
@@ -87,10 +100,7 @@ body {
   font-weight: 300;
   letter-spacing: 2px;
   color: var(--color-primary);
-  background: 
-    radial-gradient(circle at 15% 25%, rgba(0, 242, 255, 0.04) 0%, transparent 50%),
-    radial-gradient(circle at 85% 75%, rgba(0, 255, 136, 0.025) 0%, transparent 50%),
-    #050505;
+  background: transparent;
 }
 
 .loader-text {

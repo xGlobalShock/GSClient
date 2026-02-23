@@ -272,10 +272,13 @@ const BentoCard: React.FC<{
   gaugeDisplay?: string | number;
   className?: string;
   delay?: number;
+  pulse?: 'high' | 'warn' | false;
   children: React.ReactNode;
-}> = ({ icon, title, subtitle, gaugeValue, gaugeUnit, gaugeDisplay, className = '', delay = 0, children }) => (
+}> = ({ icon, title, subtitle, gaugeValue, gaugeUnit, gaugeDisplay, className = '', delay = 0, pulse = false, children }) => {
+  const pulseClass = pulse === 'high' ? 'hud-pulse' : pulse === 'warn' ? 'hud-pulse-warn' : '';
+  return (
   <motion.div
-    className={`hud-bento-card ${className}`}
+    className={`hud-bento-card ${className} ${pulseClass}`}
     initial={{ opacity: 0, y: 20, scale: 0.97 }}
     animate={{ opacity: 1, y: 0, scale: 1 }}
     transition={{ duration: 0.5, delay, ease: [0.22, 1, 0.36, 1] }}
@@ -310,7 +313,8 @@ const BentoCard: React.FC<{
       <div className="hud-card-body">{children}</div>
     </div>
   </motion.div>
-);
+  );
+};
 
 /* ═══════════════════════════════════════════
    Main SystemDetails Component
@@ -332,6 +336,13 @@ const SystemDetails: React.FC<SystemDetailsProps> = ({ systemStats, hardwareInfo
   const lhmLoading = !s?.lhmReady;
   const hwLoading = !hw;
   const extLoading = !ext;
+
+  // Breathing pulse thresholds
+  const cpuLoad = s?.cpu ?? 0;
+  const ramLoad = s?.ram ?? 0;
+  const cpuPulse: 'high' | 'warn' | false = cpuLoad > 85 ? 'high' : cpuLoad > 65 ? 'warn' : false;
+  const gpuPulse: 'high' | 'warn' | false = gpuUsage > 85 ? 'high' : gpuUsage > 65 ? 'warn' : false;
+  const ramPulse: 'high' | 'warn' | false = ramLoad > 85 ? 'high' : ramLoad > 65 ? 'warn' : false;
 
   return (
     <motion.section
@@ -357,11 +368,12 @@ const SystemDetails: React.FC<SystemDetailsProps> = ({ systemStats, hardwareInfo
           icon={<Cpu size={18} />}
           title="PROCESSOR"
           subtitle={hw?.cpuName}
-          gaugeValue={gpuTemp >= 0 ? gpuTemp : undefined}
+          gaugeValue={s?.temperature && s.temperature > 0 ? Math.min(s.temperature, 100) : undefined}
           gaugeUnit="°C"
-          gaugeDisplay={gpuTemp >= 0 ? Math.trunc(gpuTemp) : '—'}
+          gaugeDisplay={s?.temperature && s.temperature > 0 ? Math.trunc(s.temperature) : '—'}
           className="hud-tile-cpu"
           delay={0.05}
+          pulse={cpuPulse}
         >
           <Row label="Cores / Threads" value={hw ? `${hw.cpuCores}C / ${hw.cpuThreads}T` : undefined} loading={hwLoading} />
           <Row label="Max Clock" value={hw?.cpuMaxClock} loading={hwLoading} />
@@ -390,6 +402,7 @@ const SystemDetails: React.FC<SystemDetailsProps> = ({ systemStats, hardwareInfo
           gaugeUnit="%"
           className="hud-tile-gpu"
           delay={0.1}
+          pulse={gpuPulse}
         >
           {gpuVramTotal > 0 ? (
             <Row label="VRAM" value={formatMiBtoGB(gpuVramTotal)} />
@@ -436,6 +449,7 @@ const SystemDetails: React.FC<SystemDetailsProps> = ({ systemStats, hardwareInfo
           gaugeUnit="%"
           className="hud-tile-mem"
           delay={0.15}
+          pulse={ramPulse}
         >
           {hw?.ramInfo ? <Row label="Config" value={hw.ramInfo} /> : <Row label="Config" loading={hwLoading} />}
           {hw?.ramPartNumber ? <Row label="Part Number" value={hw.ramPartNumber} /> : hwLoading && <Row label="Part Number" loading />}

@@ -95,6 +95,10 @@ app.disableHardwareAcceleration();
 // Add command line switches for stability
 app.commandLine.appendSwitch('disable-gpu');
 app.commandLine.appendSwitch('disable-gpu-compositing');
+// Redirect Chromium GPU shader cache to app userData to avoid "Access is denied"
+// errors when running elevated (admin context can't access default cache path)
+app.commandLine.appendSwitch('disk-cache-dir', path.join(app.getPath('userData'), 'Cache'));
+app.commandLine.appendSwitch('gpu-disk-cache-dir', path.join(app.getPath('userData'), 'GPUCache'));
 
 
 // Simple admin check for Windows
@@ -130,10 +134,10 @@ function createWindow() {
   const isDev = !app.isPackaged;
 
   mainWindow = new BrowserWindow({
-    width: 1400,
-    height: 900,
+    width: 1420,
+    height: 768,
     minWidth: 1000,
-    minHeight: 700,
+    minHeight: 600,
     frame: false,
     autoHideMenuBar: true,
     webPreferences: {
@@ -412,9 +416,13 @@ function startLHMService() {
     '        foreach ($sensor in $hw.Sensors) {',
     '          if (-not $sensor.Value.HasValue) { continue }',
     '          if ($sensor.SensorType -eq [LibreHardwareMonitor.Hardware.SensorType]::Temperature) {',
-    '            if ($sensor.Name -eq "CPU Package") { $cpuTemp = $sensor.Value.Value }',
-    '            if ($sensor.Name -eq "Core Average" -and $cpuTemp -eq $null) { $cpuTemp = $sensor.Value.Value }',
-    '            if ($sensor.Name -eq "Core Max" -and $cpuTemp -eq $null) { $cpuTemp = $sensor.Value.Value }',
+    '            $sn = $sensor.Name',
+    '            # Intel: "CPU Package"; AMD: "CPU (Tctl/Tdie)", "Tctl", "Tdie", "Core (Tctl/Tdie)"',
+    '            if ($sn -eq "CPU Package" -or $sn -match "Tctl|Tdie") { $cpuTemp = $sensor.Value.Value }',
+    '            if ($sn -eq "Core Average" -and $cpuTemp -eq $null) { $cpuTemp = $sensor.Value.Value }',
+    '            if ($sn -eq "Core Max" -and $cpuTemp -eq $null) { $cpuTemp = $sensor.Value.Value }',
+    '            # Last resort: any CPU temperature sensor',
+    '            if ($cpuTemp -eq $null -and $sensor.Value.Value -gt 0 -and $sensor.Value.Value -lt 150) { $cpuTemp = $sensor.Value.Value }',
     '          }',
     '          # CPU clock from LHM MSR sensors (most accurate real-time boost frequency)',
     '          if ($sensor.SensorType -eq [LibreHardwareMonitor.Hardware.SensorType]::Clock -and $sensor.Name -match "^Core #") {',
@@ -435,7 +443,6 @@ function startLHMService() {
     '    }',
     '    $parts = @()',
     '    if ($cpuTemp -ne $null) { $parts += "CPUT:" + [math]::Round($cpuTemp, 1) }',
-    '    if ($cpuLoad -ne $null) { $parts += "CPUL:" + [math]::Round($cpuLoad, 1) }',
     '    if ($cpuMaxClock -ne $null) { $parts += "CPUCLK:" + [math]::Round($cpuMaxClock, 0) }',
     '    if ($gpuTemp -ne $null) { $parts += "GPUT:" + [math]::Round($gpuTemp, 1) }',
     '    if ($gpuLoad -ne $null) { $parts += "GPUL:" + [math]::Round($gpuLoad, 1) }',
@@ -491,6 +498,12 @@ function startLHMService() {
         }
       }
     }
+  });
+
+  // Log stderr for diagnostics (DLL load failures, sensor errors)
+  _lhmProcess.stderr.on('data', (data) => {
+    const msg = data.toString().trim();
+    if (msg) console.warn('[LHM] stderr:', msg.substring(0, 300));
   });
 
   _lhmProcess.on('exit', (code) => {
@@ -706,6 +719,7 @@ let _rtLastLatency = 0;
 let _rtLastSsid = '';
 let _rtLastWifiSignal = -1;
 let _rtPrimed = false;
+let _rtLastTempSource = '';  // tracks temp source changes for diagnostics
 
 // nvidia-smi GPU fallback — provides GPU metrics when LHM hasn't detected the GPU yet
 let _nvGpuUsage = -1;
@@ -831,16 +845,26 @@ function _startRealtimePush() {
 
       // ── Resolve temperature (priority: LHM → SI ACPI → estimation) ──
       let resolvedTemp = 0;
+      let tempSource = 'none';
       if (_lhmAvailable && _lhmTemp > 0) {
         resolvedTemp = _lhmTemp;
+        tempSource = 'lhm';
       } else if (siTemp && siTemp.main > 0 && siTemp.main < 150) {
         resolvedTemp = Math.round(siTemp.main * 10) / 10;
+        tempSource = 'si-acpi';
       } else {
         // Estimation fallback (same as _getStatsImpl)
         const jitter = Math.sin(Date.now() / 5000) * 1.5;
         resolvedTemp = Math.round((38 + resolvedCpu * 0.45 + jitter) * 10) / 10;
         if (resolvedTemp < 30) resolvedTemp = 30;
         if (resolvedTemp > 95) resolvedTemp = 95;
+        tempSource = 'estimation';
+      }
+
+      // Log temp source on first resolved push and when source changes
+      if (!_rtLastTempSource || _rtLastTempSource !== tempSource) {
+        console.log(`[RT] Temperature source: ${tempSource} (value: ${resolvedTemp}°C, lhmTemp: ${_lhmTemp}, siTemp: ${siTemp?.main ?? 'n/a'})`);
+        _rtLastTempSource = tempSource;
       }
 
       // ── Build unified payload (replaces both system:get-stats + system:get-extended-stats) ──
@@ -854,6 +878,7 @@ function _startRealtimePush() {
 
         // Temperature — resolved with fallback chain
         temperature: resolvedTemp,
+        tempSource: tempSource,
         lhmReady: _lhmAvailable || _perfCpuUtility >= 0,
 
         // GPU — prefer LHM (500ms refresh), fallback to nvidia-smi (3s poll)
