@@ -383,24 +383,36 @@ function _startLhmCacheTimer() {
 function startLHMService() {
   // [BYPASS CACHE] Do NOT restore stale sensor values — always start fresh
   // _loadLhmCache();  // DISABLED: real-time metrics must come from live hardware reads
-  console.log('[LHM] Cache bypass active — waiting for live sensor data');
   // Start periodic cache saves (still useful for crash recovery)
   _startLhmCacheTimer();
 
   const dllPath = path.join(__dirname, 'lib', 'LibreHardwareMonitorLib.dll');
   if (!fs.existsSync(dllPath)) {
-    console.log('[LHM] DLL not found at', dllPath);
+    console.warn('[LHM] DLL not found at', dllPath);
     return;
   }
   // Write a long-running PS script that loads LHM, opens CPU sensors,
-  // and prints TEMP:<value> every 2 seconds.
+  // and prints sensor data every 500ms.
   const scriptContent = [
+    '# LHM sensor service — errors reported on stderr, data on stdout',
+    '$ErrorActionPreference = "Stop"',
+    'try {',
+    `  Add-Type -Path '${dllPath}'`,
+    '} catch {',
+    '  [Console]::Error.WriteLine("LHMERR:DLL_LOAD:" + $_.Exception.Message)',
+    '  exit 1',
+    '}',
+    'try {',
+    '  $computer = [LibreHardwareMonitor.Hardware.Computer]::new()',
+    '  $computer.IsCpuEnabled = $true',
+    '  $computer.IsGpuEnabled = $true',
+    '  $computer.Open()',
+    '} catch {',
+    '  [Console]::Error.WriteLine("LHMERR:OPEN:" + $_.Exception.Message)',
+    '  exit 2',
+    '}',
     '$ErrorActionPreference = "SilentlyContinue"',
-    `Add-Type -Path '${dllPath}'`,
-    '$computer = [LibreHardwareMonitor.Hardware.Computer]::new()',
-    '$computer.IsCpuEnabled = $true',
-    '$computer.IsGpuEnabled = $true',
-    '$computer.Open()',
+    '[Console]::Error.WriteLine("LHMOK:READY")',
     '# Disk I/O perf counters (bytes/sec, delta-based)',
     'try { $diskReadCounter = New-Object System.Diagnostics.PerformanceCounter("PhysicalDisk", "Disk Read Bytes/sec", "_Total") ; $diskReadCounter.NextValue() | Out-Null } catch { $diskReadCounter = $null }',
     'try { $diskWriteCounter = New-Object System.Diagnostics.PerformanceCounter("PhysicalDisk", "Disk Write Bytes/sec", "_Total") ; $diskWriteCounter.NextValue() | Out-Null } catch { $diskWriteCounter = $null }',
@@ -503,11 +515,25 @@ function startLHMService() {
   // Log stderr for diagnostics (DLL load failures, sensor errors)
   _lhmProcess.stderr.on('data', (data) => {
     const msg = data.toString().trim();
-    if (msg) console.warn('[LHM] stderr:', msg.substring(0, 300));
+    if (!msg) return;
+    if (msg.startsWith('LHMOK:READY')) {
+      // LHM loaded successfully — no need to log in production
+      return;
+    }
+    if (msg.startsWith('LHMERR:')) {
+      console.warn('[LHM]', msg);
+    } else {
+      // Only log unexpected stderr in dev
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('[LHM] stderr:', msg.substring(0, 300));
+      }
+    }
   });
 
   _lhmProcess.on('exit', (code) => {
-    console.log(`[LHM] Service exited with code ${code}`);
+    if (code !== 0 && code !== null) {
+      console.warn(`[LHM] Service exited with code ${code}`);
+    }
     _lhmProcess = null;
     // Don't set _lhmAvailable = false so the last reading persists
   });
@@ -517,7 +543,7 @@ function startLHMService() {
     _lhmProcess = null;
   });
 
-  console.log('[LHM] Temperature service started (PID:', _lhmProcess.pid, ')');
+  // LHM service started silently — errors reported via stderr
 }
 
 function stopLHMService() {
@@ -542,6 +568,7 @@ function stopLHMService() {
 let _perfCounterProcess = null;
 let _perfCpuUtility = -1;     // % Processor Utility (matches Task Manager)
 let _perfCpuPerfPct = -1;     // % Processor Performance (current/base ratio × 100)
+let _perfPerCoreCpu = [];     // per-logical-processor % Processor Utility
 
 function _startPerfCounterService() {
   if (_perfCounterProcess) return;
@@ -549,23 +576,23 @@ function _startPerfCounterService() {
   const scriptContent = [
     '$ErrorActionPreference = "SilentlyContinue"',
     '',
-    '# ── Method 1: PerformanceCounter API (fastest, ~0ms per read) ──',
+    '# ── Total CPU counters (PerformanceCounter API — fastest) ──',
     'try { $cpuU = New-Object System.Diagnostics.PerformanceCounter("Processor Information", "% Processor Utility", "_Total") } catch { $cpuU = $null }',
     'try { $cpuP = New-Object System.Diagnostics.PerformanceCounter("Processor Information", "% Processor Performance", "_Total") } catch { $cpuP = $null }',
     '',
-    '# ── Method 2: WMI fallback (locale-independent, ~50-100ms per read) ──',
-    '# Win32_PerfFormattedData_Counters_ProcessorInformation.PercentProcessorUtility',
-    '# is NOT localized — works on every Windows 10/11 language.',
+    '# ── WMI fallback flag ──',
     '$useWmi = ($cpuU -eq $null)',
     'if ($useWmi) { [Console]::Error.WriteLine("[PerfCtr] PerformanceCounter unavailable, using WMI fallback") }',
     '',
-    '# Prime perf counters (first delta read is always 0)',
+    '# Prime total counters (first delta read is always 0)',
     'if ($cpuU) { $cpuU.NextValue() | Out-Null }',
     'if ($cpuP) { $cpuP.NextValue() | Out-Null }',
     'Start-Sleep -Milliseconds 500',
     '',
     'while ($true) {',
     '  $parts = @()',
+    '',
+    '  # Total CPU utility',
     '  if ($cpuU) {',
     '    try { $v = $cpuU.NextValue(); if ($v -gt 100) { $v = 100 }; $parts += "CPUU:" + [math]::Round($v, 1) } catch {}',
     '  } elseif ($useWmi) {',
@@ -577,7 +604,22 @@ function _startPerfCounterService() {
     '      }',
     '    } catch {}',
     '  }',
+    '',
+    '  # Processor Performance (for clock speed)',
     '  if ($cpuP) { try { $parts += "CPUP:" + [math]::Round($cpuP.NextValue(), 1) } catch {} }',
+    '',
+    '  # Per-core utility: Use Win32_PerfFormattedData_PerfOS_Processor for accurate, ordered logical core stats',
+    '  $coreVals = @()',
+    '  try {',
+    '    $allCores = Get-CimInstance Win32_PerfFormattedData_PerfOS_Processor -ErrorAction Stop | Where-Object { $_.Name -ne "_Total" } | Sort-Object { [int]$_.Name }',
+    '    foreach ($core in $allCores) {',
+    '      $v = [double]$core.PercentProcessorTime',
+    '      if ($v -gt 100) { $v = 100 }',
+    '      $coreVals += [math]::Round($v, 1)',
+    '    }',
+    '  } catch {}',
+    '  if ($coreVals.Count -gt 0) { $parts += "CORES:" + ($coreVals -join ",") }',
+    '',
     '  if ($parts.Count -gt 0) {',
     '    [Console]::Out.WriteLine($parts -join "|")',
     '    [Console]::Out.Flush()',
@@ -601,7 +643,18 @@ function _startPerfCounterService() {
     for (const line of lines) {
       const tokens = line.trim().split('|');
       for (const token of tokens) {
-        const [key, valStr] = token.split(':');
+        const colonIdx = token.indexOf(':');
+        if (colonIdx < 0) continue;
+        const key = token.substring(0, colonIdx);
+        const valStr = token.substring(colonIdx + 1);
+        if (key === 'CORES') {
+          // Per-core utility: comma-separated floats
+          _perfPerCoreCpu = valStr.split(',').map(s => {
+            const n = parseFloat(s);
+            return isNaN(n) ? 0 : Math.min(Math.round(n * 10) / 10, 100);
+          });
+          continue;
+        }
         const v = parseFloat(valStr);
         if (isNaN(v)) continue;
         switch (key) {
@@ -613,7 +666,7 @@ function _startPerfCounterService() {
   });
 
   _perfCounterProcess.on('exit', (code) => {
-    console.log(`[PerfCtr] Service exited with code ${code}`);
+    if (code !== 0 && code !== null) console.warn(`[PerfCtr] Service exited with code ${code}`);
     _perfCounterProcess = null;
   });
 
@@ -622,7 +675,7 @@ function _startPerfCounterService() {
     _perfCounterProcess = null;
   });
 
-  console.log('[PerfCtr] Performance counter service started (PID:', _perfCounterProcess.pid, ')');
+  // PerfCtr service started silently — errors reported via exit/error handlers
 }
 
 function _stopPerfCounterService() {
@@ -789,11 +842,10 @@ function _startRealtimePush() {
   // Prime SI's internal delta counters (first call returns baseline, not delta)
   if (!_rtPrimed) {
     Promise.allSettled([
-      si.currentLoad(),
       si.networkStats('*'),
     ]).then(() => {
       _rtPrimed = true;
-      console.log('[RT] SI delta counters primed');
+      // SI delta counters primed
     });
   }
 
@@ -806,15 +858,13 @@ function _startRealtimePush() {
     if (!mainWindow || mainWindow.isDestroyed()) return;
 
     try {
-      // All SI calls run in parallel — each uses immediate delta, not time-averaged snapshots
-      const [loadData, memData, netData, tempData] = await Promise.allSettled([
-        si.currentLoad(),           // Per-core CPU load (delta since last call)
+      // SI calls run in parallel — mem, network, temp only (CPU comes from perf counters)
+      const [memData, netData, tempData] = await Promise.allSettled([
         si.mem(),                   // Memory usage (instant kernel call)
         si.networkStats('*'),       // Network throughput per interface (delta-based tx_sec/rx_sec)
         si.cpuTemperature(),        // CPU temp from ACPI/WMI (fallback when LHM unavailable)
       ]);
 
-      const load = loadData.status === 'fulfilled' ? loadData.value : null;
       const mem = memData.status === 'fulfilled' ? memData.value : null;
       const net = netData.status === 'fulfilled' ? netData.value : null;
       const siTemp = tempData.status === 'fulfilled' ? tempData.value : null;
@@ -832,16 +882,9 @@ function _startRealtimePush() {
         resolvedClock = Math.round(baseClock * (_perfCpuPerfPct / 100));
       }
 
-      // ── Resolve CPU usage (priority: PerfCounter → SI fallback) ──
-      // PerfCounter reads % Processor Utility — matches Task Manager exactly.
-      // SI's currentLoad() uses tick-based % Processor Time which inflates on
-      // modern CPUs with frequency scaling (can show 60%+ when TM says 15%).
-      let resolvedCpu = 0;
-      if (_perfCpuUtility >= 0) {
-        resolvedCpu = _perfCpuUtility;
-      } else if (load) {
-        resolvedCpu = Math.round(load.currentLoad * 10) / 10;
-      }
+      // ── Resolve CPU usage from PerfCounter (% Processor Utility) ──
+      // Matches Task Manager exactly. No SI fallback needed.
+      let resolvedCpu = _perfCpuUtility >= 0 ? _perfCpuUtility : 0;
 
       // ── Resolve temperature (priority: LHM → SI ACPI → estimation) ──
       let resolvedTemp = 0;
@@ -861,9 +904,11 @@ function _startRealtimePush() {
         tempSource = 'estimation';
       }
 
-      // Log temp source on first resolved push and when source changes
+      // Log temp source only when falling back to estimation (indicates LHM/SI issue)
       if (!_rtLastTempSource || _rtLastTempSource !== tempSource) {
-        console.log(`[RT] Temperature source: ${tempSource} (value: ${resolvedTemp}°C, lhmTemp: ${_lhmTemp}, siTemp: ${siTemp?.main ?? 'n/a'})`);
+        if (tempSource === 'estimation') {
+          console.warn(`[RT] Temperature using estimation fallback (lhmTemp: ${_lhmTemp}, siTemp: ${siTemp?.main ?? 'n/a'})`);
+        }
         _rtLastTempSource = tempSource;
       }
 
@@ -871,8 +916,8 @@ function _startRealtimePush() {
       const payload = {
         // CPU — % Processor Utility from perf counter service (matches Task Manager)
         cpu: resolvedCpu,
-        // Per-core utilization from SI (immediate delta, not time-averaged)
-        perCoreCpu: load ? load.cpus.map(c => Math.round(c.load * 10) / 10) : [],
+        // Per-core utilization from perf counter service (% Processor Utility per logical core)
+        perCoreCpu: _perfPerCoreCpu.length > 0 ? _perfPerCoreCpu : [],
         // Current clock speed — real-time boost from LHM or perf counter
         cpuClock: resolvedClock,
 
@@ -930,7 +975,7 @@ function _startRealtimePush() {
     }
   }, 1000);
 
-  console.log('[RT] Real-time hardware push started (1000ms interval)');
+  // RT push started
 }
 
 function _stopRealtimePush() {
@@ -938,7 +983,7 @@ function _stopRealtimePush() {
   if (_realtimeLatencyTimer) { clearInterval(_realtimeLatencyTimer); _realtimeLatencyTimer = null; }
   if (_realtimeWifiTimer) { clearInterval(_realtimeWifiTimer); _realtimeWifiTimer = null; }
   if (_realtimeNvGpuTimer) { clearInterval(_realtimeNvGpuTimer); _realtimeNvGpuTimer = null; }
-  console.log('[RT] Real-time push stopped');
+  // RT push stopped
 }
 
 // IPC: frontend can request start/stop of real-time push
@@ -991,14 +1036,14 @@ function _initHardwareInfo() {
   const cached = _loadHwCache();
   if (cached) {
     _hwInfoResult = cached;
-    console.log('[HW] Loaded hardware info from cache');
+    // HW info loaded from cache
   }
 
   // 2. Always start a fresh fetch in background (updates cache for next time)
   _hwInfoPromise = _fetchHardwareInfoImpl().then(info => {
     _hwInfoResult = info;
     _saveHwCache(info);
-    console.log('[HW] Fresh hardware info fetched and cached');
+    // HW info refreshed in background
     return info;
   }).catch(err => {
     console.error('[HW] Fetch error:', err.message);
