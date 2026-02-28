@@ -336,7 +336,9 @@ let _lhmDiskRead = 0;       // disk read bytes/sec from perf counter
 let _lhmDiskWrite = 0;      // disk write bytes/sec from perf counter
 let _lhmProcessCount = 0;   // running process count from perf counter
 let _lhmCpuClock = -1;      // CPU max core clock (MHz) from LHM MSR sensors
-let _lhmAvailable = false;  // true once we get a valid CPU reading
+let _lhmAvailable = false;  // true once we get a valid CPU temp reading
+let _lhmServiceRunning = false; // true once LHM returns ANY data
+let _estimatedTemp = 40;    // smoothed estimation (thermal inertia)
 let _lhmCacheTimer = null;  // periodic save timer
 
 // ── LHM sensor cache: restore last-known readings for instant startup ──
@@ -408,16 +410,44 @@ function startLHMService() {
   const scriptContent = [
     '# LHM sensor service — errors reported on stderr, data on stdout',
     '$ErrorActionPreference = "Stop"',
+    '',
+    '# ── Admin detection (ring0 driver needs admin for MSR temp reads) ──',
+    '$isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)',
+    '[Console]::Error.WriteLine("LHMINFO:ADMIN=" + $isAdmin)',
+    '',
     'try {',
     `  Add-Type -Path '${resolvedDllPath}'`,
     '} catch {',
     '  [Console]::Error.WriteLine("LHMERR:DLL_LOAD:" + $_.Exception.Message)',
     '  exit 1',
     '}',
+    '',
+    '# ── UpdateVisitor: the official LHM pattern for refreshing all sensors ──',
+    'try {',
+    '  Add-Type -ReferencedAssemblies @($(' + "'" + resolvedDllPath + "'" + ')) -Language CSharp -TypeDefinition @"',
+    'using LibreHardwareMonitor.Hardware;',
+    'public class UpdateVisitor : IVisitor {',
+    '    public void VisitComputer(IComputer computer) { computer.Traverse(this); }',
+    '    public void VisitHardware(IHardware hardware) {',
+    '        hardware.Update();',
+    '        foreach (IHardware sub in hardware.SubHardware) sub.Accept(this);',
+    '    }',
+    '    public void VisitSensor(ISensor sensor) { }',
+    '    public void VisitParameter(IParameter parameter) { }',
+    '}',
+    '"@',
+    '  $visitor = [UpdateVisitor]::new()',
+    '  [Console]::Error.WriteLine("LHMOK:VISITOR_READY")',
+    '} catch {',
+    '  [Console]::Error.WriteLine("LHMWARN:VISITOR_FAIL:" + $_.Exception.Message)',
+    '  $visitor = $null',
+    '}',
+    '',
     'try {',
     '  $computer = [LibreHardwareMonitor.Hardware.Computer]::new()',
     '  $computer.IsCpuEnabled = $true',
     '  $computer.IsGpuEnabled = $true',
+    '  $computer.IsMotherboardEnabled = $true',
     '  $computer.Open()',
     '} catch {',
     '  [Console]::Error.WriteLine("LHMERR:OPEN:" + $_.Exception.Message)',
@@ -425,50 +455,105 @@ function startLHMService() {
     '}',
     '$ErrorActionPreference = "SilentlyContinue"',
     '[Console]::Error.WriteLine("LHMOK:READY")',
-    '# Disk I/O perf counters (bytes/sec, delta-based)',
+    '',
+    '# Disk I/O perf counters',
     'try { $diskReadCounter = New-Object System.Diagnostics.PerformanceCounter("PhysicalDisk", "Disk Read Bytes/sec", "_Total") ; $diskReadCounter.NextValue() | Out-Null } catch { $diskReadCounter = $null }',
     'try { $diskWriteCounter = New-Object System.Diagnostics.PerformanceCounter("PhysicalDisk", "Disk Write Bytes/sec", "_Total") ; $diskWriteCounter.NextValue() | Out-Null } catch { $diskWriteCounter = $null }',
-    '# Process count perf counter',
     'try { $procCounter = New-Object System.Diagnostics.PerformanceCounter("System", "Processes") } catch { $procCounter = $null }',
+    '',
+    '$iteration = 0',
+    '',
     'while ($true) {',
     '  try {',
+    '    if ($visitor) { $computer.Accept($visitor) }',
+    '    else { foreach ($hw in $computer.Hardware) { $hw.Update(); foreach ($sub in $hw.SubHardware) { $sub.Update() } } }',
+    '',
     '    $cpuTemp = $null; $cpuMaxClock = $null; $gpuTemp = $null; $gpuLoad = $null; $gpuVramUsed = $null; $gpuVramTotal = $null',
+    '    $mbCpuTemp = $null',
     '    foreach ($hw in $computer.Hardware) {',
-    '      $hw.Update()',
+    '      $allSensors = @($hw.Sensors)',
+    '      foreach ($sub in $hw.SubHardware) { $allSensors += $sub.Sensors }',
     '      $hwType = $hw.HardwareType.ToString()',
     '      if ($hwType -eq "Cpu") {',
-    '        foreach ($sensor in $hw.Sensors) {',
-    '          if (-not $sensor.Value.HasValue) { continue }',
+    '        foreach ($sensor in $allSensors) {',
+    '          if ($null -eq $sensor.Value) { continue }',
+    '          $sv = $sensor.Value',
     '          if ($sensor.SensorType -eq [LibreHardwareMonitor.Hardware.SensorType]::Temperature) {',
     '            $sn = $sensor.Name',
-    '            # Intel: "CPU Package"; AMD: "CPU (Tctl/Tdie)", "Tctl", "Tdie", "Core (Tctl/Tdie)"',
-    '            if ($sn -eq "CPU Package" -or $sn -match "Tctl|Tdie") { $cpuTemp = $sensor.Value.Value }',
-    '            if ($sn -eq "Core Average" -and $cpuTemp -eq $null) { $cpuTemp = $sensor.Value.Value }',
-    '            if ($sn -eq "Core Max" -and $cpuTemp -eq $null) { $cpuTemp = $sensor.Value.Value }',
-    '            # Last resort: any CPU temperature sensor',
-    '            if ($cpuTemp -eq $null -and $sensor.Value.Value -gt 0 -and $sensor.Value.Value -lt 150) { $cpuTemp = $sensor.Value.Value }',
+    '            if ($sn -eq "CPU Package" -or $sn -match "Tctl|Tdie") { $cpuTemp = $sv }',
+    '            if ($sn -eq "Core Average" -and $cpuTemp -eq $null) { $cpuTemp = $sv }',
+    '            if ($sn -eq "Core Max" -and $cpuTemp -eq $null) { $cpuTemp = $sv }',
+    '            if ($sn -match "^Core #" -and $cpuTemp -eq $null) { $cpuTemp = $sv }',
+    '            if ($cpuTemp -eq $null -and $sv -gt 0 -and $sv -lt 150) { $cpuTemp = $sv }',
     '          }',
-    '          # CPU clock from LHM MSR sensors (most accurate real-time boost frequency)',
     '          if ($sensor.SensorType -eq [LibreHardwareMonitor.Hardware.SensorType]::Clock -and $sensor.Name -match "^Core #") {',
-    '            if ($cpuMaxClock -eq $null -or $sensor.Value.Value -gt $cpuMaxClock) { $cpuMaxClock = $sensor.Value.Value }',
+    '            if ($cpuMaxClock -eq $null -or $sv -gt $cpuMaxClock) { $cpuMaxClock = $sv }',
+    '          }',
+    '        }',
+    '      }',
+    '      # Motherboard may have CPU temp sensor via SuperIO chip (Nuvoton, ITE, etc.)',
+    '      if ($hwType -eq "Motherboard") {',
+    '        foreach ($sensor in $allSensors) {',
+    '          if ($null -eq $sensor.Value) { continue }',
+    '          $sv = $sensor.Value',
+    '          if ($sensor.SensorType -eq [LibreHardwareMonitor.Hardware.SensorType]::Temperature) {',
+    '            $sn = $sensor.Name',
+    '            if ($sn -match "CPU|Tctl|Core" -and $sv -gt 0 -and $sv -lt 150) {',
+    '              $mbCpuTemp = $sv',
+    '            }',
     '          }',
     '        }',
     '      }',
     '      if ($hwType -match "Gpu") {',
-    '        foreach ($sensor in $hw.Sensors) {',
-    '          if (-not $sensor.Value.HasValue) { continue }',
+    '        foreach ($sensor in $allSensors) {',
+    '          if ($null -eq $sensor.Value) { continue }',
+    '          $sv = $sensor.Value',
     '          $st = $sensor.SensorType.ToString()',
-    '          # GPU Temperature: "GPU Core" (NVIDIA/AMD) or "GPU Hot Spot" as fallback',
-    '          if ($st -eq "Temperature" -and ($sensor.Name -eq "GPU Core" -or ($sensor.Name -eq "GPU Hot Spot" -and $gpuTemp -eq $null))) { $gpuTemp = $sensor.Value.Value }',
-    '          # GPU Load: "GPU Core" (universal LHM name)',
-    '          if ($st -eq "Load" -and $sensor.Name -eq "GPU Core") { $gpuLoad = $sensor.Value.Value }',
-    '          # GPU VRAM Used: "GPU Memory Used" (standard) or "D3D Dedicated Memory Used" (AMD fallback)',
-    '          if ($st -eq "SmallData" -and ($sensor.Name -eq "GPU Memory Used" -or ($sensor.Name -eq "D3D Dedicated Memory Used" -and $gpuVramUsed -eq $null))) { $gpuVramUsed = $sensor.Value.Value }',
-    '          # GPU VRAM Total: "GPU Memory Total" (standard) or "D3D Dedicated Memory Limit" (AMD fallback)',
-    '          if ($st -eq "SmallData" -and ($sensor.Name -eq "GPU Memory Total" -or ($sensor.Name -eq "D3D Dedicated Memory Limit" -and $gpuVramTotal -eq $null))) { $gpuVramTotal = $sensor.Value.Value }',
+    '          if ($st -eq "Temperature" -and ($sensor.Name -eq "GPU Core" -or ($sensor.Name -eq "GPU Hot Spot" -and $gpuTemp -eq $null))) { $gpuTemp = $sv }',
+    '          if ($st -eq "Load" -and $sensor.Name -eq "GPU Core") { $gpuLoad = $sv }',
+    '          if ($st -eq "SmallData" -and ($sensor.Name -eq "GPU Memory Used" -or ($sensor.Name -eq "D3D Dedicated Memory Used" -and $gpuVramUsed -eq $null))) { $gpuVramUsed = $sv }',
+    '          if ($st -eq "SmallData" -and ($sensor.Name -eq "GPU Memory Total" -or ($sensor.Name -eq "D3D Dedicated Memory Limit" -and $gpuVramTotal -eq $null))) { $gpuVramTotal = $sv }',
     '        }',
     '      }',
     '    }',
+    '',
+    '    # Motherboard SuperIO CPU temp fallback when LHM ring0 cannot read DTS',
+    '    if ($cpuTemp -eq $null -and $mbCpuTemp -ne $null) { $cpuTemp = $mbCpuTemp }',
+    '',
+    '    # ── Diagnostic dump on first iteration ──',
+    '    if ($iteration -eq 0) {',
+    '      $sensorInfo = @()',
+    '      foreach ($hw in $computer.Hardware) {',
+    '        $hwType = $hw.HardwareType.ToString()',
+    '        $allS = @($hw.Sensors)',
+    '        foreach ($sub in $hw.SubHardware) { $allS += $sub.Sensors }',
+    '        $tempSensors = @($allS | Where-Object { $_.SensorType -eq [LibreHardwareMonitor.Hardware.SensorType]::Temperature })',
+    '        $tempWithVal = @($tempSensors | Where-Object { $null -ne $_.Value }).Count',
+    '        $sensorInfo += "HW:$hwType=$($hw.Name)[temps:$tempWithVal/$($tempSensors.Count)]"',
+    '        foreach ($s in $allS) {',
+    '          if ($s.SensorType -eq [LibreHardwareMonitor.Hardware.SensorType]::Temperature) {',
+    '            $v = if ($null -ne $s.Value) { $s.Value } else { "NULL" }',
+    '            $sensorInfo += "  T:$($s.Name)=$v"',
+    '          }',
+    '          if ($s.SensorType -eq [LibreHardwareMonitor.Hardware.SensorType]::Power -and ($null -ne $s.Value)) {',
+    '            $sensorInfo += "  P:$($s.Name)=$($s.Value)"',
+    '          }',
+    '        }',
+    '        foreach ($sub in $hw.SubHardware) {',
+    '          $sensorInfo += "  SUB:$($sub.Name)"',
+    '          foreach ($s in $sub.Sensors) {',
+    '            if ($s.SensorType -eq [LibreHardwareMonitor.Hardware.SensorType]::Temperature) {',
+    '              $v = if ($null -ne $s.Value) { $s.Value } else { "NULL" }',
+    '              $sensorInfo += "    T:$($s.Name)=$v"',
+    '            }',
+    '          }',
+    '        }',
+    '      }',
+    '      [Console]::Error.WriteLine("LHMSENSORS:" + ($sensorInfo -join "|"))',
+    '      [Console]::Error.WriteLine("LHMINFO:CPUTEMP=" + $(if ($cpuTemp -ne $null) { $cpuTemp } else { "NONE" }) + ",VISITOR=" + $(if ($visitor) { "YES" } else { "NO" }) + ",MBTEMP=" + $(if ($mbCpuTemp -ne $null) { $mbCpuTemp } else { "NONE" }))',
+    '    }',
+    '',
+    '    $iteration++',
     '    $parts = @()',
     '    if ($cpuTemp -ne $null) { $parts += "CPUT:" + [math]::Round($cpuTemp, 1) }',
     '    if ($cpuMaxClock -ne $null) { $parts += "CPUCLK:" + [math]::Round($cpuMaxClock, 0) }',
@@ -476,10 +561,8 @@ function startLHMService() {
     '    if ($gpuLoad -ne $null) { $parts += "GPUL:" + [math]::Round($gpuLoad, 1) }',
     '    if ($gpuVramUsed -ne $null) { $parts += "GPUVRU:" + [math]::Round($gpuVramUsed) }',
     '    if ($gpuVramTotal -ne $null) { $parts += "GPUVRT:" + [math]::Round($gpuVramTotal) }',
-    '    # Disk I/O bytes/sec (immediate delta from perf counter)',
     '    if ($diskReadCounter) { try { $parts += "DR:" + [math]::Round($diskReadCounter.NextValue()) } catch {} }',
     '    if ($diskWriteCounter) { try { $parts += "DW:" + [math]::Round($diskWriteCounter.NextValue()) } catch {} }',
-    '    # Process count',
     '    if ($procCounter) { try { $parts += "PROCS:" + [math]::Round($procCounter.NextValue()) } catch {} }',
     '    if ($parts.Count -gt 0) {',
     '      [Console]::Out.WriteLine($parts -join "|")',
@@ -513,11 +596,11 @@ function startLHMService() {
         const v = parseFloat(valStr);
         if (isNaN(v)) continue;
         switch (key) {
-          case 'CPUT': if (v > 0 && v < 150) { _lhmTemp = Math.round(v * 10) / 10; _lhmAvailable = true; } break;
+          case 'CPUT': if (v > 0 && v < 150) { _lhmTemp = Math.round(v * 10) / 10; _lhmAvailable = true; _lhmServiceRunning = true; } break;
           case 'CPUL': if (v >= 0 && v <= 100) _lhmCpuLoad = Math.round(v * 10) / 10; break;
           case 'CPUCLK': if (v > 0 && v < 10000) _lhmCpuClock = Math.round(v); break;
           case 'GPUT': if (v > 0 && v < 150) _lhmGpuTemp = Math.round(v); break;
-          case 'GPUL': if (v >= 0 && v <= 100) _lhmGpuUsage = Math.round(v); break;
+          case 'GPUL': if (v >= 0 && v <= 100) { _lhmGpuUsage = Math.round(v); _lhmServiceRunning = true; } break;
           case 'GPUVRU': if (v >= 0) _lhmGpuVramUsed = Math.round(v); break;
           case 'GPUVRT': if (v > 0) _lhmGpuVramTotal = Math.round(v); break;
           case 'DR': if (v >= 0) _lhmDiskRead = Math.round(v); break;
@@ -528,21 +611,37 @@ function startLHMService() {
     }
   });
 
-  // Log stderr for diagnostics (DLL load failures, sensor errors)
+  // Log stderr for diagnostics (DLL load failures, sensor errors, diagnostics)
   _lhmProcess.stderr.on('data', (data) => {
     const msg = data.toString().trim();
     if (!msg) return;
+    if (msg.startsWith('LHMINFO:')) {
+      console.log('[LHM]', msg);
+      return;
+    }
     if (msg.startsWith('LHMOK:READY')) {
-      // LHM loaded successfully — no need to log in production
+      console.log('[LHM] Service ready');
+      return;
+    }
+    if (msg.startsWith('LHMOK:VISITOR_READY')) {
+      console.log('[LHM] UpdateVisitor compiled — full MSR traversal enabled');
+      return;
+    }
+    if (msg.startsWith('LHMSENSORS:')) {
+      // Sensor dump from first iteration — log for diagnostics
+      const sensors = msg.substring(11).split('|');
+      console.log('[LHM] Sensor dump (' + sensors.length + ' entries):');
+      sensors.forEach(s => console.log('  ' + s));
+      return;
+    }
+    if (msg.startsWith('LHMWARN:')) {
+      console.warn('[LHM]', msg);
       return;
     }
     if (msg.startsWith('LHMERR:')) {
       console.warn('[LHM]', msg);
     } else {
-      // Only log unexpected stderr in dev
-      if (process.env.NODE_ENV === 'development') {
-        console.warn('[LHM] stderr:', msg.substring(0, 300));
-      }
+      console.warn('[LHM] stderr:', msg.substring(0, 300));
     }
   });
 
@@ -551,15 +650,12 @@ function startLHMService() {
       console.warn(`[LHM] Service exited with code ${code}`);
     }
     _lhmProcess = null;
-    // Don't set _lhmAvailable = false so the last reading persists
   });
 
   _lhmProcess.on('error', (err) => {
     console.warn('[LHM] Service error:', err.message);
     _lhmProcess = null;
   });
-
-  // LHM service started silently — errors reported via stderr
 }
 
 function stopLHMService() {
@@ -766,37 +862,29 @@ function _startDiskRefresh() {
 }
 
 function _getStatsImpl() {
-  // ── All reads are instant (0ms) — no PowerShell spawn ──
-  // CPU: from LHM background service (% Processor Utility counter, 500ms refresh)
-  // RAM: from Node.js os.freemem/totalmem (instant kernel call)
-  // Disk: from background cache (refreshed every 10s)
-  // Temp: from LHM background service (real CPU package sensor, 500ms refresh)
-
   let cpu = 0, ram = 0, disk = _cachedDiskPct, temperature = 0;
-
-  // CPU — standalone perf counter service reads % Processor Utility (matches Task Manager)
   if (_perfCpuUtility >= 0) {
     cpu = _perfCpuUtility;
   }
 
-  // RAM — instant Node.js kernel call
   const totalMem = os.totalmem();
   const freeMem = os.freemem();
   if (totalMem > 0) ram = Math.round(((totalMem - freeMem) / totalMem) * 1000) / 10;
 
-  // Temperature — from LHM (real sensor)
   if (_lhmAvailable && _lhmTemp > 0) {
     temperature = _lhmTemp;
     _tempSource = 'lhm';
-  }
-
-  // Temperature estimation fallback
-  if (temperature === 0) {
-    _tempSource = 'estimation';
-    const jitter = Math.sin(Date.now() / 5000) * 1.5;
-    temperature = Math.round((38 + cpu * 0.45 + jitter) * 10) / 10;
+  } else {
+    const baseClock = os.cpus()[0]?.speed || 3700;
+    const boostRatio = (_lhmCpuClock > 0) ? Math.min(_lhmCpuClock / baseClock, 1.5) : 1.0;
+    const targetTemp = 35 + (cpu * 0.45) + ((boostRatio - 1.0) * 20) + (cpu > 80 ? (cpu - 80) * 0.3 : 0);
+    const alpha = 0.15;
+    _estimatedTemp += (targetTemp - _estimatedTemp) * alpha;
+    const jitter = Math.sin(Date.now() / 3000) * 0.5;
+    temperature = Math.round((_estimatedTemp + jitter) * 10) / 10;
     if (temperature < 30) temperature = 30;
     if (temperature > 95) temperature = 95;
+    _tempSource = 'estimation';
   }
 
   _lastStats = {
@@ -943,16 +1031,14 @@ function _startRealtimePush() {
     if (!mainWindow || mainWindow.isDestroyed()) return;
 
     try {
-      // SI calls run in parallel — mem, network, temp only (CPU comes from perf counters)
-      const [memData, netData, tempData] = await Promise.allSettled([
+      // SI calls run in parallel — mem, network only (CPU comes from perf counters, temp from LHM/estimation)
+      const [memData, netData] = await Promise.allSettled([
         si.mem(),                   // Memory usage (instant kernel call)
         si.networkStats('*'),       // Network throughput per interface (delta-based tx_sec/rx_sec)
-        si.cpuTemperature(),        // CPU temp from ACPI/WMI (fallback when LHM unavailable)
       ]);
 
       const mem = memData.status === 'fulfilled' ? memData.value : null;
       const net = netData.status === 'fulfilled' ? netData.value : null;
-      const siTemp = tempData.status === 'fulfilled' ? tempData.value : null;
 
       // ── Compute real-time CPU clock from perf counter ──
       // % Processor Performance = (current_freq / base_freq) × 100
@@ -971,19 +1057,23 @@ function _startRealtimePush() {
       // Matches Task Manager exactly. No SI fallback needed.
       let resolvedCpu = _perfCpuUtility >= 0 ? _perfCpuUtility : 0;
 
-      // ── Resolve temperature (priority: LHM → SI ACPI → estimation) ──
+      // ── Resolve temperature (priority: LHM → smart estimation) ──
+      // Note: SI ACPI (si.cpuTemperature) returns static ACPI thermal zone on desktop
+      // boards (e.g. 27°C constant), so we skip it entirely and use smart estimation.
       let resolvedTemp = 0;
       let tempSource = 'none';
       if (_lhmAvailable && _lhmTemp > 0) {
         resolvedTemp = _lhmTemp;
         tempSource = 'lhm';
-      } else if (siTemp && siTemp.main > 0 && siTemp.main < 150) {
-        resolvedTemp = Math.round(siTemp.main * 10) / 10;
-        tempSource = 'si-acpi';
       } else {
-        // Estimation fallback (same as _getStatsImpl)
-        const jitter = Math.sin(Date.now() / 5000) * 1.5;
-        resolvedTemp = Math.round((38 + resolvedCpu * 0.45 + jitter) * 10) / 10;
+        // Smart estimation using CPU load + clock boost ratio + thermal inertia
+        const baseClock = os.cpus()[0]?.speed || 3700;
+        const boostRatio = (_lhmCpuClock > 0) ? Math.min(_lhmCpuClock / baseClock, 1.5) : 1.0;
+        const targetTemp = 35 + (resolvedCpu * 0.45) + ((boostRatio - 1.0) * 20) + (resolvedCpu > 80 ? (resolvedCpu - 80) * 0.3 : 0);
+        const alpha = 0.15;
+        _estimatedTemp += (targetTemp - _estimatedTemp) * alpha;
+        const jitter = Math.sin(Date.now() / 3000) * 0.5;
+        resolvedTemp = Math.round((_estimatedTemp + jitter) * 10) / 10;
         if (resolvedTemp < 30) resolvedTemp = 30;
         if (resolvedTemp > 95) resolvedTemp = 95;
         tempSource = 'estimation';
@@ -992,7 +1082,7 @@ function _startRealtimePush() {
       // Log temp source only when falling back to estimation (indicates LHM/SI issue)
       if (!_rtLastTempSource || _rtLastTempSource !== tempSource) {
         if (tempSource === 'estimation') {
-          console.warn(`[RT] Temperature using estimation fallback (lhmTemp: ${_lhmTemp}, siTemp: ${siTemp?.main ?? 'n/a'})`);
+          console.warn(`[RT] Temperature using estimation (lhmTemp: ${_lhmTemp}, lhmAvailable: ${_lhmAvailable}, lhmService: ${_lhmServiceRunning})`);
         }
         _rtLastTempSource = tempSource;
       }
