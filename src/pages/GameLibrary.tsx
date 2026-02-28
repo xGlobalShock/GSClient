@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, X, Monitor, Cpu, ArrowLeft, Copy, Info, Shield } from 'lucide-react';
+import { Search, X, Monitor, Cpu, ArrowLeft, Copy, Info, Shield, Gamepad2 } from 'lucide-react';
+import PageHeader from '../components/PageHeader';
 import '../styles/GameLibrary.css';
 import valorantImg from '../assets/Valorant.jpg';
 import rocketLeagueImg from '../assets/Rocket League Banner.jpg';
@@ -313,6 +314,7 @@ const GameLibrary: React.FC = () => {
 
   return (
     <div className="gl-container">
+      <PageHeader icon={<Gamepad2 size={16} />} title="Game Presets" />
       <AnimatePresence mode="wait">
         {!selectedGame ? (
           <motion.div

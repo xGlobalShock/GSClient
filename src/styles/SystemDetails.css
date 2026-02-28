@@ -46,6 +46,7 @@
 .hud-bento-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
+  grid-auto-rows: auto;
   gap: 16px;
 }
 
@@ -55,12 +56,16 @@
 @media (max-width: 1100px) {
   .hud-bento-grid {
     grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: auto;
+    grid-auto-rows: auto;
   }
 }
 
 @media (max-width: 680px) {
   .hud-bento-grid {
     grid-template-columns: 1fr;
+    grid-template-rows: auto;
+    grid-auto-rows: auto;
   }
 }
 
@@ -69,16 +74,20 @@
 ══════════════════════════════════════════════════════ */
 .hud-bento-card {
   position: relative;
-  background: rgba(8, 10, 18, 0.65);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(0, 242, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  background: rgba(6, 8, 16, 0.55);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(0, 242, 255, 0.07);
   border-radius: 16px;
   overflow: hidden;
-  transition: transform 0.25s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.4s ease, box-shadow 0.4s ease;
   box-shadow:
-    0 2px 24px rgba(0, 0, 0, 0.5),
-    inset 0 1px 0 rgba(0, 242, 255, 0.04);
+    0 2px 20px rgba(0, 0, 0, 0.45),
+    0 0 1px rgba(0, 242, 255, 0.06),
+    inset 0 1px 0 rgba(0, 242, 255, 0.04),
+    inset 0 0 40px rgba(0, 242, 255, 0.008);
 }
 
 /* Subtle gradient sheen */
@@ -86,18 +95,20 @@
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(145deg, rgba(0, 242, 255, 0.03) 0%, transparent 50%, rgba(0, 255, 136, 0.015) 100%);
+  background: linear-gradient(145deg, rgba(0, 242, 255, 0.025) 0%, transparent 45%, rgba(0, 255, 136, 0.01) 100%);
   pointer-events: none;
   border-radius: inherit;
+  z-index: 1;
 }
 
 .hud-bento-card:hover {
   transform: translateY(-2px);
-  border-color: rgba(0, 242, 255, 0.18);
+  border-color: rgba(0, 242, 255, 0.16);
   box-shadow:
-    0 12px 40px rgba(0, 0, 0, 0.6),
-    0 0 0 1px rgba(0, 242, 255, 0.06),
-    0 0 30px rgba(0, 242, 255, 0.04);
+    0 8px 32px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(0, 242, 255, 0.05),
+    0 0 24px rgba(0, 242, 255, 0.03),
+    inset 0 0 40px rgba(0, 242, 255, 0.012);
 }
 
 /* ── Breathing pulse for high-load cards ── */
@@ -153,10 +164,37 @@
     0deg,
     transparent,
     transparent 2px,
-    rgba(0, 242, 255, 0.008) 2px,
-    rgba(0, 242, 255, 0.008) 4px
+    rgba(0, 242, 255, 0.005) 2px,
+    rgba(0, 242, 255, 0.005) 4px
   );
   border-radius: inherit;
+}
+
+/* ── Animated scan line — sweeps down the card for live HUD feel ── */
+.hud-scan-line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(0, 242, 255, 0.2) 35%,
+    rgba(0, 242, 255, 0.35) 50%,
+    rgba(0, 242, 255, 0.2) 65%,
+    transparent 100%);
+  box-shadow: 0 0 8px rgba(0, 242, 255, 0.15);
+  animation: hud-live-scan 4s ease-in-out infinite;
+  z-index: 10;
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+@keyframes hud-live-scan {
+  0%   { top: 0%;   opacity: 0; }
+  8%   { opacity: 0.6; }
+  92%  { opacity: 0.6; }
+  100% { top: 100%; opacity: 0; }
 }
 
 /* ── Corner accent marks ── */
@@ -166,34 +204,45 @@
   height: 10px;
   z-index: 2;
   pointer-events: none;
+  transition: border-color 0.4s ease;
 }
 
 .hud-corner-tl {
   top: 0; left: 0;
-  border-top: 1px solid rgba(0, 242, 255, 0.3);
-  border-left: 1px solid rgba(0, 242, 255, 0.3);
+  border-top: 1px solid rgba(0, 242, 255, 0.25);
+  border-left: 1px solid rgba(0, 242, 255, 0.25);
   border-radius: 16px 0 0 0;
 }
 
 .hud-corner-tr {
   top: 0; right: 0;
-  border-top: 1px solid rgba(0, 242, 255, 0.3);
-  border-right: 1px solid rgba(0, 242, 255, 0.3);
+  border-top: 1px solid rgba(0, 242, 255, 0.25);
+  border-right: 1px solid rgba(0, 242, 255, 0.25);
   border-radius: 0 16px 0 0;
 }
 
 .hud-corner-bl {
   bottom: 0; left: 0;
-  border-bottom: 1px solid rgba(0, 242, 255, 0.15);
-  border-left: 1px solid rgba(0, 242, 255, 0.15);
+  border-bottom: 1px solid rgba(0, 242, 255, 0.12);
+  border-left: 1px solid rgba(0, 242, 255, 0.12);
   border-radius: 0 0 0 16px;
 }
 
 .hud-corner-br {
   bottom: 0; right: 0;
-  border-bottom: 1px solid rgba(0, 242, 255, 0.15);
-  border-right: 1px solid rgba(0, 242, 255, 0.15);
+  border-bottom: 1px solid rgba(0, 242, 255, 0.12);
+  border-right: 1px solid rgba(0, 242, 255, 0.12);
   border-radius: 0 0 16px 0;
+}
+
+.hud-bento-card:hover .hud-corner-tl,
+.hud-bento-card:hover .hud-corner-tr {
+  border-color: rgba(0, 242, 255, 0.4);
+}
+
+.hud-bento-card:hover .hud-corner-bl,
+.hud-bento-card:hover .hud-corner-br {
+  border-color: rgba(0, 242, 255, 0.25);
 }
 
 /* ── Top accent line (usage fill) ── */
@@ -217,6 +266,22 @@
   padding: 16px 18px 18px;
   position: relative;
   z-index: 2;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Bottom edge glow — subtle ground reflection ── */
+.hud-bento-card::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 10%;
+  right: 10%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0, 242, 255, 0.08), transparent);
+  pointer-events: none;
+  z-index: 3;
 }
 
 /* ══════════════════════════════════════════════════════
@@ -236,11 +301,17 @@
   width: 36px;
   height: 36px;
   border-radius: 10px;
-  background: rgba(0, 242, 255, 0.06);
-  border: 1px solid rgba(0, 242, 255, 0.12);
+  background: rgba(0, 242, 255, 0.05);
+  border: 1px solid rgba(0, 242, 255, 0.1);
   color: #00F2FF;
   flex-shrink: 0;
-  filter: drop-shadow(0 0 3px rgba(0, 242, 255, 0.3));
+  filter: drop-shadow(0 0 4px rgba(0, 242, 255, 0.25));
+  transition: background 0.3s ease, border-color 0.3s ease;
+}
+
+.hud-bento-card:hover .hud-card-icon {
+  background: rgba(0, 242, 255, 0.08);
+  border-color: rgba(0, 242, 255, 0.18);
 }
 
 .hud-card-title-group {
@@ -314,6 +385,7 @@
 .hud-card-body {
   display: flex;
   flex-direction: column;
+  flex: 1;
 }
 
 .hud-row {
@@ -321,26 +393,33 @@
   justify-content: space-between;
   align-items: center;
   gap: 8px;
-  padding: 5px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.025);
+  padding: 5.5px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.02);
+  transition: background 0.2s ease;
 }
 
 .hud-row:last-child {
   border-bottom: none;
 }
 
+.hud-row:hover {
+  background: rgba(0, 242, 255, 0.015);
+  border-radius: 4px;
+}
+
 .hud-label {
   font-size: 11px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.3);
+  color: rgba(255, 255, 255, 0.28);
   white-space: nowrap;
   flex-shrink: 0;
+  letter-spacing: 0.2px;
 }
 
 .hud-value {
   font-size: 11px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.78);
+  color: rgba(255, 255, 255, 0.82);
   text-align: right;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -351,7 +430,7 @@
 .hud-accent {
   color: #00F2FF !important;
   font-weight: 700 !important;
-  text-shadow: 0 0 8px rgba(0, 242, 255, 0.3);
+  text-shadow: 0 0 6px rgba(0, 242, 255, 0.25);
 }
 
 /* ══════════════════════════════════════════════════════
@@ -559,55 +638,93 @@
 }
 
 /* ══════════════════════════════════════════════════════
-   Per-Core Heat Map
+   Per-Core Equalizer
 ══════════════════════════════════════════════════════ */
-.hud-heatmap-wrap {
-  padding-top: 10px;
+.hud-eq-wrap {
+  padding-top: 8px;
 }
 
-.hud-heatmap-label {
+.hud-eq-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.hud-eq-label {
   font-size: 10px;
   font-weight: 700;
   color: rgba(255, 255, 255, 0.22);
   text-transform: uppercase;
   letter-spacing: 1.2px;
-  margin-bottom: 8px;
 }
 
-.hud-heatmap-grid {
+.hud-eq-avg {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  transition: color 0.5s ease;
+}
+
+/* Container: holds all vertical bars side-by-side */
+.hud-eq-bars {
   display: flex;
-  gap: 3px;
-  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 2px;
+  height: 32px;
+  padding: 0 1px;
+  background: rgba(255, 255, 255, 0.01);
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.02);
 }
 
-.hud-heatmap-cell {
-  width: 16px;
-  height: 22px;
-  border-radius: 3px;
-  background: rgba(0, 242, 255, 0.06);
-  transition: background 0.4s ease, box-shadow 0.4s ease;
-  cursor: default;
+/* Single column */
+.hud-eq-col {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  min-width: 0;
+}
+
+/* Vertical track */
+.hud-eq-track {
+  width: 100%;
+  height: 100%;
   position: relative;
+  display: flex;
+  align-items: flex-end;
+  border-radius: 2px 2px 0 0;
+  overflow: hidden;
 }
 
-.hud-heatmap-cell::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  border: 1px solid rgba(255, 255, 255, 0.04);
-  pointer-events: none;
+/* Fill bar — grows upward */
+.hud-eq-fill {
+  width: 100%;
+  border-radius: 2px 2px 0 0;
+  transition: height 0.8s cubic-bezier(0.4, 0, 0.2, 1),
+              background 0.5s ease,
+              box-shadow 0.5s ease;
+  min-height: 1px;
 }
 
-.hud-heatmap-shimmer {
+/* Shimmer for loading state */
+.hud-eq-shimmer {
+  height: 40% !important;
   background: linear-gradient(
-    135deg,
+    0deg,
     rgba(0, 242, 255, 0.04) 0%,
-    rgba(0, 242, 255, 0.12) 50%,
+    rgba(0, 242, 255, 0.1) 50%,
     rgba(0, 242, 255, 0.04) 100%
-  );
-  background-size: 200% 200%;
-  animation: hud-heat-pulse 1.6s ease-in-out infinite;
+  ) !important;
+  background-size: 100% 200% !important;
+  animation: hud-eq-pulse 1.4s ease-in-out infinite !important;
+  box-shadow: none !important;
+}
+
+@keyframes hud-eq-pulse {
+  0%, 100% { background-position: 0 200%; opacity: 0.3; }
+  50%      { background-position: 0 0%;   opacity: 0.7; }
 }
 
 @keyframes hud-heat-pulse {
@@ -659,58 +776,194 @@
 /* ══════════════════════════════════════════════════════
    Drive List
 ══════════════════════════════════════════════════════ */
-.hud-drives-section {
-  padding-top: 8px;
+/* ══════════════════════════════════════════════════════
+   Storage Card — Futuristic Compact
+══════════════════════════════════════════════════════ */
+
+/* ── Diagnostic readout cells ── */
+.hud-stor-diag {
+  display: flex;
+  gap: 1px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(0, 242, 255, 0.05);
+  background: rgba(0, 242, 255, 0.03);
+  margin-top: 2px;
+}
+
+.hud-stor-diag-cell {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 9px 11px;
+  background: rgba(6, 8, 16, 0.45);
+  transition: background 0.2s ease;
+}
+
+.hud-stor-diag-cell:hover {
+  background: rgba(6, 8, 16, 0.25);
+}
+
+.hud-stor-diag-top {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.hud-stor-diag-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  animation: hud-net-dot-pulse 2s ease-in-out infinite;
+}
+
+.hud-stor-diag-key {
+  font-size: 9px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.2);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.hud-stor-diag-val {
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.3px;
+  text-transform: uppercase;
+}
+
+.hud-stor-diag-sub {
+  font-size: 8px;
+  color: rgba(255, 255, 255, 0.13);
+  letter-spacing: 0.3px;
+}
+
+/* ── Compact R/W speed strip ── */
+.hud-stor-section-hdr {
+  font-size: 9px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.18);
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  padding-top: 25px;
+}
+
+/* ── Compact R/W speed strip ── */
+.hud-stor-speed {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin-top: 4px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: rgba(6, 8, 16, 0.5);
+  border: 1px solid rgba(0, 242, 255, 0.04);
+}
+
+.hud-stor-speed-half {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  justify-content: center;
+}
+
+.hud-stor-speed-div {
+  width: 1px;
+  height: 14px;
+  background: rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+}
+
+.hud-stor-speed-ic {
+  flex-shrink: 0;
+  opacity: 0.55;
+}
+
+.hud-stor-speed-ic.read  { color: #00F2FF; }
+.hud-stor-speed-ic.write { color: #FFA800; }
+
+.hud-stor-speed-val {
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.2px;
+}
+
+.hud-stor-speed-val.read  { color: #00F2FF; }
+.hud-stor-speed-val.write { color: #FFA800; }
+
+/* ── Volume rows with segmented power cells ── */
+.hud-stor-vols {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  padding-top: 6px;
 }
 
-.hud-drives-title {
-  font-size: 10px;
+.hud-stor-vols-hdr {
+  font-size: 9px;
   font-weight: 700;
-  color: rgba(255, 255, 255, 0.22);
+  color: rgba(255, 255, 255, 0.18);
   text-transform: uppercase;
   letter-spacing: 1.2px;
-  margin-bottom: 2px;
 }
 
-.hud-drive-row {
+.hud-stor-vol {
   display: flex;
   align-items: center;
   gap: 8px;
+  padding: 5px 0;
 }
 
-.hud-drive-letter {
+.hud-stor-vol-id {
   font-size: 11px;
+  font-weight: 900;
+  width: 18px;
+  flex-shrink: 0;
+  letter-spacing: -0.4px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Segmented cells container */
+.hud-stor-vol-cells {
+  flex: 1;
+  display: flex;
+  gap: 2px;
+  align-items: center;
+}
+
+.hud-stor-cell {
+  flex: 1;
+  height: 8px;
+  border-radius: 1.5px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.03);
+  transition: background 0.6s ease, box-shadow 0.6s ease, border-color 0.4s ease;
+}
+
+.hud-stor-cell.lit {
+  border-color: transparent;
+}
+
+.hud-stor-vol-pct {
+  font-size: 10px;
   font-weight: 800;
-  color: rgba(0, 242, 255, 0.5);
-  width: 22px;
+  font-variant-numeric: tabular-nums;
+  width: 28px;
+  text-align: right;
   flex-shrink: 0;
 }
 
-.hud-drive-bar-track {
-  flex: 1;
-  height: 4px;
-  background: rgba(255, 255, 255, 0.04);
-  border-radius: 999px;
-  overflow: hidden;
-}
-
-.hud-drive-bar-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #00F2FF00, #00F2FF);
-  box-shadow: 0 0 6px rgba(0, 242, 255, 0.35);
-  border-radius: 999px;
-  transition: width 0.9s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.hud-drive-info {
-  font-size: 10px;
-  color: rgba(255, 255, 255, 0.25);
+.hud-stor-vol-free {
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.2);
   white-space: nowrap;
   flex-shrink: 0;
-  min-width: 56px;
+  width: 48px;
   text-align: right;
 }
 
@@ -773,5 +1026,412 @@
   color: rgba(255, 255, 255, 0.18);
   font-style: italic;
   padding-top: 4px;
+}
+
+/* ══════════════════════════════════════════════════════
+   Link Speed Rows (multi-adapter)
+══════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════
+   Network Card
+══════════════════════════════════════════════════════ */
+
+/* ── Adapter row (Ethernet / Wi-Fi) ── */
+.hud-net-adapters {
+  padding: 6px 0 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.hud-net-adapter {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: rgba(0, 242, 255, 0.02);
+  border: 1px solid rgba(0, 242, 255, 0.05);
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.hud-net-adapter:hover {
+  background: rgba(0, 242, 255, 0.04);
+  border-color: rgba(0, 242, 255, 0.1);
+}
+
+.hud-net-adapter-icon {
+  color: #00F2FF;
+  opacity: 0.5;
+  display: flex;
+  flex-shrink: 0;
+}
+
+.hud-net-adapter-name {
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.4);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.hud-net-wifi-sig {
+  font-size: 9px;
+  font-weight: 700;
+  color: #FFC107;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: rgba(255, 193, 7, 0.06);
+  border: 1px solid rgba(255, 193, 7, 0.1);
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.hud-net-adapter-speed {
+  font-size: 9px;
+  font-weight: 700;
+  color: #00F2FF;
+  white-space: nowrap;
+  margin-left: auto;
+  letter-spacing: 0.2px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: rgba(0, 242, 255, 0.06);
+  border: 1px solid rgba(0, 242, 255, 0.1);
+}
+
+.hud-net-adapter-lbl {
+  font-size: 9px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.18);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.hud-net-adapter-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.hud-net-wifi-sig + .hud-net-adapter-speed,
+.hud-net-adapter-lbl + .hud-net-adapter-speed {
+  margin-left: 0;
+}
+
+/* ── Realtime Stats Panel ── */
+.hud-net-rt {
+  display: flex;
+  gap: 1px;
+  margin-top: 6px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(0, 242, 255, 0.05);
+  background: rgba(0, 242, 255, 0.03);
+}
+
+.hud-net-rt-stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  background: rgba(6, 8, 16, 0.45);
+  transition: background 0.2s ease;
+}
+
+.hud-net-rt-stat:hover {
+  background: rgba(6, 8, 16, 0.3);
+}
+
+.hud-net-rt-head {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.hud-net-rt-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  animation: hud-net-dot-pulse 2s ease-in-out infinite;
+}
+
+@keyframes hud-net-dot-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+.hud-net-rt-pulse {
+  color: #00F2FF;
+  opacity: 0.35;
+  animation: hud-net-dot-pulse 2s ease-in-out infinite;
+}
+
+.hud-net-rt-key {
+  font-size: 9px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.2);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.hud-net-rt-badge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 3px;
+  border: 1px solid;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.hud-net-rt-big {
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.5px;
+}
+
+.hud-net-rt-big small {
+  font-size: 10px;
+  font-weight: 600;
+  opacity: 0.5;
+  margin-left: 2px;
+  letter-spacing: 0;
+}
+
+/* ── Throughput bars inside rt-stat ── */
+.hud-net-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hud-net-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hud-net-bar-icon {
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.hud-net-bar-icon.dn {
+  color: #00F2FF;
+}
+
+.hud-net-bar-icon.up {
+  color: #FFA800;
+}
+
+.hud-net-bar-track {
+  flex: 1;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.hud-net-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hud-net-bar-fill.dn {
+  background: linear-gradient(90deg, rgba(0, 242, 255, 0), #00F2FF);
+  box-shadow: 0 0 6px rgba(0, 242, 255, 0.3);
+}
+
+.hud-net-bar-fill.up {
+  background: linear-gradient(90deg, rgba(255, 168, 0, 0), #FFA800);
+  box-shadow: 0 0 6px rgba(255, 168, 0, 0.25);
+}
+
+.hud-net-bar-val {
+  font-size: 10px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  min-width: 52px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.hud-net-bar-val.dn {
+  color: #00F2FF;
+}
+
+.hud-net-bar-val.up {
+  color: #FFA800;
+}
+
+/* ══════════════════════════════════════════════════════
+   System Card — Realtime Panel (matches Network style)
+══════════════════════════════════════════════════════ */
+.hud-sys-rt {
+  display: flex;
+  gap: 1px;
+  margin-top: 6px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(0, 242, 255, 0.05);
+  background: rgba(0, 242, 255, 0.03);
+}
+
+.hud-sys-rt-stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  background: rgba(6, 8, 16, 0.45);
+  transition: background 0.2s ease;
+}
+
+.hud-sys-rt-stat:hover {
+  background: rgba(6, 8, 16, 0.3);
+}
+
+.hud-sys-rt-head {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.hud-sys-rt-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  animation: hud-net-dot-pulse 2s ease-in-out infinite;
+}
+
+.hud-sys-rt-key {
+  font-size: 9px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.2);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.hud-sys-rt-big {
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1;
+  color: #00F2FF;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.3px;
+}
+
+.hud-sys-rt-zap {
+  color: #FFA800;
+  opacity: 0.6;
+  animation: hud-net-dot-pulse 2s ease-in-out infinite;
+}
+
+.hud-sys-rt-plan {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.65);
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hud-sys-rt-batt {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 2px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #00FF88;
+  opacity: 0.8;
+}
+
+/* ── Usage RT panels (VRAM / RAM) — matches Network rt style ── */
+.hud-usage-rt {
+  display: flex;
+  gap: 1px;
+  margin-top: 6px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(0, 242, 255, 0.05);
+  background: rgba(0, 242, 255, 0.03);
+}
+
+.hud-usage-rt-stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  background: rgba(6, 8, 16, 0.45);
+  transition: background 0.2s ease;
+}
+
+.hud-usage-rt-stat:hover {
+  background: rgba(6, 8, 16, 0.3);
+}
+
+.hud-usage-rt-head {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.hud-usage-rt-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  animation: hud-net-dot-pulse 2s ease-in-out infinite;
+}
+
+.hud-usage-rt-key {
+  font-size: 9px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.2);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.hud-usage-rt-big {
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.5px;
+}
+
+.hud-usage-rt-big small {
+  font-size: 10px;
+  font-weight: 600;
+  opacity: 0.5;
+  margin-left: 2px;
+  letter-spacing: 0;
+}
+
+.hud-usage-rt-track {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-top: 2px;
+}
+
+.hud-usage-rt-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
 }
 

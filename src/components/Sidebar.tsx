@@ -153,11 +153,11 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage, online: 
   }, [onlineProp]);
 
   const menuItems: MenuItem[] = useMemo(() => [
-    { id: 'dashboard', label: 'Dashboard', icon: Home },
-    { id: 'performance', label: 'Performance', icon: Activity },
-    { id: 'gameLibrary', label: 'Game Library', icon: Gamepad2 },
-    { id: 'obsPresets', label: 'OBS Presets', icon: Video },
-    { id: 'cleaner', label: 'Cleaner', icon: Trash2 },
+    { id: 'dashboard', label: 'System Details', icon: Home },
+    { id: 'performance', label: 'PC Tweaks', icon: Activity },
+    { id: 'gameLibrary', label: 'Game Presets', icon: Gamepad2 },
+    { id: 'obsPresets', label: 'Streaming Presets', icon: Video },
+    { id: 'cleaner', label: 'Cleanup Toolkit', icon: Trash2 },
     { id: 'settings', label: 'Settings', icon: Settings },
   ], []);
 

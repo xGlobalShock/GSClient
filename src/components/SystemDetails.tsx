@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import {
   Cpu, MonitorSpeaker, MemoryStick, HardDrive,
   Network, Wifi, Zap, Battery, Monitor, Server,
-  ArrowUp, ArrowDown, Activity, Gauge,
+  ArrowUp, ArrowDown, Activity, Gauge, Clock,
 } from 'lucide-react';
 import type { HardwareInfo, ExtendedStats } from '../App';
 import '../styles/SystemDetails.css';
@@ -19,6 +19,7 @@ interface SystemDetailsProps {
   };
   hardwareInfo?: HardwareInfo;
   extendedStats?: ExtendedStats;
+  hideHeader?: boolean; // when true, skip the internal section header (outer page already has one)
 }
 
 /* ═══════════════════════════════════════════
@@ -195,19 +196,25 @@ const SKELETON_CARDS = [
   { cls: 'hud-tile-sys',     icon: <Monitor size={18} />,        title: 'SYSTEM',     rows: 4 },
 ];
 
-const SkeletonLoading: React.FC = () => (
+interface SkeletonProps {
+  hideHeader?: boolean;
+}
+
+const SkeletonLoading: React.FC<SkeletonProps> = ({ hideHeader }) => (
   <motion.section
     className="hud-section"
     initial={{ opacity: 0 }}
     animate={{ opacity: 1 }}
     transition={{ duration: 0.35 }}
   >
-    {/* Header */}
-    <div className="hud-section-header">
-      <div className="hud-section-icon"><Server size={16} /></div>
-      <h3 className="hud-section-title">SYSTEM DETAILS</h3>
-      <div className="hud-section-line" />
-    </div>
+    {/* Header - may be hidden when outer page already has one */}
+    {!hideHeader && (
+      <div className="hud-section-header">
+        <div className="hud-section-icon"><Server size={16} /></div>
+        <h3 className="hud-section-title">SYSTEM DETAILS</h3>
+        <div className="hud-section-line" />
+      </div>
+    )}
 
     {/* Skeleton status bar */}
     <div className="hud-skel-status">
@@ -293,47 +300,48 @@ const IOStrip: React.FC<{ up: string; down: string }> = ({ up, down }) => (
 );
 
 /* ═══════════════════════════════════════════
-   Per-Core Heat Map
+   Per-Core Equalizer
 ═══════════════════════════════════════════ */
 const CoreHeatMap: React.FC<{ cores: number[]; threadCount?: number; loading?: boolean }> = ({
   cores, threadCount, loading,
 }) => {
-  const getHeatColor = (pct: number) => {
-    if (pct < 25) return '#00F2FF';
-    if (pct < 50) return '#00D4AA';
-    if (pct < 75) return '#FFD600';
+  const getBarColor = (pct: number) => {
+    if (pct < 30) return '#00F2FF';
+    if (pct < 60) return '#00D4AA';
+    if (pct < 85) return '#FFD600';
     return '#FF2D55';
   };
 
-  if (loading) {
-    return (
-      <div className="hud-heatmap-wrap">
-        <div className="hud-heatmap-label">PER-CORE</div>
-        <div className="hud-heatmap-grid">
-          {Array.from({ length: threadCount || 8 }).map((_, i) => (
-            <div key={i} className="hud-heatmap-cell hud-heatmap-shimmer" />
-          ))}
-        </div>
-      </div>
-    );
-  }
+  const count = loading ? (threadCount || 8) : cores.length;
+  const avg = !loading && cores.length > 0
+    ? Math.round(cores.reduce((a, b) => a + b, 0) / cores.length)
+    : 0;
 
   return (
-    <div className="hud-heatmap-wrap">
-      <div className="hud-heatmap-label">PER-CORE</div>
-      <div className="hud-heatmap-grid">
-        {cores.map((pct, i) => {
-          const color = getHeatColor(pct);
+    <div className="hud-eq-wrap">
+      <div className="hud-eq-header">
+        <span className="hud-eq-label">PER-CORE</span>
+        {!loading && cores.length > 0 && (
+          <span className="hud-eq-avg" style={{ color: getBarColor(avg) }}>{avg}%</span>
+        )}
+      </div>
+      <div className="hud-eq-bars">
+        {Array.from({ length: count }).map((_, i) => {
+          const pct = loading ? 0 : Math.min(cores[i] ?? 0, 100);
+          const color = getBarColor(pct);
           return (
-            <div
-              key={i}
-              className="hud-heatmap-cell"
-              title={`Core ${i}: ${pct}%`}
-              style={{
-                background: `${color}${Math.max(Math.round(pct * 2.55), 18).toString(16).padStart(2, '0')}`,
-                boxShadow: pct > 50 ? `0 0 6px ${color}44` : 'none',
-              }}
-            />
+            <div key={i} className="hud-eq-col" title={`Thread ${i}: ${Math.round(pct)}%`}>
+              <div className="hud-eq-track">
+                <div
+                  className={`hud-eq-fill ${loading ? 'hud-eq-shimmer' : ''}`}
+                  style={{
+                    height: loading ? '0%' : `${pct}%`,
+                    background: loading ? undefined : `linear-gradient(to top, ${color}44, ${color})`,
+                    boxShadow: pct > 50 ? `0 0 8px ${color}40, inset 0 0 4px ${color}20` : 'none',
+                  }}
+                />
+              </div>
+            </div>
           );
         })}
       </div>
@@ -366,6 +374,8 @@ const BentoCard: React.FC<{
   >
     {/* Scanline overlay */}
     <div className="hud-scanline-overlay" />
+    {/* Animated scan line */}
+    <div className="hud-scan-line" />
     {/* Corner accents */}
     <div className="hud-corner hud-corner-tl" />
     <div className="hud-corner hud-corner-tr" />
@@ -400,14 +410,14 @@ const BentoCard: React.FC<{
 /* ═══════════════════════════════════════════
    Main SystemDetails Component
 ═══════════════════════════════════════════ */
-const SystemDetails: React.FC<SystemDetailsProps> = ({ systemStats, hardwareInfo, extendedStats }) => {
+const SystemDetails: React.FC<SystemDetailsProps> = ({ systemStats, hardwareInfo, extendedStats, hideHeader }) => {
   const hw = hardwareInfo;
   const ext = extendedStats;
   const s = systemStats;
 
   // ── Show skeleton while no meaningful data has arrived ──
   const hasAnyData = (s && s.cpu > 0) || hw || ext;
-  if (!hasAnyData) return <SkeletonLoading />;
+  if (!hasAnyData) return <SkeletonLoading hideHeader={hideHeader} />;
 
   const gpuUsage = ext?.gpuUsage != null && ext.gpuUsage >= 0 ? ext.gpuUsage : (s?.gpuUsage ?? -1);
   const gpuTemp = ext?.gpuTemp != null && ext.gpuTemp >= 0 ? ext.gpuTemp : (s?.gpuTemp ?? -1);
@@ -438,12 +448,14 @@ const SystemDetails: React.FC<SystemDetailsProps> = ({ systemStats, hardwareInfo
     >
       <HudGradients />
 
-      {/* Section Header */}
-      <div className="hud-section-header">
-        <div className="hud-section-icon"><Server size={16} /></div>
-        <h3 className="hud-section-title">SYSTEM DETAILS</h3>
-        <div className="hud-section-line" />
-      </div>
+      {/* Section Header (skip if hideHeader) */}
+      {!hideHeader && (
+        <div className="hud-section-header">
+          <div className="hud-section-icon"><Server size={16} /></div>
+          <h3 className="hud-section-title">SYSTEM DETAILS</h3>
+          <div className="hud-section-line" />
+        </div>
+      )}
 
       {/* Bento Grid */}
       <div className="hud-bento-grid">
@@ -504,14 +516,26 @@ const SystemDetails: React.FC<SystemDetailsProps> = ({ systemStats, hardwareInfo
           {hasGpu ? (
             <>
               <Row label="GPU Temp" value={gpuTemp >= 0 ? `${Math.trunc(gpuTemp)}°C` : undefined} accent loading={gpuTemp < 0} />
-              {gpuVramUsed >= 0 && gpuVramTotal > 0 ? (
-                <NeonBar
-                  pct={(gpuVramUsed / gpuVramTotal) * 100}
-                  label="VRAM Used"
-                  display={`${formatMiBtoGB(gpuVramUsed)} / ${formatMiBtoGB(gpuVramTotal)}`}
-                  color="#00D4AA"
-                />
-              ) : (
+              {gpuVramUsed >= 0 && gpuVramTotal > 0 ? (() => {
+                const pct = (gpuVramUsed / gpuVramTotal) * 100;
+                const c = pct > 90 ? '#FF2D55' : pct > 70 ? '#FFD600' : '#00D4AA';
+                return (
+                  <div className="hud-usage-rt">
+                    <div className="hud-usage-rt-stat">
+                      <div className="hud-usage-rt-head">
+                        <span className="hud-usage-rt-dot" style={{ background: c, boxShadow: `0 0 5px ${c}` }} />
+                        <span className="hud-usage-rt-key">VRAM Used</span>
+                      </div>
+                      <span className="hud-usage-rt-big" style={{ color: c }}>
+                        {formatMiBtoGB(gpuVramUsed)}<small> / {formatMiBtoGB(gpuVramTotal)}</small>
+                      </span>
+                      <div className="hud-usage-rt-track">
+                        <div className="hud-usage-rt-fill" style={{ width: `${Math.min(pct, 100)}%`, background: `linear-gradient(90deg, ${c}00, ${c})`, boxShadow: `0 0 6px ${c}50` }} />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })() : (
                 <Row label="VRAM Used" loading />
               )}
             </>
@@ -539,14 +563,26 @@ const SystemDetails: React.FC<SystemDetailsProps> = ({ systemStats, hardwareInfo
           {hw?.ramInfo ? <Row label="Config" value={hw.ramInfo} /> : <Row label="Config" loading={hwLoading} />}
           {hw?.ramPartNumber ? <Row label="Part Number" value={hw.ramPartNumber} /> : hwLoading && <Row label="Part Number" loading />}
           {hw?.ramSticks ? <Row label="Sticks" value={hw.ramSticks} /> : hwLoading && <Row label="Sticks" loading />}
-          {ext && ext.ramTotalGB > 0 ? (
-            <NeonBar
-              pct={(ext.ramUsedGB / ext.ramTotalGB) * 100}
-              label="Used"
-              display={`${ext.ramUsedGB.toFixed(1)} / ${ext.ramTotalGB.toFixed(1)} GB`}
-              color="#00F2FF"
-            />
-          ) : (
+          {ext && ext.ramTotalGB > 0 ? (() => {
+            const pct = (ext.ramUsedGB / ext.ramTotalGB) * 100;
+            const c = pct > 90 ? '#FF2D55' : pct > 70 ? '#FFD600' : '#00F2FF';
+            return (
+              <div className="hud-usage-rt">
+                <div className="hud-usage-rt-stat">
+                  <div className="hud-usage-rt-head">
+                    <span className="hud-usage-rt-dot" style={{ background: c, boxShadow: `0 0 5px ${c}` }} />
+                    <span className="hud-usage-rt-key">RAM Used</span>
+                  </div>
+                  <span className="hud-usage-rt-big" style={{ color: c }}>
+                    {ext.ramUsedGB.toFixed(1)}<small> / {ext.ramTotalGB.toFixed(1)} GB</small>
+                  </span>
+                  <div className="hud-usage-rt-track">
+                    <div className="hud-usage-rt-fill" style={{ width: `${Math.min(pct, 100)}%`, background: `linear-gradient(90deg, ${c}00, ${c})`, boxShadow: `0 0 6px ${c}50` }} />
+                  </div>
+                </div>
+              </div>
+            );
+          })() : (
             <Row label="Used" loading={extLoading} />
           )}
         </BentoCard>
@@ -561,39 +597,96 @@ const SystemDetails: React.FC<SystemDetailsProps> = ({ systemStats, hardwareInfo
           className="hud-tile-storage"
           delay={0.2}
         >
-          <Row label="Type" value={hw?.diskType} loading={hwLoading} />
-          <Row
-            label="Health"
-            value={hw?.diskHealth}
-            chip={hw?.diskHealth?.toLowerCase() === 'healthy' ? 'green' : 'yellow'}
-            loading={hwLoading}
-          />
-          <Row
-            label="Read/Write"
-            loading={extLoading}
-            value={ext ? (
-              <div className="hud-io-inline">
-                <IOStrip up={fmt(ext.diskWriteSpeed || 0)} down={fmt(ext.diskReadSpeed || 0)} />
-              </div>
-            ) : undefined}
-          />
-          {hw?.allDrives && hw.allDrives.length > 0 && (
-            <div className="hud-drives-section">
-              <div className="hud-drives-title">ALL DRIVES</div>
-              {hw.allDrives.map((d) => (
-                <div key={d.letter} className="hud-drive-row">
-                  <span className="hud-drive-letter">{d.letter}</span>
-                  <div className="hud-drive-bar-track">
-                    <div
-                      className="hud-drive-bar-fill"
-                      style={{
-                        width: `${d.totalGB > 0 ? Math.min(((d.totalGB - d.freeGB) / d.totalGB) * 100, 100) : 0}%`,
-                      }}
-                    />
+          {/* ── Diagnostic readout: Type + Health ── */}
+          {(hw?.diskType || hw?.diskHealth || hwLoading) && (
+            <div className="hud-stor-diag">
+              {hwLoading && !hw?.diskType ? (
+                <div className="hud-stor-diag-cell"><ValueLoader /></div>
+              ) : hw?.diskType && (
+                <div className="hud-stor-diag-cell">
+                  <div className="hud-stor-diag-top">
+                    <span className="hud-stor-diag-dot" style={{ background: '#00F2FF', boxShadow: '0 0 6px #00F2FF88' }} />
+                    <span className="hud-stor-diag-key">Type</span>
                   </div>
-                  <span className="hud-drive-info">{d.freeGB} GB free</span>
+                  <span className="hud-stor-diag-val" style={{ color: '#00F2FF' }}>{hw.diskType}</span>
+                  <span className="hud-stor-diag-sub">{hw.diskType === 'SSD' ? 'Solid State Drive' : hw.diskType === 'HDD' ? 'Hard Disk Drive' : 'Storage Device'}</span>
                 </div>
-              ))}
+              )}
+              {hwLoading && !hw?.diskHealth ? (
+                <div className="hud-stor-diag-cell"><ValueLoader /></div>
+              ) : hw?.diskHealth && (() => {
+                const ok = hw.diskHealth.toLowerCase() === 'healthy';
+                const c = ok ? '#00FF88' : '#FFD600';
+                return (
+                  <div className="hud-stor-diag-cell">
+                    <div className="hud-stor-diag-top">
+                      <span className="hud-stor-diag-dot" style={{ background: c, boxShadow: `0 0 6px ${c}88` }} />
+                      <span className="hud-stor-diag-key">Health</span>
+                    </div>
+                    <span className="hud-stor-diag-val" style={{ color: c }}>{hw.diskHealth}</span>
+                    <span className="hud-stor-diag-sub">{ok ? 'No issues detected' : 'Attention needed'}</span>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+
+          {/* ── Compact R/W speed strip ── */}
+          {(ext || extLoading) && (
+            <>
+              <div className="hud-stor-section-hdr">Read / Write</div>
+              <div className="hud-stor-speed">
+                {ext ? (() => {
+                  const r = ext.diskReadSpeed || 0;
+                  const w = ext.diskWriteSpeed || 0;
+                  return (
+                    <>
+                      <div className="hud-stor-speed-half">
+                        <ArrowDown size={9} className="hud-stor-speed-ic read" />
+                        <span className="hud-stor-speed-val read">{fmt(r)}</span>
+                      </div>
+                      <span className="hud-stor-speed-div" />
+                      <div className="hud-stor-speed-half">
+                        <ArrowUp size={9} className="hud-stor-speed-ic write" />
+                        <span className="hud-stor-speed-val write">{fmt(w)}</span>
+                      </div>
+                    </>
+                  );
+                })() : <ValueLoader />}
+              </div>
+            </>
+          )}
+
+          {/* ── Volumes — segmented power-cell bars ── */}
+          {hw?.allDrives && hw.allDrives.length > 0 && (
+            <div className="hud-stor-vols">
+              <div className="hud-stor-vols-hdr">Volumes</div>
+              {hw.allDrives.map((d) => {
+                const usedGB = d.totalGB - d.freeGB;
+                const pct = d.totalGB > 0 ? Math.round((usedGB / d.totalGB) * 100) : 0;
+                const color = pct > 90 ? '#FF2D55' : pct > 70 ? '#FFD600' : '#00F2FF';
+                const SEGS = 12;
+                const litCount = Math.round((pct / 100) * SEGS);
+                return (
+                  <div key={d.letter} className="hud-stor-vol">
+                    <span className="hud-stor-vol-id" style={{ color }}>{d.letter}</span>
+                    <div className="hud-stor-vol-cells">
+                      {Array.from({ length: SEGS }, (_, i) => (
+                        <div
+                          key={i}
+                          className={`hud-stor-cell ${i < litCount ? 'lit' : ''}`}
+                          style={i < litCount ? {
+                            background: color,
+                            boxShadow: `0 0 4px ${color}66`,
+                          } : undefined}
+                        />
+                      ))}
+                    </div>
+                    <span className="hud-stor-vol-pct" style={{ color }}>{pct}%</span>
+                    <span className="hud-stor-vol-free">{d.freeGB} GB</span>
+                  </div>
+                );
+              })}
             </div>
           )}
         </BentoCard>
@@ -616,40 +709,108 @@ const SystemDetails: React.FC<SystemDetailsProps> = ({ systemStats, hardwareInfo
           className="hud-tile-net"
           delay={0.25}
         >
-          {hw?.ipAddress ? <Row label="Local IP Address" value={hw.ipAddress} /> : <Row label="Local IP Address" loading={hwLoading} />}
+          {/* Static info — standard rows */}
+          <Row label="Local IP Address" value={hw?.ipAddress} loading={hwLoading} />
+          <Row label="Gateway" value={hw?.gateway} loading={hwLoading} />
+          <Row label="DNS" value={hw?.dns} loading={hwLoading} />
           {hw?.macAddress ? <Row label="MAC" value={hw.macAddress} /> : hwLoading && <Row label="MAC" loading />}
-          {hw?.gateway ? <Row label="Gateway" value={hw.gateway} /> : hwLoading && <Row label="Gateway" loading />}
-          {hw?.dns ? <Row label="DNS" value={hw.dns} /> : hwLoading && <Row label="DNS" loading />}
           {ext?.ssid && <Row label="Wi‑Fi SSID" value={ext.ssid} />}
-          {ext ? (
-            ext.latencyMs != null && ext.latencyMs > 0 ? (
-              <NeonBar
-                pct={Math.min(ext.latencyMs / 200 * 100, 100)}
-                label="Ping/Latency"
-                display={`${ext.latencyMs} ms`}
-                color={ext.latencyMs < 30 ? '#00FF88' : ext.latencyMs < 80 ? '#FFD600' : '#FF2D55'}
-              />
-            ) : null
-          ) : (
-            <Row label="Ping/Latency" loading />
-          )}
-          {hw?.networkLinkSpeed ? <Row label="Link Speed" value={hw.networkLinkSpeed} /> : <Row label="Link Speed" loading={hwLoading} />}
-          {ext ? (
-            <Row
-              label="Realtime Speed"
-              value={(ext.networkUp > 0 || ext.networkDown > 0) ? (
-                <div className="hud-io-inline">
-                  <IOStrip up={fmtMbps(ext.networkUp)} down={fmtMbps(ext.networkDown)} />
+
+          {/* ── Active connection ── */}
+          {(() => {
+            // Determine connection type: WiFi if SSID present, otherwise Ethernet
+            const isWifi = ext?.ssid && ext.ssid.length > 0 && ext.wifiSignal > 0;
+            const adapters = hw?.networkAdapters;
+            const activeAdapter = adapters
+              ? adapters.find(a => isWifi ? a.type === 'WiFi' : a.type === 'Ethernet') || adapters[0]
+              : null;
+            // Prefer realtime link speed from extended stats (refreshes every ~2s)
+            const linkSpeed = ext?.activeLinkSpeed || activeAdapter?.linkSpeed || hw?.networkLinkSpeed || '—';
+
+            if (!activeAdapter && !hw?.networkLinkSpeed && hwLoading) {
+              return <Row label="Connection" loading />;
+            }
+
+            return activeAdapter || hw?.networkLinkSpeed ? (
+              <div className="hud-net-adapters">
+                <div className="hud-net-adapter">
+                  <span className="hud-net-adapter-icon">
+                    {isWifi ? <Wifi size={11} /> : <Network size={11} />}
+                  </span>
+                  <span className="hud-net-adapter-name">
+                    {ext?.activeAdapterName || activeAdapter?.name || (isWifi ? 'Wi-Fi' : 'Ethernet')}
+                  </span>
+                  <span className="hud-net-adapter-right">
+                    {isWifi && ext && ext.wifiSignal > 0 && (
+                      <><span className="hud-net-adapter-lbl">Signal:</span><span className="hud-net-wifi-sig">{ext.wifiSignal}%</span></>
+                    )}
+                    <span className="hud-net-adapter-lbl">Link Speed:</span>
+                    <span className="hud-net-adapter-speed">{linkSpeed}</span>
+                  </span>
                 </div>
-              ) : '—'}
-            />
-          ) : (
-            <Row label="Realtime Speed" loading />
-          )}
-          {ext && ext.wifiSignal > 0 && (
-            <div className="hud-inline-row wifi">
-              <Wifi size={13} />
-              <span>Wi-Fi Signal: {ext.wifiSignal}%</span>
+              </div>
+            ) : null;
+          })()}
+
+          {/* ── Realtime Stats ── */}
+          {(ext || extLoading) && (
+            <div className="hud-net-rt">
+              {/* Ping */}
+              {ext ? (
+                ext.latencyMs != null && ext.latencyMs > 0 ? (() => {
+                  const ms = ext.latencyMs;
+                  const c = ms <= 80 ? '#00FF88' : ms <= 180 ? '#FFD600' : '#FF2D55';
+                  const q = ms <= 30 ? 'Excellent' : ms <= 80 ? 'Good' : ms <= 180 ? 'Fair' : 'Poor';
+                  return (
+                    <div className="hud-net-rt-stat">
+                      <div className="hud-net-rt-head">
+                        <span className="hud-net-rt-dot" style={{ background: c, boxShadow: `0 0 5px ${c}` }} />
+                        <span className="hud-net-rt-key">Ping</span>
+                        <span className="hud-net-rt-badge" style={{ color: c, borderColor: `${c}30`, background: `${c}0A` }}>{q}</span>
+                      </div>
+                      <span className="hud-net-rt-big" style={{ color: c }}>{ms}<small>ms</small></span>
+                    </div>
+                  );
+                })() : null
+              ) : (
+                <div className="hud-net-rt-stat"><ValueLoader /></div>
+              )}
+
+              {/* Throughput */}
+              {ext ? (() => {
+                const up = ext.networkUp ?? 0;
+                const down = ext.networkDown ?? 0;
+                const scale = (b: number) => {
+                  const mbps = (b * 8) / (1024 * 1024);
+                  return mbps > 0 ? Math.max(3, Math.min(Math.pow(mbps / 1000, 0.35) * 100, 100)) : 0;
+                };
+                return (
+                  <div className="hud-net-rt-stat">
+                    <div className="hud-net-rt-head">
+                      <Activity size={10} className="hud-net-rt-pulse" />
+                      <span className="hud-net-rt-key">Live Speed</span>
+                    </div>
+                    <div className="hud-net-bars">
+                      <div className="hud-net-bar-row">
+                        <ArrowDown size={9} className="hud-net-bar-icon dn" />
+                        <div className="hud-net-bar-track">
+                          <div className="hud-net-bar-fill dn" style={{ width: `${scale(down)}%` }} />
+                        </div>
+                        <span className="hud-net-bar-val dn">{fmtMbps(down)}</span>
+                      </div>
+                      <div className="hud-net-bar-row">
+                        <ArrowUp size={9} className="hud-net-bar-icon up" />
+                        <div className="hud-net-bar-track">
+                          <div className="hud-net-bar-fill up" style={{ width: `${scale(up)}%` }} />
+                        </div>
+                        <span className="hud-net-bar-val up">{fmtMbps(up)}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })() : (
+                <div className="hud-net-rt-stat"><ValueLoader /></div>
+              )}
             </div>
           )}
         </BentoCard>
@@ -665,16 +826,39 @@ const SystemDetails: React.FC<SystemDetailsProps> = ({ systemStats, hardwareInfo
           className="hud-tile-sys"
           delay={0.3}
         >
-          <Row label="Build" value={hw?.windowsBuild} loading={hwLoading} />
           <Row label="Motherboard" value={hw?.motherboardProduct ? cleanBoardName(hw.motherboardProduct) : hw?.motherboardManufacturer} loading={hwLoading} />
-          <Row label="BIOS" value={(hw?.biosVersion || hw?.biosDate) ? `${hw?.biosVersion || 'Unknown'}${hw?.biosDate ? ' — ' + hw.biosDate : ''}` : undefined} loading={hwLoading} />
-          <Row label="Board S/N" value={!isPlaceholderSerial(hw?.motherboardSerial) ? hw?.motherboardSerial : (hw ? '—' : undefined)} loading={hwLoading} />
-          <Row label="Uptime" value={ext?.systemUptime ?? hw?.systemUptime} accent loading={!(ext?.systemUptime || hw?.systemUptime) && (extLoading || hwLoading)} />
-          <Row label="Power Plan" value={hw?.powerPlan ?? (hw ? '—' : undefined)} loading={hwLoading} />
-          {hw?.hasBattery && (
-            <div className="hud-inline-row batt">
-              <Battery size={13} />
-              <span>{hw.batteryPercent}% — {hw.batteryStatus}</span>
+          <Row label="BIOS Version" value={(hw?.biosVersion || hw?.biosDate) ? `${hw?.biosVersion || 'Unknown'}${hw?.biosDate ? ' — ' + hw.biosDate : ''}` : undefined} loading={hwLoading} />
+          <Row label="Board Serial Number" value={!isPlaceholderSerial(hw?.motherboardSerial) ? hw?.motherboardSerial : (hw ? '—' : undefined)} loading={hwLoading} />
+          <Row label="Windows Build" value={hw?.windowsBuild} loading={hwLoading} />
+          {hw?.lastWindowsUpdate ? <Row label="Last Windows Update" value={hw.lastWindowsUpdate} accent={hw.lastWindowsUpdate !== 'Unknown'} /> : hwLoading && <Row label="Last Windows Update" loading />}
+          {hw?.windowsActivation ? <Row label="Windows License" value={hw.windowsActivation} accent={hw.windowsActivation === 'Licensed'} /> : hwLoading && <Row label="Windows License" loading />}
+
+          {/* ── Realtime panel (matches Network card style) ── */}
+          {(ext || hw || extLoading || hwLoading) && (
+            <div className="hud-sys-rt">
+              {/* Uptime */}
+              <div className="hud-sys-rt-stat">
+                <div className="hud-sys-rt-head">
+                  <span className="hud-sys-rt-dot" style={{ background: '#00F2FF', boxShadow: '0 0 5px #00F2FF' }} />
+                  <span className="hud-sys-rt-key">Uptime</span>
+                </div>
+                <span className="hud-sys-rt-big">{ext?.systemUptime ?? hw?.systemUptime ?? '—'}</span>
+              </div>
+
+              {/* Power & Resources */}
+              <div className="hud-sys-rt-stat">
+                <div className="hud-sys-rt-head">
+                  <Zap size={10} className="hud-sys-rt-zap" />
+                  <span className="hud-sys-rt-key">Power Plan</span>
+                </div>
+                <span className="hud-sys-rt-plan">{hw?.powerPlan ?? '—'}</span>
+                {hw?.hasBattery && (
+                  <div className="hud-sys-rt-batt">
+                    <Battery size={11} />
+                    <span>{hw.batteryPercent}% — {hw.batteryStatus}</span>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </BentoCard>

@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import '../styles/Settings.css';
 import { loadSettings, saveSettings } from '../utils/settings';
+import PageHeader from '../components/PageHeader';
+import { Settings as SettingsIcon } from 'lucide-react';
 
 const Settings: React.FC = () => {
   const [settings, setSettings] = useState(() => ({
@@ -41,7 +43,7 @@ const Settings: React.FC = () => {
       animate={{ opacity: 1 }}
       transition={{ duration: 0.5 }}
     >
-      <h2 className="section-title">Settings</h2>
+      <PageHeader icon={<SettingsIcon size={16} />} title="Settings" />
 
       <div className="settings-sections">
         <div className="settings-section">

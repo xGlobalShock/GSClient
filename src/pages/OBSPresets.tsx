@@ -4,6 +4,8 @@ import { applyObsPreset, launchObs } from '../services/obsPresetsService';
 import { useToast } from '../contexts/ToastContext';
 import { motion } from 'framer-motion';
 import { Broadcast, Monitor } from 'phosphor-react';
+import PageHeader from '../components/PageHeader';
+import { Video } from 'lucide-react';
 import '../styles/OBSPresets.css';
 
 // Icon mapping helper
@@ -68,15 +70,7 @@ const OBSPresets: React.FC = () => {
       animate={{ opacity: 1 }}
       transition={{ duration: 0.5 }}
     >
-      {/* Hero header */}
-      <div className="obs-hero">
-        <div className="obs-hero-glow" />
-        <div className="obs-hero-content">
-          <div className="obs-hero-badge">STREAMING</div>
-          <h1 className="obs-hero-title">OBS Presets</h1>
-          <p className="obs-hero-sub">Select a preset to apply to your OBS Studio setup</p>
-        </div>
-      </div>
+      <PageHeader icon={<Video size={16} />} title="Streaming Presets" />
 
       {/* Cards grid */}
       <div className="obs-grid">

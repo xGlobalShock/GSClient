@@ -35,6 +35,7 @@ export interface HardwareInfo {
   allDrives: { letter: string; totalGB: number; freeGB: number; label: string }[];
   networkAdapter: string;
   networkLinkSpeed?: string;
+  networkAdapters?: { name: string; type: string; linkSpeed: string }[];
   ipAddress: string;
   ipv6Address?: string;
   macAddress?: string;
@@ -50,6 +51,8 @@ export interface HardwareInfo {
   windowsBuild: string;
   systemUptime: string;
   powerPlan: string;
+  lastWindowsUpdate?: string;
+  windowsActivation?: string;
   hasBattery: boolean;
   batteryPercent: number;
   batteryStatus: string;
@@ -66,6 +69,8 @@ export interface ExtendedStats {
   networkDown: number;
   ssid?: string;
   wifiSignal: number;
+  activeAdapterName?: string;
+  activeLinkSpeed?: string;
   latencyMs?: number;
   ramUsedGB: number;
   ramTotalGB: number;
@@ -124,6 +129,11 @@ function App() {
       }
     };
     fetchHardwareInfo();
+
+    // Listen for background-refreshed hardware info (replaces stale cache)
+    const onHwUpdated = (info: HardwareInfo) => { setHardwareInfo(info); };
+    const unsub = window.electron?.ipcRenderer?.on?.('hardware-info-updated', onHwUpdated);
+    return () => { unsub?.(); };
   }, []);
 
   const renderPage = () => {
@@ -163,7 +173,9 @@ function App() {
           <Sidebar currentPage={currentPage} setCurrentPage={setCurrentPage} />
           <div className="main-content">
             <Header />
-            <Loader />
+            <div className="page-content">
+              <Loader />
+            </div>
           </div>
         </div>
       ) : (

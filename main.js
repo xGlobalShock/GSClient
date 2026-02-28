@@ -135,7 +135,7 @@ function createWindow() {
 
   mainWindow = new BrowserWindow({
     width: 1420,
-    height: 768,
+    height: 820,
     minWidth: 1000,
     minHeight: 600,
     frame: false,
@@ -386,10 +386,22 @@ function startLHMService() {
   // Start periodic cache saves (still useful for crash recovery)
   _startLhmCacheTimer();
 
-  const dllPath = path.join(__dirname, 'lib', 'LibreHardwareMonitorLib.dll');
+  // In production builds __dirname points inside the asar archive.
+  // Use process.resourcesPath to locate the unpacked lib folder.
+  const dllPath = app.isPackaged
+    ? path.join(process.resourcesPath, 'lib', 'LibreHardwareMonitorLib.dll')
+    : path.join(__dirname, 'lib', 'LibreHardwareMonitorLib.dll');
   if (!fs.existsSync(dllPath)) {
-    console.warn('[LHM] DLL not found at', dllPath);
-    return;
+    // Also try the app directory as a fallback
+    const fallbackPath = path.join(app.getAppPath(), 'lib', 'LibreHardwareMonitorLib.dll');
+    if (!fs.existsSync(fallbackPath)) {
+      console.warn('[LHM] DLL not found at', dllPath, 'or', fallbackPath);
+      return;
+    }
+    // Use fallback path
+    var resolvedDllPath = fallbackPath;
+  } else {
+    var resolvedDllPath = dllPath;
   }
   // Write a long-running PS script that loads LHM, opens CPU sensors,
   // and prints sensor data every 500ms.
@@ -397,7 +409,7 @@ function startLHMService() {
     '# LHM sensor service — errors reported on stderr, data on stdout',
     '$ErrorActionPreference = "Stop"',
     'try {',
-    `  Add-Type -Path '${dllPath}'`,
+    `  Add-Type -Path '${resolvedDllPath}'`,
     '} catch {',
     '  [Console]::Error.WriteLine("LHMERR:DLL_LOAD:" + $_.Exception.Message)',
     '  exit 1',
@@ -446,10 +458,14 @@ function startLHMService() {
     '        foreach ($sensor in $hw.Sensors) {',
     '          if (-not $sensor.Value.HasValue) { continue }',
     '          $st = $sensor.SensorType.ToString()',
-    '          if ($st -eq "Temperature" -and $sensor.Name -eq "GPU Core") { $gpuTemp = $sensor.Value.Value }',
+    '          # GPU Temperature: "GPU Core" (NVIDIA/AMD) or "GPU Hot Spot" as fallback',
+    '          if ($st -eq "Temperature" -and ($sensor.Name -eq "GPU Core" -or ($sensor.Name -eq "GPU Hot Spot" -and $gpuTemp -eq $null))) { $gpuTemp = $sensor.Value.Value }',
+    '          # GPU Load: "GPU Core" (universal LHM name)',
     '          if ($st -eq "Load" -and $sensor.Name -eq "GPU Core") { $gpuLoad = $sensor.Value.Value }',
-    '          if ($st -eq "SmallData" -and $sensor.Name -eq "GPU Memory Used") { $gpuVramUsed = $sensor.Value.Value }',
-    '          if ($st -eq "SmallData" -and $sensor.Name -eq "GPU Memory Total") { $gpuVramTotal = $sensor.Value.Value }',
+    '          # GPU VRAM Used: "GPU Memory Used" (standard) or "D3D Dedicated Memory Used" (AMD fallback)',
+    '          if ($st -eq "SmallData" -and ($sensor.Name -eq "GPU Memory Used" -or ($sensor.Name -eq "D3D Dedicated Memory Used" -and $gpuVramUsed -eq $null))) { $gpuVramUsed = $sensor.Value.Value }',
+    '          # GPU VRAM Total: "GPU Memory Total" (standard) or "D3D Dedicated Memory Limit" (AMD fallback)',
+    '          if ($st -eq "SmallData" -and ($sensor.Name -eq "GPU Memory Total" -or ($sensor.Name -eq "D3D Dedicated Memory Limit" -and $gpuVramTotal -eq $null))) { $gpuVramTotal = $sensor.Value.Value }',
     '        }',
     '      }',
     '    }',
@@ -580,6 +596,21 @@ function _startPerfCounterService() {
     'try { $cpuU = New-Object System.Diagnostics.PerformanceCounter("Processor Information", "% Processor Utility", "_Total") } catch { $cpuU = $null }',
     'try { $cpuP = New-Object System.Diagnostics.PerformanceCounter("Processor Information", "% Processor Performance", "_Total") } catch { $cpuP = $null }',
     '',
+    '# ── Per-core counters (PerformanceCounter API — lightweight, delta-based) ──',
+    '$coreCounters = @()',
+    'try {',
+    '  $cat = New-Object System.Diagnostics.PerformanceCounterCategory("Processor Information")',
+    '  $instances = $cat.GetInstanceNames() | Where-Object { $_ -ne "_Total" -and $_ -notlike "*_Total" } | Sort-Object { $p = $_ -split ","; [int]$p[0] * 1000 + [int]$p[1] }',
+    '  foreach ($inst in $instances) {',
+    '    try {',
+    '      $c = New-Object System.Diagnostics.PerformanceCounter("Processor Information", "% Processor Utility", $inst)',
+    '      $c.NextValue() | Out-Null',
+    '      $coreCounters += $c',
+    '    } catch {}',
+    '  }',
+    '} catch {}',
+    'if ($coreCounters.Count -eq 0) { [Console]::Error.WriteLine("[PerfCtr] Per-core counters unavailable, will use WMI fallback") }',
+    '',
     '# ── WMI fallback flag ──',
     '$useWmi = ($cpuU -eq $null)',
     'if ($useWmi) { [Console]::Error.WriteLine("[PerfCtr] PerformanceCounter unavailable, using WMI fallback") }',
@@ -608,16 +639,40 @@ function _startPerfCounterService() {
     '  # Processor Performance (for clock speed)',
     '  if ($cpuP) { try { $parts += "CPUP:" + [math]::Round($cpuP.NextValue(), 1) } catch {} }',
     '',
-    '  # Per-core utility: Use Win32_PerfFormattedData_PerfOS_Processor for accurate, ordered logical core stats',
+    '  # Per-core utility: prefer PerformanceCounter objects (lightweight delta-based)',
     '  $coreVals = @()',
-    '  try {',
-    '    $allCores = Get-CimInstance Win32_PerfFormattedData_PerfOS_Processor -ErrorAction Stop | Where-Object { $_.Name -ne "_Total" } | Sort-Object { [int]$_.Name }',
-    '    foreach ($core in $allCores) {',
-    '      $v = [double]$core.PercentProcessorTime',
-    '      if ($v -gt 100) { $v = 100 }',
-    '      $coreVals += [math]::Round($v, 1)',
+    '  if ($coreCounters.Count -gt 0) {',
+    '    foreach ($cc in $coreCounters) {',
+    '      try {',
+    '        $v = [double]$cc.NextValue()',
+    '        if ($v -lt 0) { $v = 0 }',
+    '        if ($v -gt 100) { $v = 100 }',
+    '        $coreVals += [math]::Round($v, 1)',
+    '      } catch { $coreVals += 0 }',
     '    }',
-    '  } catch {}',
+    '  } else {',
+    '    # Fallback: WMI query (heavier, can inflate readings)',
+    '    try {',
+    '      $allCores = Get-CimInstance Win32_PerfFormattedData_Counters_ProcessorInformation -ErrorAction Stop | Where-Object { $_.Name -notlike "*_Total*" }',
+    '      $allCores = $allCores | Sort-Object { $p = $_.Name -split ","; [int]$p[0] * 1000 + [int]$p[1] }',
+    '      foreach ($core in $allCores) {',
+    '        $v = [double]$core.PercentProcessorUtility',
+    '        if ($v -lt 0) { $v = 0 }',
+    '        if ($v -gt 100) { $v = 100 }',
+    '        $coreVals += [math]::Round($v, 1)',
+    '      }',
+    '    } catch {',
+    '      # Fallback: PerfOS_Processor (less accurate but always available)',
+    '      try {',
+    '        $allCores = Get-CimInstance Win32_PerfFormattedData_PerfOS_Processor -ErrorAction Stop | Where-Object { $_.Name -ne "_Total" } | Sort-Object { [int]$_.Name }',
+    '        foreach ($core in $allCores) {',
+    '          $v = [double]$core.PercentProcessorTime',
+    '          if ($v -gt 100) { $v = 100 }',
+    '          $coreVals += [math]::Round($v, 1)',
+    '        }',
+    '      } catch {}',
+    '    }',
+    '  }',
     '  if ($coreVals.Count -gt 0) { $parts += "CORES:" + ($coreVals -join ",") }',
     '',
     '  if ($parts.Count -gt 0) {',
@@ -802,19 +857,41 @@ function _startLatencyPoll() {
 function _startWifiPoll() {
   const fetchWifi = async () => {
     try {
-      const conns = await si.wifiConnections();
-      if (conns && conns.length > 0) {
-        _rtLastSsid = conns[0].ssid || '';
-        _rtLastWifiSignal = conns[0].quality ?? -1;
+      // Only report WiFi data if WiFi is the default-route interface
+      const defaultIface = await si.networkInterfaceDefault();
+      const ifaces = await si.networkInterfaces();
+      const ifaceArr = Array.isArray(ifaces) ? ifaces : [ifaces];
+      const defaultNet = ifaceArr.find(i => i.iface === defaultIface);
+      const isWifiDefault = defaultNet &&
+        (defaultNet.type === 'wireless' || /wi-?fi|wireless|wlan/i.test(defaultNet.iface));
+
+      if (isWifiDefault) {
+        const conns = await si.wifiConnections();
+        if (conns && conns.length > 0) {
+          _rtLastSsid = conns[0].ssid || '';
+          _rtLastWifiSignal = conns[0].quality ?? -1;
+        } else {
+          _rtLastSsid = '';
+          _rtLastWifiSignal = -1;
+        }
+      } else {
+        _rtLastSsid = '';
+        _rtLastWifiSignal = -1;
       }
-    } catch {}
+    } catch {
+      _rtLastSsid = '';
+      _rtLastWifiSignal = -1;
+    }
   };
   fetchWifi();
   _realtimeWifiTimer = setInterval(fetchWifi, 10000);
 }
 
 // nvidia-smi GPU poll — runs every 3s, skips if LHM is already providing GPU data
+// Stops retrying after 3 consecutive failures (e.g. AMD GPU — no nvidia-smi available)
 function _startNvGpuPoll() {
+  let failCount = 0;
+  const MAX_FAILS = 3;
   const poll = async () => {
     // Skip GPU poll if LHM is already providing all GPU data
     if (_lhmGpuUsage >= 0 && _lhmGpuTemp >= 0 && _lhmGpuVramTotal > 0) return;
@@ -830,7 +907,15 @@ function _startNvGpuPoll() {
         if (!isNaN(parts[2])) _nvGpuVramUsed = Math.round(parts[2]);
         if (!isNaN(parts[3])) _nvGpuVramTotal = Math.round(parts[3]);
       }
-    } catch {}
+      failCount = 0; // reset on success
+    } catch {
+      failCount++;
+      if (failCount >= MAX_FAILS && _realtimeNvGpuTimer) {
+        clearInterval(_realtimeNvGpuTimer);
+        _realtimeNvGpuTimer = null;
+        // nvidia-smi not available (AMD/Intel GPU) — stopped polling
+      }
+    }
   };
   poll(); // immediate first call
   _realtimeNvGpuTimer = setInterval(poll, 3000);
@@ -1002,6 +1087,7 @@ ipcMain.handle('system:stop-realtime', () => {
 // On first launch: 3 parallel PS scripts + nvidia-smi (~5-8s).
 // On subsequent launches: returns disk cache (<10ms), refreshes in background.
 // ──────────────────────────────────────────────────────
+const HW_CACHE_VERSION = 2; // Bump when schema changes to invalidate old cache
 let _hwInfoResult = null;    // resolved HardwareInfo object (from cache or fresh fetch)
 let _hwInfoPromise = null;   // pending fetch promise (so IPC handler can await if no cache)
 
@@ -1014,8 +1100,8 @@ function _loadHwCache() {
   try {
     const raw = fs.readFileSync(_getHwCachePath(), 'utf8');
     const obj = JSON.parse(raw);
-    // Cache valid for 7 days (hardware rarely changes)
-    if (obj.data && Date.now() - (obj._ts || 0) < 7 * 86400000) {
+    // Cache valid for 7 days AND must match current schema version
+    if (obj.data && (obj._v || 1) === HW_CACHE_VERSION && Date.now() - (obj._ts || 0) < 7 * 86400000) {
       return obj.data;
     }
   } catch {}
@@ -1024,7 +1110,7 @@ function _loadHwCache() {
 
 function _saveHwCache(data) {
   try {
-    fs.writeFileSync(_getHwCachePath(), JSON.stringify({ _ts: Date.now(), data }), 'utf8');
+    fs.writeFileSync(_getHwCachePath(), JSON.stringify({ _v: HW_CACHE_VERSION, _ts: Date.now(), data }), 'utf8');
   } catch (e) {
     console.warn('[HW] Cache write failed:', e.message);
   }
@@ -1041,9 +1127,13 @@ function _initHardwareInfo() {
 
   // 2. Always start a fresh fetch in background (updates cache for next time)
   _hwInfoPromise = _fetchHardwareInfoImpl().then(info => {
+    const hadOldCache = !!_hwInfoResult;
     _hwInfoResult = info;
     _saveHwCache(info);
-    // HW info refreshed in background
+    // Push fresh data to renderer if we served stale cache initially
+    if (hadOldCache) {
+      try { BrowserWindow.getAllWindows().forEach(w => w.webContents.send('hardware-info-updated', info)); } catch {}
+    }
     return info;
   }).catch(err => {
     console.error('[HW] Fetch error:', err.message);
@@ -1089,6 +1179,8 @@ async function _fetchHardwareInfoImpl() {
     motherboardSerial: '',
     biosVersion: '',
     biosDate: '',
+    lastWindowsUpdate: '',
+    windowsActivation: '',
     windowsVersion: '',
     windowsBuild: '',
     systemUptime: '',
@@ -1118,7 +1210,41 @@ $s1 = 'Unknown GPU|||0|||N/A'
 try {
   $gpu = Get-CimInstance Win32_VideoController | Where-Object { $_.Status -eq 'OK' -and $_.Name -notmatch '(Virtual|Dummy|Parsec|Remote|Generic)' } | Select-Object -First 1
   if (-not $gpu) { $gpu = Get-CimInstance Win32_VideoController | Where-Object { $_.Status -eq 'OK' } | Select-Object -First 1 }
-  if ($gpu) { $s1 = "$($gpu.Name)|||$([math]::Round($gpu.AdapterRAM / 1GB, 1))|||$($gpu.DriverVersion)" }
+  if ($gpu) {
+    # AdapterRAM overflows to 0 for GPUs with >4GB VRAM (32-bit WMI limit).
+    # Fallback: query qwMemorySize from registry (reliable for AMD/NVIDIA).
+    $vramGB = 0
+    if ($gpu.AdapterRAM -and $gpu.AdapterRAM -gt 0) {
+      $vramGB = [math]::Round($gpu.AdapterRAM / 1GB, 1)
+    } else {
+      try {
+        $regPaths = Get-ChildItem 'HKLM:\SYSTEM\ControlSet001\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}' -ErrorAction SilentlyContinue
+        foreach ($rp in $regPaths) {
+          try {
+            $props = Get-ItemProperty $rp.PSPath -ErrorAction SilentlyContinue
+            if ($props.DriverDesc -eq $gpu.Name -or $props.ProviderName -match $gpu.Name.Split(' ')[0]) {
+              $qw = $props.'HardwareInformation.qwMemorySize'
+              if ($qw -and $qw -gt 0) { $vramGB = [math]::Round($qw / 1GB, 1); break }
+            }
+          } catch {}
+        }
+      } catch {}
+      # Final fallback: try AdapterCompatibility-based registry lookup
+      if ($vramGB -eq 0) {
+        try {
+          $regPaths2 = Get-ChildItem 'HKLM:\SYSTEM\ControlSet001\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}' -ErrorAction SilentlyContinue
+          foreach ($rp in $regPaths2) {
+            try {
+              $props = Get-ItemProperty $rp.PSPath -ErrorAction SilentlyContinue
+              $qw = $props.'HardwareInformation.qwMemorySize'
+              if ($qw -and $qw -gt 0) { $vramGB = [math]::Round($qw / 1GB, 1); break }
+            } catch {}
+          }
+        } catch {}
+      }
+    }
+    $s1 = "$($gpu.Name)|||$vramGB|||$($gpu.DriverVersion)"
+  }
 } catch {}
 
 $s2 = '0||||||||||'
@@ -1161,7 +1287,23 @@ try {
   $mac = $a.MacAddress
   $gw = (Get-NetIPConfiguration -InterfaceIndex $a.ifIndex -ErrorAction SilentlyContinue).Ipv4DefaultGateway.NextHop
   $dns = (Get-DnsClientServerAddress -InterfaceIndex $a.ifIndex -ErrorAction SilentlyContinue -AddressFamily IPv4 | Select-Object -First 1).ServerAddresses -join ','
-  $s5 = "$($a.Name) ($($a.InterfaceDescription))|||$ipv4|||$($a.LinkSpeed)|||$mac|||$ipv6|||$gw|||$dns"
+  # Collect all active adapters with name, type (WiFi/Ethernet), and link speed
+  $allAdapters = ''
+  try {
+    $adapters = Get-NetAdapter | Where-Object { $_.Status -eq 'Up' }
+    $parts = @()
+    foreach ($ad in $adapters) {
+      $adType = if ($ad.MediaType -match '802\.11|Wireless|Wi-?Fi') { 'WiFi' } elseif ($ad.MediaType -match '802\.3|Ethernet') { 'Ethernet' } else { 'Other' }
+      # Fallback: check adapter name if MediaType is ambiguous
+      if ($adType -eq 'Other') {
+        if ($ad.Name -match 'Wi-?Fi|Wireless|WLAN') { $adType = 'WiFi' }
+        elseif ($ad.Name -match 'Ethernet|LAN') { $adType = 'Ethernet' }
+      }
+      $parts += "$($ad.Name)~$adType~$($ad.LinkSpeed)"
+    }
+    $allAdapters = $parts -join '^^'
+  } catch {}
+  $s5 = "$($a.Name) ($($a.InterfaceDescription))|||$ipv4|||$($a.LinkSpeed)|||$mac|||$ipv6|||$gw|||$dns|||$allAdapters"
 } catch {}
 
 $s6 = 'Windows|||'
@@ -1247,7 +1389,21 @@ try {
   }
 } catch {}
 
-Write-Output ($s12 + '@@' + $s13 + '@@' + $s14 + '@@' + $s15)
+$s16 = '|||'
+try {
+  # Last Windows Update
+  $lastUpd = 'Unknown'
+  try {
+    $hf = Get-HotFix -ErrorAction SilentlyContinue | Where-Object { $_.InstalledOn } | Sort-Object InstalledOn -Descending | Select-Object -First 1
+    if ($hf) { $lastUpd = $hf.InstalledOn.ToString('yyyy-MM-dd') }
+  } catch {}
+  # Windows Activation
+  $act = 'Unknown'
+  try { $lic = Get-CimInstance SoftwareLicensingProduct -Filter "ApplicationID='55c92734-d682-4d71-983e-d6ec3f16059f' AND LicenseStatus=1" -ErrorAction SilentlyContinue | Select-Object -First 1; if ($lic) { $act = 'Licensed' } else { $act = 'Not Activated' } } catch { $act = 'Unknown' }
+  $s16 = "$lastUpd|||$act"
+} catch {}
+
+Write-Output ($s12 + '@@' + $s13 + '@@' + $s14 + '@@' + $s15 + '@@' + $s16)
     `, 15000),
 
     // ── nvidia-smi for GPU driver version + accurate VRAM total (separate binary, runs in parallel) ──
@@ -1259,7 +1415,7 @@ Write-Output ($s12 + '@@' + $s13 + '@@' + $s14 + '@@' + $s15)
   const valOf = (r) => r.status === 'fulfilled' ? (r.value || '') : '';
   const sectionsA = valOf(hwA).split('@@');   // sections 0-4
   const sectionsB = valOf(hwB).split('@@');   // sections 5-11 (mapped as 0-6)
-  const sectionsC = valOf(hwC).split('@@');   // sections 12-15 (mapped as 0-3)
+  const sectionsC = valOf(hwC).split('@@');   // sections 12-16 (mapped as 0-4)
   // Parse nvidia-smi result: "driver_version, memory_total_mib" e.g. "546.33, 8192"
   const nvRaw = valOf(nvDriverR);
   const nvParts = nvRaw.split(',').map(s => s.trim());
@@ -1433,6 +1589,13 @@ Write-Output ($s12 + '@@' + $s13 + '@@' + $s14 + '@@' + $s15)
     info.ipv6Address = parts[4] || '';
     info.gateway = parts[5] || '';
     info.dns = parts[6] || '';
+    // Parse all active adapters' link speeds
+    if (parts[7]) {
+      info.networkAdapters = parts[7].split('^^').filter(s => s.trim()).map(entry => {
+        const [name, type, linkSpeed] = entry.split('~');
+        return { name: name || '', type: type || 'Other', linkSpeed: linkSpeed || '' };
+      });
+    }
   } catch {}
 
   // 6: Windows — with additional validation for Win11 vs Win10
@@ -1550,6 +1713,13 @@ Write-Output ($s12 + '@@' + $s13 + '@@' + $s14 + '@@' + $s15)
     }
   } catch {}
 
+  // 16: Last Windows Update, Windows Activation
+  try {
+    const parts = get(16).split('|||').map(s => s.trim());
+    info.lastWindowsUpdate = parts[0] || 'Unknown';
+    info.windowsActivation = parts[1] || 'Unknown';
+  } catch {}
+
   return info;
 }
 
@@ -1583,12 +1753,16 @@ async function _getExtStatsImpl() {
   const [allR, gpuR] = await Promise.allSettled([
 
     runPSScript(`
-# ── Network: snapshot BEFORE long operations (for throughput delta) ──
+# ── Network: pick adapter with default route (= active connection) ──
 $netAdapter = $null; $netBefore = $null
 try {
-  $netAdapter = Get-NetAdapter | Where-Object { $_.Status -eq 'Up' -and $_.Name -notmatch 'Virtual|vEthernet|Loopback|Microsoft|Container' } | Select-Object -First 1
-  if ($netAdapter) { $netBefore = Get-NetAdapterStatistics -Name $netAdapter.Name }
+  $defRoute = Get-NetRoute -DestinationPrefix '0.0.0.0/0' -ErrorAction SilentlyContinue | Sort-Object RouteMetric | Select-Object -First 1
+  if ($defRoute) { $netAdapter = Get-NetAdapter -InterfaceIndex $defRoute.InterfaceIndex -ErrorAction SilentlyContinue }
 } catch {}
+if (-not $netAdapter) {
+  try { $netAdapter = Get-NetAdapter | Where-Object { $_.Status -eq 'Up' -and $_.Name -notmatch 'Virtual|vEthernet|Loopback|Microsoft|Container' } | Select-Object -First 1 } catch {}
+}
+try { if ($netAdapter) { $netBefore = Get-NetAdapterStatistics -Name $netAdapter.Name } } catch {}
 $sw = [System.Diagnostics.Stopwatch]::StartNew()
 
 # ── Fast CIM queries ──
@@ -1634,20 +1808,30 @@ if ($netAdapter -and $netBefore) {
   } catch {}
 }
 
-# ── Wi-Fi info ──
+# ── Wi-Fi info (only if primary adapter is Wi-Fi) ──
 $ssid = ''; $sig = ''
-try {
-  $w = netsh wlan show interfaces 2>$null
-  if ($w) {
-    $sl = $w | Select-String -Pattern '^\\s*SSID' | Where-Object { $_.ToString() -notmatch 'BSSID' } | Select-Object -First 1
-    $sg2 = $w | Select-String 'Signal' | Select-Object -First 1
-    if ($sl) { $ssid = $sl.ToString().Split(':',2)[1].Trim() }
-    if ($sg2) { $sig = $sg2.ToString().Split(':',2)[1].Trim() }
-  }
-} catch {}
+$isWifiPrimary = $false
+if ($netAdapter) {
+  $isWifiPrimary = ($netAdapter.MediaType -match '802\.11|Wireless|Wi-?Fi') -or ($netAdapter.Name -match 'Wi-?Fi|Wireless|WLAN')
+}
+if ($isWifiPrimary) {
+  try {
+    $w = netsh wlan show interfaces 2>$null
+    if ($w) {
+      $sl = $w | Select-String -Pattern '^\\s*SSID' | Where-Object { $_.ToString() -notmatch 'BSSID' } | Select-Object -First 1
+      $sg2 = $w | Select-String 'Signal' | Select-Object -First 1
+      if ($sl) { $ssid = $sl.ToString().Split(':',2)[1].Trim() }
+      if ($sg2) { $sig = $sg2.ToString().Split(':',2)[1].Trim() }
+    }
+  } catch {}
+}
+
+# ── Active adapter name & link speed ──
+$adName = ''; $adLink = ''
+if ($netAdapter) { $adName = $netAdapter.Name; $adLink = $netAdapter.LinkSpeed }
 
 # ── Output: 3 sections separated by @@ ──
-Write-Output "$clock|$ramU|$ramT|$procs|$uptime|$lat@@$coreStr|$([math]::Round($dr))|$([math]::Round($dw))@@$netUp|$netDn|$ssid|$sig"
+Write-Output "$clock|$ramU|$ramT|$procs|$uptime|$lat@@$coreStr|$([math]::Round($dr))|$([math]::Round($dw))@@$netUp|$netDn|$ssid|$sig|$adName|$adLink"
     `, 8000),
     
     execFileAsync(
@@ -1692,14 +1876,16 @@ Write-Output "$clock|$ramU|$ramT|$procs|$uptime|$lat@@$coreStr|$([math]::Round($
     }
   } catch {}
 
-  // Network: up|down|ssid|signal
+  // Network: up|down|ssid|signal|adapterName|linkSpeed
   try {
     const parts = netRaw.split('|');
     if (parts.length >= 4) {
       ext.networkUp = parseInt(parts[0]) || 0;
       ext.networkDown = parseInt(parts[1]) || 0;
-      if (parts[2]) ext.ssid = parts[2];
-      if (parts[3]) ext.wifiSignal = parseInt(parts[3]) || -1;
+      ext.ssid = parts[2] || '';
+      ext.wifiSignal = parts[3] ? parseInt(parts[3]) : -1;
+      if (parts[4]) ext.activeAdapterName = parts[4];
+      if (parts[5]) ext.activeLinkSpeed = parts[5];
     }
   } catch {}
 

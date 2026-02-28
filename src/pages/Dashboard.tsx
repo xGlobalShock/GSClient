@@ -15,10 +15,14 @@ interface DashboardProps {
   statsLoaded?: boolean;
 }
 
+import { Home } from 'lucide-react';
+import PageHeader from '../components/PageHeader';
+
 const Dashboard: React.FC<DashboardProps> = ({ systemStats, hardwareInfo, extendedStats }) => {
   return (
     <div className="dashboard-page">
-      <SystemDetails systemStats={systemStats} hardwareInfo={hardwareInfo} extendedStats={extendedStats} />
+      <PageHeader icon={<Home size={16} />} title="System Details" />
+      <SystemDetails systemStats={systemStats} hardwareInfo={hardwareInfo} extendedStats={extendedStats} hideHeader />
     </div>
   );
 };

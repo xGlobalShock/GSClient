@@ -3,6 +3,8 @@ import { motion } from 'framer-motion';
 import CleanerCard from '../components/CleanerCard';
 import { cleanerUtilities } from '../data/cleanerUtilities';
 import { useToast } from '../contexts/ToastContext';
+import PageHeader from '../components/PageHeader';
+import { Trash2 } from 'lucide-react';
 import '../styles/Cleaner.css';
 
 declare global {
@@ -115,19 +117,7 @@ const Cleaner: React.FC = () => {
       animate={{ opacity: 1 }}
       transition={{ duration: 0.5 }}
     >
-      {/* Hero header */}
-      <div className="cleaner-hero">
-        <div className="cleaner-hero-glow" />
-        <div className="cleaner-hero-content">
-          <div className="cleaner-hero-left">
-            <div className="cleaner-hero-badge">MAINTENANCE</div>
-            <h1 className="cleaner-hero-title">System Cleaner</h1>
-            <p className="cleaner-hero-sub">
-              Optimize your system by clearing unnecessary cache and temporary files
-            </p>
-          </div>
-        </div>
-      </div>
+      <PageHeader icon={<Trash2 size={16} />} title="Cleanup Toolkit" />
 
       {/* Tab Navigation */}
       <div className="cleaner-tabs">

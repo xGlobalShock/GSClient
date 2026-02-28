@@ -26,6 +26,9 @@ declare global {
   }
 }
 
+import { Activity } from 'lucide-react';
+import PageHeader from '../components/PageHeader';
+
 const Performance: React.FC = () => {
   const [applyingId, setApplyingId] = useState<string | null>(null);
   const [enabledTweaks, setEnabledTweaks] = useState<{ [key: string]: boolean }>({});
@@ -249,60 +252,48 @@ const Performance: React.FC = () => {
       animate={{ opacity: 1 }}
       transition={{ duration: 0.6 }}
     >
-      {/* Futuristic Header Panel */}
-      <div className="perf-hero">
-        <div className="perf-hero-bg" />
-        <div className="perf-hero-content">
-          <div className="perf-hero-left">
-            <div className="perf-hero-badge">SYSTEM CORE</div>
-            <h1 className="perf-hero-title">System Tweaks</h1>
-            <p className="perf-hero-subtitle">
-              Kernel &amp; registry optimizations for minimal latency and maximum performance
-            </p>
-          </div>
-          <div className="perf-hero-right">
-            <div className="perf-hero-stat">
-              <div className="perf-hero-stat-ring">
-                <svg viewBox="0 0 80 80" className="perf-ring-svg">
-                  <circle cx="40" cy="40" r="34" className="perf-ring-track" />
-                  <circle
-                    cx="40" cy="40" r="34"
-                    className="perf-ring-fill"
-                    style={{
-                      strokeDasharray: `${(appliedCount / totalCount) * 213.6} 213.6`
-                    }}
-                  />
-                </svg>
-                <span className="perf-ring-label">{appliedCount}/{totalCount}</span>
-              </div>
-              <span className="perf-hero-stat-text">Active</span>
+      <PageHeader
+        icon={<Activity size={16} />}
+        title="PC Tweaks"
+        stat={
+          <div className="perf-hero-stat">
+            <div className="perf-hero-stat-ring">
+              <svg className="perf-ring-svg" viewBox="0 0 56 56">
+                <circle className="perf-ring-track" cx="28" cy="28" r="24" />
+                <circle
+                  className="perf-ring-fill"
+                  cx="28"
+                  cy="28"
+                  r="24"
+                  strokeDasharray={`${totalCount > 0 ? (appliedCount / totalCount) * 150.8 : 0} 150.8`}
+                />
+              </svg>
+              <span className="perf-ring-label">{appliedCount}/{totalCount}</span>
             </div>
-            <div className="perf-hero-actions">
-              <button
-                className="perf-action-btn perf-action-restore"
-                onClick={handleCreateRestorePoint}
-                disabled={creatingRestore}
-                title="Create a system restore point"
-              >
-                <ArrowCounterClockwise size={15} weight="bold" />
-                <span>{creatingRestore ? 'Creating...' : 'Restore Point'}</span>
-              </button>
-              <button
-                className="perf-action-btn perf-action-refresh"
-                onClick={() => { addToast('Scanning tweak status...', 'info'); runChecksOnDemand(); }}
-              >
-                <ArrowCounterClockwise size={15} weight="bold" />
-                <span>Scan Status</span>
-              </button>
-            </div>
-            {lastRestoreInfo && (
-              <div className="perf-restore-info">
-                Last: {lastRestoreInfo.postObj?.CreationTime || lastRestoreInfo.postObj?.CreationTimeUtc || ''}
-              </div>
-            )}
+            <span className="perf-hero-stat-text">Applied</span>
           </div>
-        </div>
-      </div>
+        }
+        actions={
+          <div className="perf-hero-actions">
+            <button
+              className="perf-action-btn"
+              onClick={handleCreateRestorePoint}
+              disabled={creatingRestore}
+              title="Create a system restore point"
+            >
+              <ArrowCounterClockwise size={14} weight="bold" />
+              <span>{creatingRestore ? 'Creating...' : 'Restore Point'}</span>
+            </button>
+            <button
+              className="perf-action-btn perf-action-refresh"
+              onClick={() => { addToast('Scanning tweak status...', 'info'); runChecksOnDemand(); }}
+            >
+              <ArrowCounterClockwise size={14} weight="bold" />
+              <span>Scan Status</span>
+            </button>
+          </div>
+        }
+      />
 
       {/* Tweaks Grid */}
       <div className="perf-tweaks-grid">
