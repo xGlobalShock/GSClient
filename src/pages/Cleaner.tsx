@@ -75,6 +75,24 @@ const Cleaner: React.FC = () => {
     { id: 'nvidia', label: 'NVIDIA Cache', count: utilityTabs.nvidia.length },
   ];
 
+  const tabDescriptions: { [key in 'windows' | 'games' | 'nvidia']: React.ReactNode } = {
+    windows: (
+      <>
+        <strong>Windows Cache:</strong> clears out <strong>leftover temporary files</strong> and <strong>system junk</strong> from Windows and installed apps.
+      </>
+    ),
+    games: (
+      <>
+        Remove <strong>temporary game data caches</strong> to help keep games running smoothly.
+      </>
+    ),
+    nvidia: (
+      <>
+        Clear <strong>NVIDIA driver caches</strong> to resolve graphics hiccups.
+      </>
+    ),
+  };
+
   const handleClean = async (id: string) => {
     setCleaningId(id);
     try {
@@ -119,22 +137,25 @@ const Cleaner: React.FC = () => {
     >
       <PageHeader icon={<Trash2 size={16} />} title="Cleanup Toolkit" />
 
-      {/* Tab Navigation */}
-      <div className="cleaner-tabs">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            className={`cleaner-tab ${activeTab === tab.id ? 'cleaner-tab--active' : ''}`}
-            onClick={() => setActiveTab(tab.id as any)}
-          >
-            <span className="cleaner-tab-label">{tab.label}</span>
-            <span className="cleaner-tab-count">{tab.count}</span>
-          </button>
-        ))}
+      {/* Tab Navigation + description */}
+      <div className="cleaner-tabs-container">
+        <div className="cleaner-tabs">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              className={`cleaner-tab ${activeTab === tab.id ? 'cleaner-tab--active' : ''}`}
+              onClick={() => setActiveTab(tab.id as any)}
+            >
+              <span className="cleaner-tab-label">{tab.label}</span>
+              <span className="cleaner-tab-count">{tab.count}</span>
+            </button>
+          ))}
+        </div>
+        <div className="cleaner-tab-desc">{tabDescriptions[activeTab]}</div>
       </div>
 
       {/* Cards grid */}
-      <div className="cleaner-grid">
+      <div className="cleaner-grid cleaner-grid--small">
         {utilityTabs[activeTab].map((utility, index) => (
           <motion.div
             key={utility.id}

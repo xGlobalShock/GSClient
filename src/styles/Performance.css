@@ -1,12 +1,14 @@
-/* =============================================
-   PERFORMANCE PAGE — FUTURISTIC HOLOGRID THEME
-   ============================================= */
+/* ═══════════════════════════════════════════════════════════════
+   PERFORMANCE PAGE — Glassmorphic Bento HUD
+═══════════════════════════════════════════════════════════════ */
 
 .perf-page {
   display: flex;
   flex-direction: column;
-  gap: 28px;
+  gap: 20px;
   position: relative;
+  /* slight lift so header matches vertical position of other pages */
+  margin-top: -10px;
 }
 
 /* ——— HERO PANEL ——— */
@@ -243,13 +245,13 @@
 .perf-tweaks-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 12px;
+  gap: 14px;
   width: 100%;
 }
 
 @media (max-width: 1024px) {
   .perf-tweaks-grid {
-    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   }
 }
 

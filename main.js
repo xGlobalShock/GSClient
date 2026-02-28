@@ -889,9 +889,7 @@ function _getStatsImpl() {
 
   _lastStats = {
     cpu, ram, disk, temperature,
-    // True once LHM or perf counter service has produced a valid reading
     lhmReady: _lhmAvailable || _perfCpuUtility >= 0,
-    // GPU data — prefer LHM, fallback to nvidia-smi poll values
     gpuTemp: _lhmGpuTemp >= 0 ? _lhmGpuTemp : (_nvGpuTemp >= 0 ? _nvGpuTemp : -1),
     gpuUsage: _lhmGpuUsage >= 0 ? _lhmGpuUsage : (_nvGpuUsage >= 0 ? _nvGpuUsage : -1),
     gpuVramUsed: _lhmGpuVramUsed >= 0 ? _lhmGpuVramUsed : (_nvGpuVramUsed >= 0 ? _nvGpuVramUsed : -1),
@@ -900,13 +898,6 @@ function _getStatsImpl() {
   return _lastStats;
 }
 
-// ──────────────────────────────────────────────────────
-// Real-Time Hardware Push System
-// Uses systeminformation (SI) + LHM for high-frequency metrics.
-// Pushes merged stats to frontend via webContents.send every 1000ms.
-// SI provides delta-based per-core CPU, clock speed, network throughput.
-// LHM provides temperatures and GPU data (500ms refresh).
-// ──────────────────────────────────────────────────────
 let _realtimeTimer = null;
 let _realtimeLatencyTimer = null;
 let _realtimeWifiTimer = null;

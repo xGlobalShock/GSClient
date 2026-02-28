@@ -64,16 +64,13 @@ const CleanerCard: React.FC<CleanerCardProps> = ({
       {isLoading && <div className="cc-sweep" />}
 
       <div className="cc-inner">
-        {/* Top: category + icon */}
+        {/* Top row: icon and title */}
         <div className="cc-top">
-          <span className="cc-category">{cacheType}</span>
           <div className="cc-icon-box">
             {renderIcon()}
           </div>
+          <h3 className="cc-title cc-title-inline">{title}</h3>
         </div>
-
-        {/* Title */}
-        <h3 className="cc-title">{title}</h3>
 
         {/* Description */}
         <p className="cc-desc">{description}</p>

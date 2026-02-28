@@ -1,11 +1,19 @@
+// phospor-react icons (only used for windows cache)
+import {
+  Cpu,
+  Trash,
+  FileText,
+  ArrowCounterClockwise,
+  DownloadSimple,
+  GlobeHemisphereEast,
+  FolderSimple
+} from 'phosphor-react';
+
+// bring back game & nvidia asset logos
 import PrefetchLogo from '../assets/Prefetch.png';
-import { Cpu, Warning, Trash, ArrowCounterClockwise, Question, Monitor, Cloud } from 'phosphor-react';
 import ForzaLogo from '../assets/Forza.png';
 import ApexLogo from '../assets/Apex legends.png';
 import NvidiaLogo from '../assets/nvidia.png';
-import DNSLogo from '../assets/DNS.png';
-import TempFilesLogo from '../assets/TempFiles.png';
-import WinUpdatesLogo from '../assets/WinUpdates.png';
 import CODLogo from '../assets/COD Banner.jpg';
 import CS2Logo from '../assets/CS2 Banner.jpg';
 import FortniteLogo from '../assets/Fortnite Banner.jpg';
@@ -30,9 +38,9 @@ export const cleanerUtilities: CleanerUtility[] = [
     {
       id: 'forza-shaders',
       title: 'Clear Forza Horizon 5 Shaders',
-      icon: ForzaLogo, // Use Forza logo asset
+      icon: ForzaLogo,
       cacheType: 'Forza Shader Cache',
-      description: 'Clears Forza Horizon 5 shader cache to fix stuttering and graphics issues.',
+      description: 'Removes temporary graphics data to help the game run smoother.',
       buttonText: 'Clear Cache',
       color: '#0074D9',
       buttonColor: '#27ae60',
@@ -40,9 +48,9 @@ export const cleanerUtilities: CleanerUtility[] = [
   {
     id: 'nvidia-cache',
     title: 'Clear NVIDIA Cache',
-    icon: NvidiaLogo, // NVIDIA Cache: Nvidia logo (local)
+    icon: NvidiaLogo,
     cacheType: 'DXCache/GLCache',
-    description: 'Clears shader cache to fix stuttering after game updates.',
+    description: 'Clears out stored game data that may impact performance.',
     buttonText: 'Clear Cache',
     color: '#0074D9',
     buttonColor: '#00FF00',
@@ -50,9 +58,9 @@ export const cleanerUtilities: CleanerUtility[] = [
   {
     id: 'apex-shaders',
     title: 'Clear Apex Shaders',
-    icon: ApexLogo, // Use Apex logo asset
+    icon: ApexLogo,
     cacheType: 'Shader Cache',
-    description: 'Clears psCache.pso to fix stuttering and improve performance.',
+    description: 'Wipes old cached files to keep performance optimal.',
     buttonText: 'Clear Cache',
     color: '#0074D9',
     buttonColor: '#FF6B35',
@@ -62,7 +70,7 @@ export const cleanerUtilities: CleanerUtility[] = [
     title: 'Clear Call of Duty Shaders',
     icon: CODLogo,
     cacheType: 'Shader Cache',
-    description: 'Clears Call of Duty shader cache to fix stuttering and graphics glitches.',
+    description: 'Removes cached files that can cause lag or glitches.',
     buttonText: 'Clear Cache',
     color: '#000000',
     buttonColor: '#27ae60',
@@ -72,7 +80,7 @@ export const cleanerUtilities: CleanerUtility[] = [
     title: 'Clear CS2 Shaders',
     icon: CS2Logo,
     cacheType: 'Shader Cache',
-    description: 'Clears Counter-Strike 2 shader cache for optimal performance.',
+    description: 'Erases temporary game data to maintain smooth gameplay.',
     buttonText: 'Clear Cache',
     color: '#1B1B1B',
     buttonColor: '#27ae60',
@@ -82,7 +90,7 @@ export const cleanerUtilities: CleanerUtility[] = [
     title: 'Clear Fortnite Shaders',
     icon: FortniteLogo,
     cacheType: 'Shader Cache',
-    description: 'Clears Fortnite shader cache to improve FPS and reduce stuttering.',
+    description: 'Purges cached files to help boost frame rates.',
     buttonText: 'Clear Cache',
     color: '#3B82F6',
     buttonColor: '#27ae60',
@@ -92,7 +100,7 @@ export const cleanerUtilities: CleanerUtility[] = [
     title: 'Clear LoL Shaders',
     icon: LoLLogo,
     cacheType: 'Shader Cache',
-    description: 'Clears League of Legends shader cache for better in-game performance.',
+    description: 'Removes old resource files to improve responsiveness.',
     buttonText: 'Clear Cache',
     color: '#0A7EBB',
     buttonColor: '#27ae60',
@@ -102,7 +110,7 @@ export const cleanerUtilities: CleanerUtility[] = [
     title: 'Clear Overwatch 2 Shaders',
     icon: OverwatchLogo,
     cacheType: 'Shader Cache',
-    description: 'Clears Overwatch 2 shader cache to fix performance issues.',
+    description: 'Deletes temporary game files that may slow things down.',
     buttonText: 'Clear Cache',
     color: '#F4A300',
     buttonColor: '#27ae60',
@@ -112,7 +120,7 @@ export const cleanerUtilities: CleanerUtility[] = [
     title: 'Clear Rainbow Six Siege Shaders',
     icon: R6Logo,
     cacheType: 'Shader Cache',
-    description: 'Clears Rainbow Six Siege shader cache to improve stability.',
+    description: 'Clears stored game data to avoid hiccups or crashes.',
     buttonText: 'Clear Cache',
     color: '#FFA500',
     buttonColor: '#27ae60',
@@ -122,7 +130,7 @@ export const cleanerUtilities: CleanerUtility[] = [
     title: 'Clear Rocket League Shaders',
     icon: RocketLeagueLogo,
     cacheType: 'Shader Cache',
-    description: 'Clears Rocket League shader cache for smoother gameplay.',
+    description: 'Wipes temporary graphics files for smoother play.',
     buttonText: 'Clear Cache',
     color: '#4169E1',
     buttonColor: '#27ae60',
@@ -132,7 +140,7 @@ export const cleanerUtilities: CleanerUtility[] = [
     title: 'Clear Valorant Shaders',
     icon: ValorantLogo,
     cacheType: 'Shader Cache',
-    description: 'Clears Valorant shader cache for consistent FPS and reduced lag.',
+    description: 'Removes cached files to help maintain stable performance.',
     buttonText: 'Clear Cache',
     color: '#FF4655',
     buttonColor: '#27ae60',
@@ -140,9 +148,9 @@ export const cleanerUtilities: CleanerUtility[] = [
   {
     id: 'temp-files',
     title: 'Clear Temp Files',
-    icon: TempFilesLogo, // Temp Files: new icon
+    icon: FileText,
     cacheType: 'Temporary Files',
-    description: 'Clears %temp% folder to free up disk space instantly.',
+    description: 'Removes temporary system files to quickly recover storage space.',
     buttonText: 'Clear Files',
     color: '#0074D9',
     buttonColor: '#9D4EDD',
@@ -150,7 +158,7 @@ export const cleanerUtilities: CleanerUtility[] = [
   {
     id: 'prefetch',
     title: 'Clear Prefetch',
-    icon: PrefetchLogo, // Prefetch: new icon
+    icon: ArrowCounterClockwise,
     cacheType: 'Startup Cache',
     description: 'Clears prefetch cache to optimize system startup performance.',
     buttonText: 'Clear Cache',
@@ -160,7 +168,7 @@ export const cleanerUtilities: CleanerUtility[] = [
   {
     id: 'update-cache',
     title: 'Clear Update Cache',
-    icon: WinUpdatesLogo, // Update Cache: new icon
+    icon: DownloadSimple,
     cacheType: 'Windows Updates',
     description: 'Removes cached Windows update files to save disk space.',
     buttonText: 'Clear Cache',
@@ -170,7 +178,7 @@ export const cleanerUtilities: CleanerUtility[] = [
   {
     id: 'dns-cache',
     title: 'Clear DNS Cache',
-    icon: DNSLogo, // DNS Cache: new icon
+    icon: GlobeHemisphereEast,
     cacheType: 'Network Resolver',
     description: 'Clears cached DNS records to refresh network connectivity.',
     buttonText: 'Clear Cache',

@@ -1,81 +1,12 @@
-/* =============================================
-   STREAMING PRESETS — FUTURISTIC HOLOGRID DESIGN
-   ============================================= */
+/* ═══════════════════════════════════════════════════════════════
+   STREAMING PRESETS — Glassmorphic Bento HUD
+   Matches Dashboard / Cleanup Toolkit / PC Tweaks aesthetic
+═══════════════════════════════════════════════════════════════ */
 
 .obs-page {
   display: flex;
   flex-direction: column;
-  gap: 24px;
-}
-
-/* ——— HERO HEADER ——— */
-.obs-hero {
-  position: relative;
-  border-radius: 14px;
-  overflow: hidden;
-  border: 1px solid rgba(0, 242, 255, 0.08);
-  background: rgba(8, 10, 18, 0.65);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-}
-
-.obs-hero::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent 0%, rgba(0, 242, 255, 0.35) 30%, rgba(0, 212, 170, 0.35) 70%, transparent 100%);
-}
-
-.obs-hero-glow {
-  position: absolute;
-  inset: 0;
-  background:
-    radial-gradient(ellipse 50% 60% at 75% 40%, rgba(0, 242, 255, 0.04) 0%, transparent 70%),
-    radial-gradient(ellipse 40% 50% at 20% 60%, rgba(0, 255, 136, 0.03) 0%, transparent 70%);
-  pointer-events: none;
-}
-
-.obs-hero-content {
-  position: relative;
-  z-index: 1;
-  padding: 22px 28px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.obs-hero-badge {
-  display: inline-flex;
-  align-items: center;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 3px;
-  color: rgba(0, 242, 255, 0.75);
-  text-transform: uppercase;
-  padding: 3px 10px;
-  border: 1px solid rgba(0, 242, 255, 0.15);
-  border-radius: 4px;
-  background: rgba(0, 242, 255, 0.04);
-  width: fit-content;
-}
-
-.obs-hero-title {
-  font-size: 22px;
-  font-weight: 800;
-  color: #fff;
-  margin: 0;
-  letter-spacing: -0.3px;
-  text-shadow: 0 0 24px rgba(0, 242, 255, 0.1);
-}
-
-.obs-hero-sub {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.45);
-  margin: 0;
-  line-height: 1.4;
+  gap: 20px;
 }
 
 /* ——— GRID ——— */
@@ -84,33 +15,80 @@
   grid-template-columns: repeat(2, 1fr);
   gap: 16px;
   max-width: 720px;
+  width: 50%;
   margin: 0 auto;
-  width: 100%;
-  padding: 0 16px;
 }
 
 /* ——— CARD ——— */
 .obs-card {
   --accent: #00F2FF;
   position: relative;
-  border-radius: 12px;
+  border-radius: 16px;
   overflow: hidden;
-  background: rgba(8, 10, 18, 0.65);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(0, 242, 255, 0.08);
+  background: rgba(6, 8, 16, 0.55);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(0, 242, 255, 0.07);
+  box-shadow:
+    0 2px 16px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(0, 242, 255, 0.04),
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.02);
   transition:
-    border-color 0.3s ease,
-    box-shadow 0.4s ease,
-    transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    border-color 0.35s ease,
+    box-shadow 0.45s ease,
+    transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Gradient sheen overlay */
+.obs-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--accent) 4%, transparent) 0%,
+    transparent 40%,
+    transparent 60%,
+    rgba(0, 255, 136, 0.015) 100%
+  );
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0;
+  transition: opacity 0.45s ease;
+}
+
+.obs-card:hover::before {
+  opacity: 1;
+}
+
+/* Ambient radial glow on hover */
+.obs-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    radial-gradient(ellipse 70% 60% at 80% 20%, color-mix(in srgb, var(--accent) 5%, transparent) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 80% at 10% 90%, rgba(0, 255, 136, 0.02) 0%, transparent 60%);
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0;
+  transition: opacity 0.45s ease;
+}
+
+.obs-card:hover::after {
+  opacity: 1;
 }
 
 .obs-card:hover {
-  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
-  transform: translateY(-3px);
+  border-color: color-mix(in srgb, var(--accent) 22%, transparent);
+  transform: translateY(-4px);
   box-shadow:
-    0 6px 28px rgba(0, 0, 0, 0.45),
-    0 0 28px color-mix(in srgb, var(--accent) 6%, transparent);
+    0 8px 32px rgba(0, 0, 0, 0.45),
+    0 0 32px color-mix(in srgb, var(--accent) 5%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--accent) 8%, transparent),
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.03);
 }
 
 .obs-card--busy {
@@ -124,10 +102,17 @@
   left: 0;
   right: 0;
   height: 1px;
-  z-index: 4;
+  z-index: 5;
   pointer-events: none;
   overflow: hidden;
-  opacity: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--accent) 30%, transparent) 30%,
+    color-mix(in srgb, var(--accent) 30%, transparent) 70%,
+    transparent 100%
+  );
+  opacity: 0.35;
   transition: opacity 0.4s ease;
 }
 
@@ -139,10 +124,16 @@
   width: 40%;
   height: 100%;
   background: linear-gradient(90deg, transparent, var(--accent), transparent);
-  animation: obsEdgeSweep 3s ease-in-out infinite;
+  animation: obsEdgeSweep 4s ease-in-out infinite;
+  opacity: 0;
+  transition: opacity 0.4s ease;
 }
 
 .obs-card:hover .obs-card-edge {
+  opacity: 0.8;
+}
+
+.obs-card:hover .obs-card-edge::after {
   opacity: 1;
 }
 
@@ -158,38 +149,42 @@
   height: 14px;
   z-index: 2;
   pointer-events: none;
-  opacity: 0.2;
-  transition: opacity 0.4s ease, width 0.35s ease, height 0.35s ease;
+  opacity: 0.15;
+  transition: opacity 0.45s ease, width 0.4s ease, height 0.4s ease;
 }
 
 .obs-card:hover .obs-card-corner {
-  opacity: 0.55;
+  opacity: 0.5;
   width: 18px;
   height: 18px;
 }
 
 .obs-corner--tl {
   top: 0; left: 0;
-  border-top: 2px solid var(--accent);
-  border-left: 2px solid var(--accent);
+  border-top: 1.5px solid color-mix(in srgb, var(--accent) 60%, transparent);
+  border-left: 1.5px solid color-mix(in srgb, var(--accent) 60%, transparent);
+  border-top-left-radius: 2px;
 }
 
 .obs-corner--tr {
   top: 0; right: 0;
-  border-top: 2px solid var(--accent);
-  border-right: 2px solid var(--accent);
+  border-top: 1.5px solid color-mix(in srgb, var(--accent) 60%, transparent);
+  border-right: 1.5px solid color-mix(in srgb, var(--accent) 60%, transparent);
+  border-top-right-radius: 2px;
 }
 
 .obs-corner--bl {
   bottom: 0; left: 0;
-  border-bottom: 2px solid color-mix(in srgb, var(--accent) 65%, transparent);
-  border-left: 2px solid color-mix(in srgb, var(--accent) 65%, transparent);
+  border-bottom: 1.5px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  border-left: 1.5px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  border-bottom-left-radius: 2px;
 }
 
 .obs-corner--br {
   bottom: 0; right: 0;
-  border-bottom: 2px solid color-mix(in srgb, var(--accent) 65%, transparent);
-  border-right: 2px solid color-mix(in srgb, var(--accent) 65%, transparent);
+  border-bottom: 1.5px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  border-right: 1.5px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  border-bottom-right-radius: 2px;
 }
 
 /* Loading sweep bar */
@@ -199,8 +194,8 @@
   left: -100%;
   width: 200%;
   height: 2px;
-  background: linear-gradient(90deg, transparent, var(--accent), transparent);
-  animation: obsSweep 1.5s ease-in-out infinite;
+  background: linear-gradient(90deg, transparent 20%, var(--accent), transparent 80%);
+  animation: obsSweep 1.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
   z-index: 10;
 }
 
@@ -230,56 +225,63 @@
 .obs-card-icon {
   font-size: 28px;
   line-height: 1;
-  filter: drop-shadow(0 0 8px color-mix(in srgb, var(--accent) 40%, transparent));
-  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  color: var(--accent);
+  filter: drop-shadow(0 0 8px color-mix(in srgb, var(--accent) 30%, transparent));
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), filter 0.35s ease;
 }
 
 .obs-card:hover .obs-card-icon {
-  transform: scale(1.12);
+  transform: scale(1.1);
+  filter: drop-shadow(0 0 12px color-mix(in srgb, var(--accent) 45%, transparent));
 }
 
 /* Difficulty badge */
 .obs-diff-badge {
-  font-size: 9px;
+  font-size: 8px;
   font-weight: 700;
   letter-spacing: 1.5px;
   text-transform: uppercase;
-  padding: 3px 10px;
+  padding: 3px 9px;
   border-radius: 4px;
   border: 1px solid;
 }
 
 .obs-diff--beginner {
   color: #00ff88;
-  background: rgba(0, 255, 136, 0.08);
-  border-color: rgba(0, 255, 136, 0.25);
+  background: rgba(0, 255, 136, 0.06);
+  border-color: rgba(0, 255, 136, 0.18);
 }
 
 .obs-diff--intermediate {
   color: #ffc864;
-  background: rgba(255, 200, 100, 0.08);
-  border-color: rgba(255, 200, 100, 0.25);
+  background: rgba(255, 200, 100, 0.06);
+  border-color: rgba(255, 200, 100, 0.18);
 }
 
 .obs-diff--advanced {
   color: #ff66ff;
-  background: rgba(255, 0, 255, 0.08);
-  border-color: rgba(255, 0, 255, 0.25);
+  background: rgba(255, 0, 255, 0.06);
+  border-color: rgba(255, 0, 255, 0.18);
 }
 
 /* Title */
 .obs-card-title {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 700;
-  color: #fff;
+  color: rgba(255, 255, 255, 0.95);
   margin: 0;
-  letter-spacing: -0.2px;
+  letter-spacing: -0.15px;
+  transition: color 0.35s ease;
+}
+
+.obs-card:hover .obs-card-title {
+  color: #fff;
 }
 
 /* Description */
 .obs-card-desc {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.42);
+  font-size: 10.5px;
+  color: rgba(255, 255, 255, 0.38);
   margin: 0;
   line-height: 1.5;
 }
@@ -287,8 +289,13 @@
 /* Divider */
 .obs-card-divider {
   height: 1px;
-  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 20%, transparent) 0%, color-mix(in srgb, var(--accent) 8%, transparent) 60%, transparent 100%);
-  margin: 2px 0;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--accent) 15%, transparent) 0%,
+    color-mix(in srgb, var(--accent) 8%, transparent) 40%,
+    rgba(255, 255, 255, 0.02) 100%
+  );
+  margin: 4px 0 2px;
 }
 
 /* Feature list */
@@ -303,8 +310,8 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.55);
+  font-size: 10.5px;
+  color: rgba(255, 255, 255, 0.5);
 }
 
 .obs-feat-dot {
@@ -312,38 +319,39 @@
   height: 4px;
   border-radius: 50%;
   background: var(--accent);
-  opacity: 0.5;
+  opacity: 0.4;
   flex-shrink: 0;
 }
 
-/* Action button */
+/* Action button — glass style matching cc-btn */
 .obs-card-btn {
   position: relative;
   width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 10px 16px;
+  gap: 7px;
+  padding: 9px 16px;
   margin-top: 4px;
-  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, transparent);
   border-radius: 8px;
   background: color-mix(in srgb, var(--accent) 6%, transparent);
   color: var(--accent);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: 1.2px;
   text-transform: uppercase;
   cursor: pointer;
   overflow: hidden;
-  transition: all 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
 }
 
 .obs-card-btn::before {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 10%, transparent) 0%, transparent 60%);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 8%, transparent) 0%, transparent 60%);
   opacity: 0;
   transition: opacity 0.3s ease;
 }
@@ -353,9 +361,11 @@
 }
 
 .obs-card-btn:hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
-  box-shadow: 0 0 20px color-mix(in srgb, var(--accent) 12%, transparent), inset 0 0 20px color-mix(in srgb, var(--accent) 4%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
   transform: translateY(-1px);
+  box-shadow:
+    0 4px 18px rgba(0, 0, 0, 0.3),
+    0 0 20px color-mix(in srgb, var(--accent) 8%, transparent);
 }
 
 .obs-card-btn:active:not(:disabled) {
@@ -372,14 +382,19 @@
   display: inline-block;
   width: 12px;
   height: 12px;
-  border: 2px solid color-mix(in srgb, var(--accent) 25%, transparent);
+  border: 1.5px solid color-mix(in srgb, var(--accent) 20%, transparent);
   border-top-color: var(--accent);
   border-radius: 50%;
-  animation: obsSpin 0.75s linear infinite;
+  animation: obsSpin 0.7s linear infinite;
 }
 
 @keyframes obsSpin {
   to { transform: rotate(360deg); }
+}
+
+/* Busy state */
+.obs-card--busy .obs-card-inner {
+  opacity: 0.65;
 }
 
 /* ——— RESPONSIVE ——— */
@@ -388,16 +403,9 @@
     grid-template-columns: 1fr;
   }
 
-  .obs-hero-content {
-    padding: 18px 20px;
-  }
-
-  .obs-hero-title {
-    font-size: 18px;
-  }
-
   .obs-card-inner {
-    padding: 14px 16px 12px;
+    padding: 14px 16px 13px;
+    gap: 8px;
   }
 
   .obs-card-title {
@@ -406,7 +414,7 @@
 
   .obs-card-btn {
     padding: 8px 14px;
-    font-size: 10px;
+    font-size: 9px;
   }
 }
 
