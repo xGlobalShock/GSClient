@@ -27,24 +27,7 @@
   -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 30%, black 30%, transparent 80%);
 }
 
-/* ── Animated scanline ── */
-.nv-scanline {
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 2px;
-  z-index: 10;
-  pointer-events: none;
-  background: linear-gradient(90deg, transparent 0%, rgba(0,242,255,0.15) 20%, rgba(0,242,255,0.3) 50%, rgba(0,242,255,0.15) 80%, transparent 100%);
-  box-shadow: 0 0 20px 4px rgba(0,242,255,0.08);
-  animation: nvScanDown 6s ease-in-out infinite;
-}
 
-@keyframes nvScanDown {
-  0%   { top: -2px; opacity: 0; }
-  10%  { opacity: 1; }
-  90%  { opacity: 1; }
-  100% { top: 100%; opacity: 0; }
-}
 
 /* ── Refresh / Rescan button ── */
 .nv-refresh {

@@ -944,6 +944,119 @@
 }
 
 /* 
+   VIDEO SETTINGS PRESETS
+    */
+.gl-presets-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1rem;
+}
+
+.gl-preset-card {
+  position: relative;
+  background: rgba(6,8,16,0.85);
+  border: 1px solid rgba(0,242,255,0.12);
+  border-radius: 12px;
+  padding: 1rem 1.1rem 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  transition: border-color 0.25s, box-shadow 0.25s;
+  overflow: hidden;
+}
+.gl-preset-card:hover {
+  border-color: rgba(0,242,255,0.35);
+  box-shadow: 0 0 18px rgba(0,242,255,0.08);
+}
+
+.gl-preset-card__head {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+.gl-preset-card__icon { color: #00f2ff; flex-shrink: 0; }
+
+.gl-preset-card__info {
+  display: flex;
+  flex-direction: column;
+}
+.gl-preset-card__label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #e4e6ea;
+  letter-spacing: 0.02em;
+}
+.gl-preset-card__file {
+  font-size: 0.68rem;
+  color: rgba(0,242,255,0.55);
+  font-family: 'Courier New', monospace;
+}
+
+.gl-preset-card__desc {
+  font-size: 0.75rem;
+  color: rgba(200,210,225,0.65);
+  line-height: 1.35;
+  margin: 0;
+}
+
+.gl-preset-card__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  border: 1px solid rgba(0,242,255,0.3);
+  border-radius: 8px;
+  color: #00f2ff;
+  background: rgba(0,242,255,0.06);
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+  width: fit-content;
+}
+.gl-preset-card__btn:hover {
+  background: rgba(0,242,255,0.14);
+  border-color: rgba(0,242,255,0.5);
+}
+.gl-preset-card__btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.gl-preset-card__btn--done {
+  color: #3bff90;
+  border-color: rgba(59,255,144,0.35);
+  background: rgba(59,255,144,0.06);
+}
+.gl-preset-card__btn--done:hover {
+  background: rgba(59,255,144,0.12);
+  border-color: rgba(59,255,144,0.5);
+}
+
+.gl-preset-card__rail {
+  position: absolute;
+  bottom: 0;
+  left: 10%;
+  right: 10%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(0,242,255,0.25), transparent);
+  border-radius: 2px;
+  transition: opacity 0.3s;
+  opacity: 0;
+}
+.gl-preset-card:hover .gl-preset-card__rail { opacity: 1; }
+
+.gl-empty--sm {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 2rem;
+  color: rgba(200,210,225,0.4);
+  text-align: center;
+}
+.gl-empty--sm p { margin: 0; font-size: 0.82rem; }
+
+/* 
    MODAL
     */
 .gl-modal-overlay {

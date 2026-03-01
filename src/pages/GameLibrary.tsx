@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, X, Monitor, Cpu, ArrowLeft, Copy, Info, Shield, Gamepad2 } from 'lucide-react';
+import { Search, X, Monitor, Cpu, ArrowLeft, Copy, Info, Shield, Gamepad2, Download, Check, FileVideo } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import '../styles/GameLibrary.css';
 import valorantImg from '../assets/Valorant.jpg';
@@ -26,6 +26,58 @@ interface OptimizationSettings {
     tweaks: { name: string; value: string; benefit: string }[];
   };
 }
+
+/* ── Video Settings Presets ── */
+interface VideoPreset {
+  id: string;
+  label: string;
+  description: string;
+  filename: string;
+  content: string;
+}
+
+const VIDEO_PRESETS: Record<string, VideoPreset[]> = {
+  'valorant': [
+    { id: 'val-comp', label: 'Competitive (Low)', description: 'Max FPS, minimum visuals for ranked play', filename: 'valorant-competitive.cfg',
+      content: 'EDisplayMode=Fullscreen\nResolution=1920x1080\nTextureQuality=med\nDetailQuality=low\nUIQuality=low\nAnisotropicFiltering=2x\nAntiAliasing=MSAA-2x\nVSync=Off\nFPSLimit=0\nMaterialQuality=low\nBloom=Off\nDistortion=Off\nShadows=Off' },
+    { id: 'val-bal', label: 'Balanced (Medium)', description: 'Good visuals with solid FPS', filename: 'valorant-balanced.cfg',
+      content: 'EDisplayMode=Fullscreen\nResolution=1920x1080\nTextureQuality=high\nDetailQuality=med\nUIQuality=med\nAnisotropicFiltering=4x\nAntiAliasing=MSAA-4x\nVSync=Off\nFPSLimit=0\nMaterialQuality=med\nBloom=On\nDistortion=On\nShadows=Medium' },
+  ],
+  'cs2': [
+    { id: 'cs2-comp', label: 'Competitive (Stretched)', description: '4:3 stretched, all low for max FPS', filename: 'cs2-competitive.cfg',
+      content: 'setting.gpu_level "0"\nsetting.gpu_mem_level "0"\nsetting.cpu_level "0"\nsetting.mat_vsync "0"\nsetting.mat_queue_mode "-1"\nsetting.r_fullscreen_gamma "2.2"\nresolution 1280x960\nfullscreen 1\nr_drawtracers_firstperson 1\nfps_max 0' },
+    { id: 'cs2-vis', label: 'Visibility (Medium)', description: 'Balanced settings for clarity', filename: 'cs2-visibility.cfg',
+      content: 'setting.gpu_level "1"\nsetting.gpu_mem_level "1"\nsetting.cpu_level "1"\nsetting.mat_vsync "0"\nresolution 1920x1080\nfullscreen 1\nsetting.csm_quality_level "1"\nsetting.r_player_visibility_mode "1"\nfps_max 0' },
+  ],
+  'apex-legends': [
+    { id: 'apex-perf', label: 'Performance (Low)', description: 'All low, stretched res for max FPS', filename: 'apex-performance.cfg',
+      content: 'setting.cl_gib_allow "0"\nsetting.cl_particle_fallback_multiplier "0"\nsetting.mat_depthfeather_enable "0"\nsetting.mat_forceaniso "1"\nsetting.csm_enabled "0"\nsetting.mat_postprocess_enable "0"\nsetting.r_visambient "0"\nsetting.volumetric_lighting "0"\nsetting.r_lod_switch_scale "0.5"\nfps_max 0' },
+    { id: 'apex-bal', label: 'Balanced (Medium)', description: 'Good visuals with competitive performance', filename: 'apex-balanced.cfg',
+      content: 'setting.cl_gib_allow "1"\nsetting.cl_particle_fallback_multiplier "1"\nsetting.mat_forceaniso "4"\nsetting.csm_enabled "1"\nsetting.csm_quality_level "1"\nsetting.mat_postprocess_enable "1"\nsetting.volumetric_lighting "0"\nfps_max 0' },
+  ],
+  'fortnite': [
+    { id: 'fn-comp', label: 'Competitive (Performance)', description: 'Performance mode, low meshes', filename: 'fortnite-competitive.ini',
+      content: '[/Script/FortniteGame.FortGameUserSettings]\nsg.ViewDistanceQuality=0\nsg.AntiAliasingQuality=0\nsg.ShadowQuality=0\nsg.PostProcessQuality=0\nsg.TextureQuality=0\nsg.EffectsQuality=0\nsg.FoliageQuality=0\nFrameRateLimit=0\nFullscreenMode=0' },
+    { id: 'fn-bal', label: 'Balanced (Medium)', description: 'DirectX 11, medium settings', filename: 'fortnite-balanced.ini',
+      content: '[/Script/FortniteGame.FortGameUserSettings]\nsg.ViewDistanceQuality=2\nsg.AntiAliasingQuality=2\nsg.ShadowQuality=1\nsg.PostProcessQuality=1\nsg.TextureQuality=2\nsg.EffectsQuality=1\nsg.FoliageQuality=1\nFrameRateLimit=0\nFullscreenMode=0' },
+  ],
+  'overwatch': [
+    { id: 'ow-comp', label: 'Competitive (Low)', description: 'All low for maximum FPS', filename: 'overwatch-competitive.cfg',
+      content: 'RenderScale=75\nTextureQuality=Low\nTextureFilteringQuality=Low-1x\nLocalFogDetail=Low\nDynamicReflections=Off\nShadowDetail=Off\nModelDetail=Low\nEffectsDetail=Low\nLightingQuality=Low\nAntialias=Off\nRefractionQuality=Low\nScreenshotQuality=1x\nTripleBuffering=Off\nVSync=Off\nFrameRateLimit=0' },
+  ],
+  'league-of-legends': [
+    { id: 'lol-perf', label: 'Performance (Low)', description: 'Smoothest gameplay, all low', filename: 'lol-performance.cfg',
+      content: '[Performance]\nGraphicsSlider=1\nShadowsEnabled=0\nCharacterQuality=1\nEnvironmentQuality=1\nEffectsQuality=1\nFrameCapType=0\nEnableHUDAnimations=0\nWaitForVerticalSync=0\nEnableGrassSwaying=0' },
+  ],
+  'rocket-league': [
+    { id: 'rl-comp', label: 'Competitive (Performance)', description: 'Max FPS, minimal visual effects', filename: 'rocketleague-competitive.cfg',
+      content: 'TextureDetail=Performance\nWorldDetail=Performance\nParticleDetail=Performance\nHighQualityShaders=False\nAmbientOcclusion=False\nDepthOfField=False\nBloom=False\nLightShafts=False\nLensFlares=False\nDynamicShadows=False\nMotionBlur=False\nWeatherFX=False\nTransparentGoalpost=True' },
+  ],
+  'cod': [
+    { id: 'cod-comp', label: 'Competitive (Low)', description: 'Minimum settings for max FPS', filename: 'cod-competitive.cfg',
+      content: 'TextureResolution=Low\nTextureFilter=Normal\nShadowMapResolution=Low\nCacheSunShadow=On\nParticleQuality=Low\nTessellation=Off\nWeatherGrid=Off\nSSAO=Off\nReflectionQuality=Off\nAntiAliasing=Off\nDepthOfField=Off\nMotionBlur=Off\nFilmGrain=0\nVSync=Off' },
+  ],
+};
 
 interface Game {
   id: string;
@@ -255,7 +307,9 @@ const GameLibrary: React.FC = () => {
   const [showCommandsModal, setShowCommandsModal] = useState(false);
   const [selectedResPreset, setSelectedResPreset] = useState('Native');
   const [selectedAspectRatio, setSelectedAspectRatio] = useState('16:9');
-  const [activeTab, setActiveTab] = useState<'graphics' | 'launch' | 'system'>('graphics');
+  const [activeTab, setActiveTab] = useState<'graphics' | 'launch' | 'presets'>('graphics');
+  const [downloadedPresets, setDownloadedPresets] = useState<Record<string, boolean>>({});
+  const [downloadingPreset, setDownloadingPreset] = useState<string | null>(null);
 
   const categories = useMemo(() => ['All', ...Array.from(new Set(games.map(game => game.category)))], []);
 
@@ -304,13 +358,26 @@ const GameLibrary: React.FC = () => {
 
   // Count settings for the selected game
   const settingsCounts = useMemo(() => {
-    if (!selectedGame) return { graphics: 0, launch: 0, system: 0 };
+    if (!selectedGame) return { graphics: 0, launch: 0, presets: 0 };
+    const presets = VIDEO_PRESETS[selectedGame.id] || [];
     return {
       graphics: selectedGame.recommended.graphics.settings.length,
       launch: selectedGame.recommended.launch.options.length,
-      system: selectedGame.recommended.performance.tweaks.length,
+      presets: presets.length,
     };
   }, [selectedGame]);
+
+  const handleDownloadPreset = useCallback(async (preset: VideoPreset) => {
+    if (!window.electron?.ipcRenderer) return;
+    setDownloadingPreset(preset.id);
+    try {
+      const res: any = await window.electron.ipcRenderer.invoke('preset:save-video-settings', preset.filename, preset.content);
+      if (res?.success) {
+        setDownloadedPresets(prev => ({ ...prev, [preset.id]: true }));
+      }
+    } catch { /* ignore */ }
+    setDownloadingPreset(null);
+  }, []);
 
   return (
     <div className="gl-container">
@@ -428,8 +495,8 @@ const GameLibrary: React.FC = () => {
                   <span className="gl-dash__stat-label">Launch</span>
                 </div>
                 <div className="gl-dash__stat">
-                  <span className="gl-dash__stat-val">{settingsCounts.system}</span>
-                  <span className="gl-dash__stat-label">System</span>
+                  <span className="gl-dash__stat-val">{settingsCounts.presets}</span>
+                  <span className="gl-dash__stat-label">Presets</span>
                 </div>
               </div>
             </div>
@@ -444,9 +511,9 @@ const GameLibrary: React.FC = () => {
                 <Cpu size={15} />
                 Launch Options
               </button>
-              <button className={`gl-tab ${activeTab === 'system' ? 'gl-tab--active' : ''}`} onClick={() => setActiveTab('system')}>
-                <Shield size={15} />
-                System
+              <button className={`gl-tab ${activeTab === 'presets' ? 'gl-tab--active' : ''}`} onClick={() => setActiveTab('presets')}>
+                <FileVideo size={15} />
+                Video Settings Presets
               </button>
             </div>
 
@@ -526,21 +593,38 @@ const GameLibrary: React.FC = () => {
                   </motion.div>
                 )}
 
-                {/* System Tab */}
-                {activeTab === 'system' && (
-                  <motion.div key="sys" initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }} transition={{ duration: 0.2 }}>
-                    <div className="gl-sys-grid">
-                      {selectedGame.recommended.performance.tweaks.map((t, i) => (
-                        <div key={`${t.name}-${i}`} className="gl-sys-card">
-                          <div className="gl-sys-card__head">
-                            <span className="gl-sys-card__name">{t.name}</span>
-                            <span className="gl-sys-card__val">{t.value}</span>
+                {/* Video Settings Presets Tab */}
+                {activeTab === 'presets' && (
+                  <motion.div key="presets" initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }} transition={{ duration: 0.2 }}>
+                    {(VIDEO_PRESETS[selectedGame.id] || []).length > 0 ? (
+                      <div className="gl-presets-grid">
+                        {(VIDEO_PRESETS[selectedGame.id] || []).map((preset, i) => (
+                          <div key={preset.id} className="gl-preset-card">
+                            <div className="gl-preset-card__head">
+                              <FileVideo size={18} className="gl-preset-card__icon" />
+                              <div className="gl-preset-card__info">
+                                <span className="gl-preset-card__label">{preset.label}</span>
+                                <span className="gl-preset-card__file">{preset.filename}</span>
+                              </div>
+                            </div>
+                            <p className="gl-preset-card__desc">{preset.description}</p>
+                            <button
+                              className={`gl-preset-card__btn ${downloadedPresets[preset.id] ? 'gl-preset-card__btn--done' : ''}`}
+                              onClick={() => handleDownloadPreset(preset)}
+                              disabled={downloadingPreset === preset.id}
+                            >
+                              {downloadedPresets[preset.id] ? (<><Check size={14} /> Saved</>) : downloadingPreset === preset.id ? 'Saving...' : (<><Download size={14} /> Download</>)}
+                            </button>
+                            <div className="gl-preset-card__rail" />
                           </div>
-                          <p className="gl-sys-card__benefit">{t.benefit}</p>
-                          <div className="gl-sys-card__bar" />
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="gl-empty gl-empty--sm">
+                        <FileVideo size={32} />
+                        <p>No video presets available for this game yet</p>
+                      </div>
+                    )}
                   </motion.div>
                 )}
               </AnimatePresence>

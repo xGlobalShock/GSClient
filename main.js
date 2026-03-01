@@ -242,6 +242,20 @@ ipcMain.handle('network:ping', async (event, host) => {
   }
 });
 
+// Video Settings Presets – save preset file to videosettings-presets folder
+ipcMain.handle('preset:save-video-settings', async (event, filename, content) => {
+  try {
+    const { app } = require('electron');
+    const dir = path.join(app.getPath('userData'), 'videosettings-presets');
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    const filePath = path.join(dir, filename);
+    fs.writeFileSync(filePath, content, 'utf-8');
+    return { success: true, path: filePath };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
 // Restore Point IPC Handler
 ipcMain.handle('system:create-restore-point', async (event, description) => {
   try {

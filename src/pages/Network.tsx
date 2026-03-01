@@ -102,7 +102,7 @@ const Network: React.FC = () => {
     <motion.div className="nv" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.6 }}>
       {/* Background effects */}
       <div className="nv-bg-grid" />
-      <div className="nv-scanline" />
+
 
       <PageHeader
         icon={<Wifi size={16} />}
