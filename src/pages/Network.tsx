@@ -78,7 +78,7 @@ const Network: React.FC = () => {
   useEffect(() => {
     mountedRef.current = true;
     pingAll();
-    const iv = setInterval(pingAll, 5000);
+    const iv = setInterval(pingAll, 1000);
     return () => { mountedRef.current = false; clearInterval(iv); };
   }, [pingAll]);
 
