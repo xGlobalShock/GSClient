@@ -227,6 +227,21 @@ app.on('activate', () => {
   }
 });
 
+// Network ping helper
+ipcMain.handle('network:ping', async (event, host) => {
+  try {
+    // simple Windows ping; for cross-platform we could adjust but this app is Windows-focused
+    const cmd = `ping -n 1 ${host}`;
+    const { stdout } = await execAsync(cmd, { shell: true, timeout: 10000 });
+    // look for time=Xms or time<1ms style
+    const m = stdout.match(/time[=<]\s*(\d+)\s*ms/);
+    const time = m ? parseInt(m[1], 10) : null;
+    return { success: time !== null, time };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
 // Restore Point IPC Handler
 ipcMain.handle('system:create-restore-point', async (event, description) => {
   try {

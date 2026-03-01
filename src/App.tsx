@@ -8,6 +8,7 @@ import Cleaner from './pages/Cleaner';
 import Settings from './pages/Settings';
 import GameLibrary from './pages/GameLibrary';
 import OBSPresets from './pages/OBSPresets';
+import Network from './pages/Network';
 import { ToastProvider } from './contexts/ToastContext';
 import { ToastContainer } from './components/ToastContainer';
 import { useRealtimeHardware } from './hooks/useRealtimeHardware';
@@ -152,6 +153,9 @@ function App() {
         </div>
         <div style={{ display: currentPage === 'cleaner' ? 'block' : 'none' }}>
           <Cleaner />
+        </div>
+        <div style={{ display: currentPage === 'network' ? 'block' : 'none' }}>
+          <Network />
         </div>
         <div style={{ display: currentPage === 'gameLibrary' ? 'block' : 'none' }}>
           <GameLibrary />

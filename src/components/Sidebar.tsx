@@ -8,6 +8,7 @@ import {
   Gamepad2,
   Zap,
   Video,
+  Wifi,
 } from 'lucide-react';
 import { LucideIcon } from 'lucide-react';
 import '../styles/Sidebar.css';
@@ -155,6 +156,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage, online: 
   const menuItems: MenuItem[] = useMemo(() => [
     { id: 'dashboard', label: 'System Details', icon: Home },
     { id: 'performance', label: 'PC Tweaks', icon: Activity },
+    { id: 'network', label: 'Network Diagnostics', icon: Wifi },
     { id: 'gameLibrary', label: 'Game Presets', icon: Gamepad2 },
     { id: 'obsPresets', label: 'Streaming Presets', icon: Video },
     { id: 'cleaner', label: 'Cleanup Toolkit', icon: Trash2 },
