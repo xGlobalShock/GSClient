@@ -2629,6 +2629,212 @@ ipcMain.handle('cleaner:clear-valorant-shaders', async () => {
   }
 });
 
+// ── Individual Disk Cleanup Handlers ────────────────────────────────────
+
+// Windows Temp (C:\Windows\Temp)
+ipcMain.handle('cleaner:clear-windows-temp', async () => {
+  try {
+    const winTemp = path.join(process.env.WINDIR || 'C:\\Windows', 'Temp');
+    let filesDeleted = 0, totalSize = 0, filesBefore = 0;
+    if (fs.existsSync(winTemp)) {
+      const files = fs.readdirSync(winTemp);
+      filesBefore = files.length;
+      for (const file of files) {
+        try {
+          const fp = path.join(winTemp, file);
+          const stats = fs.statSync(fp);
+          totalSize += stats.size;
+          fs.rmSync(fp, { recursive: true, force: true });
+          filesDeleted++;
+        } catch (e) {}
+      }
+    }
+    return { success: true, message: 'Cleared Windows Temp', filesDeleted, filesBefore, filesAfter: filesBefore - filesDeleted, spaceSaved: `${(totalSize / (1024 * 1024)).toFixed(2)} MB` };
+  } catch (error) {
+    if (isPermissionError(error)) return { success: false, message: 'Run the app as administrator' };
+    return { success: false, message: `Error: ${error.message}` };
+  }
+});
+
+// Thumbnail Cache
+ipcMain.handle('cleaner:clear-thumbnail-cache', async () => {
+  try {
+    const explorerDir = path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'Microsoft', 'Windows', 'Explorer');
+    let filesDeleted = 0, totalSize = 0, filesBefore = 0;
+    if (fs.existsSync(explorerDir)) {
+      const files = fs.readdirSync(explorerDir).filter(f => /^thumbcache_/i.test(f));
+      filesBefore = files.length;
+      for (const file of files) {
+        try {
+          const fp = path.join(explorerDir, file);
+          const stats = fs.statSync(fp);
+          totalSize += stats.size;
+          fs.rmSync(fp, { force: true });
+          filesDeleted++;
+        } catch (e) {}
+      }
+    }
+    return { success: true, message: 'Cleared Thumbnail Cache', filesDeleted, filesBefore, filesAfter: filesBefore - filesDeleted, spaceSaved: `${(totalSize / (1024 * 1024)).toFixed(2)} MB` };
+  } catch (error) {
+    if (isPermissionError(error)) return { success: false, message: 'Run the app as administrator' };
+    return { success: false, message: `Error: ${error.message}` };
+  }
+});
+
+// Windows Log Files
+ipcMain.handle('cleaner:clear-windows-logs', async () => {
+  try {
+    const logsDir = path.join(process.env.WINDIR || 'C:\\Windows', 'Logs');
+    let filesDeleted = 0, totalSize = 0, filesBefore = 0;
+    if (fs.existsSync(logsDir)) {
+      const walkAndDelete = (dir) => {
+        try {
+          const entries = fs.readdirSync(dir, { withFileTypes: true });
+          for (const entry of entries) {
+            const fp = path.join(dir, entry.name);
+            filesBefore++;
+            try {
+              const stats = fs.statSync(fp);
+              totalSize += entry.isDirectory() ? 0 : stats.size;
+              fs.rmSync(fp, { recursive: true, force: true });
+              filesDeleted++;
+            } catch (e) {}
+          }
+        } catch (e) {}
+      };
+      walkAndDelete(logsDir);
+    }
+    return { success: true, message: 'Cleared Windows Logs', filesDeleted, filesBefore, filesAfter: filesBefore - filesDeleted, spaceSaved: `${(totalSize / (1024 * 1024)).toFixed(2)} MB` };
+  } catch (error) {
+    if (isPermissionError(error)) return { success: false, message: 'Run the app as administrator' };
+    return { success: false, message: `Error: ${error.message}` };
+  }
+});
+
+// Crash Dumps
+ipcMain.handle('cleaner:clear-crash-dumps', async () => {
+  try {
+    const dumpsDir = path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'CrashDumps');
+    let filesDeleted = 0, totalSize = 0, filesBefore = 0;
+    if (fs.existsSync(dumpsDir)) {
+      const files = fs.readdirSync(dumpsDir);
+      filesBefore = files.length;
+      for (const file of files) {
+        try {
+          const fp = path.join(dumpsDir, file);
+          const stats = fs.statSync(fp);
+          totalSize += stats.size;
+          fs.rmSync(fp, { recursive: true, force: true });
+          filesDeleted++;
+        } catch (e) {}
+      }
+    }
+    return { success: true, message: 'Cleared Crash Dumps', filesDeleted, filesBefore, filesAfter: filesBefore - filesDeleted, spaceSaved: `${(totalSize / (1024 * 1024)).toFixed(2)} MB` };
+  } catch (error) {
+    if (isPermissionError(error)) return { success: false, message: 'Run the app as administrator' };
+    return { success: false, message: `Error: ${error.message}` };
+  }
+});
+
+// Windows Error Reports
+ipcMain.handle('cleaner:clear-error-reports', async () => {
+  try {
+    const werDir = path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'Microsoft', 'Windows', 'WER', 'ReportArchive');
+    let filesDeleted = 0, totalSize = 0, filesBefore = 0;
+    if (fs.existsSync(werDir)) {
+      const entries = fs.readdirSync(werDir);
+      filesBefore = entries.length;
+      for (const entry of entries) {
+        try {
+          const fp = path.join(werDir, entry);
+          const stats = fs.statSync(fp);
+          totalSize += stats.isDirectory() ? 0 : stats.size;
+          fs.rmSync(fp, { recursive: true, force: true });
+          filesDeleted++;
+        } catch (e) {}
+      }
+    }
+    return { success: true, message: 'Cleared Error Reports', filesDeleted, filesBefore, filesAfter: filesBefore - filesDeleted, spaceSaved: `${(totalSize / (1024 * 1024)).toFixed(2)} MB` };
+  } catch (error) {
+    if (isPermissionError(error)) return { success: false, message: 'Run the app as administrator' };
+    return { success: false, message: `Error: ${error.message}` };
+  }
+});
+
+// Delivery Optimization Cache
+ipcMain.handle('cleaner:clear-delivery-optimization', async () => {
+  try {
+    const doDir = path.join(process.env.WINDIR || 'C:\\Windows', 'SoftwareDistribution', 'DeliveryOptimization');
+    let filesDeleted = 0, totalSize = 0, filesBefore = 0;
+    if (fs.existsSync(doDir)) {
+      const entries = fs.readdirSync(doDir);
+      filesBefore = entries.length;
+      for (const entry of entries) {
+        try {
+          const fp = path.join(doDir, entry);
+          const stats = fs.statSync(fp);
+          totalSize += stats.isDirectory() ? 0 : stats.size;
+          fs.rmSync(fp, { recursive: true, force: true });
+          filesDeleted++;
+        } catch (e) {}
+      }
+    }
+    return { success: true, message: 'Cleared Delivery Optimization Cache', filesDeleted, filesBefore, filesAfter: filesBefore - filesDeleted, spaceSaved: `${(totalSize / (1024 * 1024)).toFixed(2)} MB` };
+  } catch (error) {
+    if (isPermissionError(error)) return { success: false, message: 'Run the app as administrator' };
+    return { success: false, message: `Error: ${error.message}` };
+  }
+});
+
+// Font Cache
+ipcMain.handle('cleaner:clear-font-cache', async () => {
+  try {
+    const fontCacheDir = path.join(process.env.WINDIR || 'C:\\Windows', 'ServiceProfiles', 'LocalService', 'AppData', 'Local', 'FontCache');
+    let filesDeleted = 0, totalSize = 0, filesBefore = 0;
+    if (fs.existsSync(fontCacheDir)) {
+      const files = fs.readdirSync(fontCacheDir).filter(f => /\.dat$/i.test(f));
+      filesBefore = files.length;
+      for (const file of files) {
+        try {
+          const fp = path.join(fontCacheDir, file);
+          const stats = fs.statSync(fp);
+          totalSize += stats.size;
+          fs.rmSync(fp, { force: true });
+          filesDeleted++;
+        } catch (e) {}
+      }
+    }
+    return { success: true, message: 'Cleared Font Cache', filesDeleted, filesBefore, filesAfter: filesBefore - filesDeleted, spaceSaved: `${(totalSize / (1024 * 1024)).toFixed(2)} MB` };
+  } catch (error) {
+    if (isPermissionError(error)) return { success: false, message: 'Run the app as administrator' };
+    return { success: false, message: `Error: ${error.message}` };
+  }
+});
+
+// Recent Files (.lnk shortcuts)
+ipcMain.handle('cleaner:clear-recent-files', async () => {
+  try {
+    const recentDir = path.join(process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'), 'Microsoft', 'Windows', 'Recent');
+    let filesDeleted = 0, totalSize = 0, filesBefore = 0;
+    if (fs.existsSync(recentDir)) {
+      const files = fs.readdirSync(recentDir).filter(f => /\.lnk$/i.test(f));
+      filesBefore = files.length;
+      for (const file of files) {
+        try {
+          const fp = path.join(recentDir, file);
+          const stats = fs.statSync(fp);
+          totalSize += stats.size;
+          fs.rmSync(fp, { force: true });
+          filesDeleted++;
+        } catch (e) {}
+      }
+    }
+    return { success: true, message: 'Cleared Recent Files', filesDeleted, filesBefore, filesAfter: filesBefore - filesDeleted, spaceSaved: `${(totalSize / (1024 * 1024)).toFixed(2)} MB` };
+  } catch (error) {
+    return { success: false, message: `Error: ${error.message}` };
+  }
+});
+
 ipcMain.handle('cleaner:clear-temp-files', async () => {
   try {
     const tempDir = process.env.TEMP || os.tmpdir();
@@ -3829,4 +4035,529 @@ ipcMain.handle('obs:launch', async () => {
       message: `Failed to launch OBS: ${error.message}`
     };
   }
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+// SOFTWARE UPDATES — winget integration
+// ══════════════════════════════════════════════════════════════════════════
+
+// Check for outdated apps via winget
+ipcMain.handle('software:check-updates', async () => {
+  try {
+    let stdout = '';
+    try {
+      const result = await execAsync(
+        'chcp 65001 >nul && winget upgrade --include-unknown --accept-source-agreements 2>nul',
+        {
+          timeout: 45000,
+          windowsHide: true,
+          encoding: 'utf8',
+          shell: 'cmd.exe',
+          maxBuffer: 1024 * 1024 * 5,
+        }
+      );
+      stdout = result.stdout || '';
+    } catch (execErr) {
+      // winget may exit with non-zero code even when output is valid
+      if (execErr.stdout) {
+        stdout = execErr.stdout;
+      } else {
+        throw execErr;
+      }
+    }
+
+    console.log('[software:check-updates] Raw output length:', stdout.length);
+    
+    // winget uses \r for progress spinner - clean by taking last non-empty \r segment per line
+    const lines = stdout.split('\n').map(l => {
+      const parts = l.split('\r').map(p => p.trimEnd()).filter(p => p.length > 0);
+      return parts.length > 0 ? parts[parts.length - 1] : '';
+    }).filter(l => l.length > 0);
+
+    // Find the header line (contains "Name" and "Id" and "Version")
+    const headerIdx = lines.findIndex(l => /Name\s+Id\s+Version/i.test(l));
+    if (headerIdx === -1) {
+      console.log('[software:check-updates] No header found. Lines:', lines.slice(0, 10));
+      return { success: true, packages: [], count: 0 };
+    }
+
+    // Find the separator line (dashes)
+    const sepIdx = lines.findIndex((l, i) => i > headerIdx && /^-{10,}/.test(l.trim()));
+    if (sepIdx === -1) {
+      console.log('[software:check-updates] No separator found after header');
+      return { success: true, packages: [], count: 0 };
+    }
+
+    // Parse column positions from header
+    const header = lines[headerIdx];
+    const nameStart = 0;
+    const idStart = header.search(/\bId\b/);
+    const versionStart = header.search(/\bVersion\b/);
+    const availableStart = header.search(/\bAvailable\b/);
+    const sourceStart = header.search(/\bSource\b/);
+
+    console.log('[software:check-updates] Columns:', { idStart, versionStart, availableStart, sourceStart });
+
+    const packages = [];
+    for (let i = sepIdx + 1; i < lines.length; i++) {
+      const line = lines[i];
+      if (!line.trim()) continue;
+      // Stop at summary line like "X upgrades available." or end markers
+      if (/^\d+ upgrades? available/i.test(line.trim())) break;
+      if (/^The following/i.test(line.trim())) break;
+
+      // Skip lines that are too short to contain valid data
+      if (line.length < idStart + 3) continue;
+
+      const name = line.substring(nameStart, idStart).trim();
+      const id = line.substring(idStart, versionStart).trim();
+      const rawVersion = versionStart >= 0 && availableStart >= 0
+        ? line.substring(versionStart, availableStart).trim()
+        : '';
+      const version = rawVersion.replace(/^<\s*/, '');
+      const available = availableStart >= 0 && sourceStart >= 0
+        ? line.substring(availableStart, sourceStart).trim()
+        : availableStart >= 0
+          ? line.substring(availableStart).trim()
+          : '';
+      const source = sourceStart >= 0 ? line.substring(sourceStart).trim() : 'winget';
+
+      // Skip packages with "<" version prefix — winget can't reliably upgrade these
+      const isUnknownVersion = rawVersion.startsWith('<');
+
+      if (name && id && id.includes('.') && !isUnknownVersion) {
+        packages.push({ name, id, version, available, source });
+      }
+    }
+
+    console.log('[software:check-updates] Found', packages.length, 'packages');
+    return { success: true, packages, count: packages.length };
+  } catch (error) {
+    console.error('[software:check-updates] Error:', error.message?.substring(0, 300));
+    return { success: false, message: `Failed to check updates: ${error.message}`, packages: [], count: 0 };
+  }
+});
+
+// ── Helper: follow redirects and get Content-Length via HEAD request ──
+function headContentLength(url, redirects = 0) {
+  if (redirects > 5) return Promise.resolve(0);
+  const mod = url.startsWith('https') ? require('https') : require('http');
+  return new Promise(resolve => {
+    const req = mod.request(url, { method: 'HEAD', timeout: 8000 }, res => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        res.resume();
+        resolve(headContentLength(res.headers.location, redirects + 1));
+      } else {
+        resolve(parseInt(res.headers['content-length'] || '0', 10));
+        res.resume();
+      }
+    });
+    req.on('error', () => resolve(0));
+    req.on('timeout', () => { req.destroy(); resolve(0); });
+    req.end();
+  });
+}
+
+function formatBytes(bytes) {
+  if (!bytes || bytes <= 0) return '';
+  if (bytes >= 1024 * 1024 * 1024) return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+  if (bytes >= 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  if (bytes >= 1024) return (bytes / 1024).toFixed(0) + ' KB';
+  return bytes + ' B';
+}
+
+// Get installer file size for a single package
+ipcMain.handle('software:get-package-size', async (_event, packageId) => {
+  const cleanId = String(packageId).replace(/[^\x20-\x7E]/g, '').trim();
+  try {
+    const { stdout } = await execAsync(
+      `chcp 65001 >nul && winget show --id ${cleanId} --accept-source-agreements 2>nul`,
+      { timeout: 15000, windowsHide: true, encoding: 'utf8', shell: 'cmd.exe' }
+    );
+    // Look for "Installer Url:" line
+    const urlMatch = stdout.match(/Installer\s+Url:\s*(https?:\/\/\S+)/i);
+    if (!urlMatch) return { id: cleanId, size: '', bytes: 0 };
+
+    const bytes = await headContentLength(urlMatch[1].trim());
+    return { id: cleanId, size: formatBytes(bytes), bytes };
+  } catch (e) {
+    return { id: cleanId, size: '', bytes: 0 };
+  }
+});
+
+// Update a single app
+ipcMain.handle('software:update-app', async (_event, packageId) => {
+  const cleanId = String(packageId).replace(/[^\x20-\x7E]/g, '').trim();
+  console.log('[software:update-app] Updating:', JSON.stringify(cleanId));
+
+  return new Promise((resolve) => {
+    const win = BrowserWindow.getAllWindows()[0];
+    let fullOutput = '';
+    let phase = 'preparing';
+
+    const sendProgress = (data) => {
+      if (win && !win.isDestroyed()) {
+        win.webContents.send('software:update-progress', { packageId: cleanId, ...data });
+      }
+    };
+
+    sendProgress({ phase: 'preparing', status: 'Preparing update…', percent: 0 });
+
+    const proc = spawn('cmd.exe', [
+      '/c', `chcp 65001 >nul && winget upgrade --id ${cleanId} --accept-source-agreements --accept-package-agreements`
+    ], { windowsHide: true });
+
+    const timeout = setTimeout(() => {
+      proc.kill();
+      sendProgress({ phase: 'error', status: 'Update timed out', percent: 0 });
+      resolve({ success: false, message: `Update timed out for ${packageId}` });
+    }, 180000);
+
+    const processChunk = (chunk) => {
+      const text = chunk.toString();
+      fullOutput += text;
+      const segments = text.split('\r').map(s => s.trim()).filter(s => s.length > 0);
+
+      for (const seg of segments) {
+        // Skip spinner characters
+        if (/^[-\\|/]$/.test(seg)) {
+          if (phase === 'downloading') {
+            sendProgress({ phase, status: 'Downloading…', percent: -1 });
+          } else if (phase === 'installing') {
+            sendProgress({ phase, status: 'Installing…', percent: -1 });
+          }
+          continue;
+        }
+
+        const urlMatch = seg.match(/^Downloading\s+(https?:\/\/.+)/i);
+        if (urlMatch) {
+          phase = 'downloading';
+          sendProgress({ phase: 'downloading', status: 'Downloading…', percent: -1 });
+          continue;
+        }
+
+        // Status messages
+        if (/^Found\s/i.test(seg)) {
+          sendProgress({ phase: 'preparing', status: seg.substring(0, 80), percent: 5 });
+        } else if (/verified installer hash/i.test(seg)) {
+          phase = 'verifying';
+          sendProgress({ phase: 'verifying', status: 'Installer verified', percent: 100 });
+        } else if (/Starting package install/i.test(seg)) {
+          phase = 'installing';
+          sendProgress({ phase: 'installing', status: 'Installing…', percent: -1 });
+        } else if (/Successfully installed/i.test(seg)) {
+          phase = 'done';
+          sendProgress({ phase: 'done', status: 'Successfully installed!', percent: 100 });
+        } else if (/no applicable/i.test(seg) || /no available upgrade/i.test(seg)) {
+          sendProgress({ phase: 'done', status: 'Already up to date', percent: 100 });
+        } else if (/no installed package found/i.test(seg)) {
+          sendProgress({ phase: 'error', status: 'Package not found — update manually or via its own updater', percent: 0 });
+        } else if (/cannot be upgraded using winget/i.test(seg) || /use the method provided by the publisher/i.test(seg)) {
+          sendProgress({ phase: 'error', status: 'This app must be updated through its own updater', percent: 0 });
+        } else if (/currently running.*exit the application/i.test(seg)) {
+          sendProgress({ phase: 'error', status: 'Close the app first, then try updating again', percent: 0 });
+        } else if (/access is denied|administrator/i.test(seg)) {
+          sendProgress({ phase: 'error', status: 'Requires administrator privileges', percent: 0 });
+        } else if (/Installer failed/i.test(seg)) {
+          sendProgress({ phase: 'error', status: 'Installer failed — the app may need to be closed first', percent: 0 });
+        } else if (/failed|error|denied|cannot|exit code/i.test(seg)) {
+          sendProgress({ phase: 'error', status: seg.substring(0, 100), percent: 0 });
+        }
+      }
+    };
+
+    proc.stdout.on('data', processChunk);
+    proc.stderr.on('data', processChunk);
+
+    proc.on('close', (code) => {
+      clearTimeout(timeout);
+      const output = fullOutput.toLowerCase();
+      const success = output.includes('successfully installed') ||
+                      output.includes('no available upgrade') ||
+                      output.includes('no applicable');
+
+      const friendlyError = (output) => {
+        if (output.includes('no installed package found')) return 'Package not found — update manually or via its own updater';
+        if (output.includes('cannot be upgraded using winget') || output.includes('use the method provided by the publisher')) return 'This app must be updated through its own updater';
+        if (output.includes('currently running') && output.includes('exit the application')) return 'Close the app first, then try updating again';
+        if (output.includes('administrator') || output.includes('access is denied')) return 'Run the app as administrator to update this package.';
+        if (output.includes('installer failed')) return 'Installer failed — the app may need to be closed first';
+        return null;
+      };
+
+      if (success) {
+        sendProgress({ phase: 'done', status: 'Update complete!', percent: 100 });
+        resolve({ success: true, message: `${packageId} updated successfully` });
+      } else {
+        const friendly = friendlyError(output);
+        const msg = friendly || fullOutput.split('\r').map(s=>s.trim()).filter(s=>s.length>0).pop() || `Update failed (exit code: ${code})`;
+        sendProgress({ phase: 'error', status: msg.substring(0, 120), percent: 0 });
+        resolve({ success: false, message: msg });
+      }
+    });
+
+    proc.on('error', (err) => {
+      clearTimeout(timeout);
+      sendProgress({ phase: 'error', status: err.message, percent: 0 });
+      resolve({ success: false, message: `Failed to start update: ${err.message}` });
+    });
+  });
+});
+
+// Update all apps
+ipcMain.handle('software:update-all', async () => {
+  try {
+    const { stdout, stderr } = await execAsync(
+      'winget upgrade --all --silent --accept-source-agreements --accept-package-agreements 2>nul',
+      { timeout: 300000, windowsHide: true, encoding: 'utf8', shell: true }
+    );
+    return { success: true, message: 'All packages updated' };
+  } catch (error) {
+    if (isPermissionError(error)) {
+      return { success: false, message: 'Run the app as administrator to update all packages.' };
+    }
+    return { success: false, message: `Update all failed: ${error.message}` };
+  }
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+// APP INSTALLER — install apps via winget
+// ══════════════════════════════════════════════════════════════════════════
+
+// Check which package IDs are already installed
+ipcMain.handle('appinstall:check-installed', async (_event, catalogApps) => {
+  try {
+    const { stdout } = await execAsync(
+      'chcp 65001 >nul && winget list --accept-source-agreements 2>nul',
+      { timeout: 30000, windowsHide: true, encoding: 'utf8', shell: 'cmd.exe', maxBuffer: 1024 * 1024 * 5 }
+    );
+
+    // ── Clean \r spinner characters, then rejoin wrapped lines ──
+    // winget uses \r for progress spinners — take last non-empty \r segment per line.
+    // Then rejoin continuation lines (which start with whitespace).
+    const rawLines = stdout.split('\n').map(l => {
+      const parts = l.split('\r').map(p => p.trimEnd()).filter(p => p.length > 0);
+      return parts.length > 0 ? parts[parts.length - 1] : '';
+    }).filter(l => l.length > 0);
+
+    const lines = [];
+    for (const l of rawLines) {
+      if (/^\s+\S/.test(l) && lines.length > 0 && lines[lines.length - 1] !== '') {
+        lines[lines.length - 1] += l;
+      } else {
+        lines.push(l);
+      }
+    }
+
+    // ── Parse the winget table: extract both Name and Id columns ──
+    const headerIdx = lines.findIndex(l => /Name\s+Id\s+Version/i.test(l));
+    const installedEntries = []; // { name: string, id: string }
+
+    if (headerIdx !== -1) {
+      const headerLine = lines[headerIdx];
+      const nameStart = 0;
+      const idStart = headerLine.search(/\bId\b/i);
+      const versionStart = headerLine.search(/\bVersion\b/i);
+
+      // Data starts after the separator line (dashes)
+      const dataStart = headerIdx + 2;
+      for (let i = dataStart; i < lines.length; i++) {
+        const line = lines[i];
+        if (line.length < idStart + 2) continue;
+        const rawName = line.substring(nameStart, idStart).trim();
+        const rawId = line.substring(idStart, versionStart > idStart ? versionStart : line.length).trim();
+        if (rawId && rawId !== '---' && rawName) {
+          installedEntries.push({ name: rawName.toLowerCase(), id: rawId.toLowerCase() });
+        }
+      }
+    }
+
+    console.log(`[appinstall:check-installed] Parsed ${installedEntries.length} installed packages from winget list`);
+
+    // Build fast lookup sets
+    const installedIdSet = new Set(installedEntries.map(e => e.id));
+    const installedNameSet = new Set(installedEntries.map(e => e.name));
+
+    // catalogApps is either [{id, name}] (new) or [string] (legacy fallback)
+    const apps = Array.isArray(catalogApps)
+      ? catalogApps.map(a => typeof a === 'string' ? { id: a, name: '' } : a)
+      : [];
+
+    const installed = {};
+    for (const app of apps) {
+      const catalogIdLower = app.id.toLowerCase();
+      const catalogNameLower = (app.name || '').toLowerCase();
+
+      // Strategy 1: Exact winget ID match (e.g. Brave.Brave === Brave.Brave)
+      if (installedIdSet.has(catalogIdLower)) {
+        installed[app.id] = true;
+        continue;
+      }
+
+      // Strategy 2: Installed ID starts with catalog ID
+      // Catches Google.Chrome matching Google.Chrome.EXE
+      let found = false;
+      for (const entry of installedEntries) {
+        if (entry.id.startsWith(catalogIdLower) && entry.id.length <= catalogIdLower.length + 10) {
+          found = true;
+          break;
+        }
+      }
+      if (found) {
+        installed[app.id] = true;
+        continue;
+      }
+
+      // Strategy 3: Exact name match from winget list Name column
+      // Catches Discord (ARP\User\X64\Discord has Name="Discord")
+      if (catalogNameLower && installedNameSet.has(catalogNameLower)) {
+        installed[app.id] = true;
+        continue;
+      }
+
+      // Strategy 4: For ARP entries, check if the last segment of the ARP path
+      // matches the first part of the catalog ID (before the dot)
+      // e.g. ARP\Machine\X64\Git_is1 → "git" vs catalog "Git.Git" → "git"
+      const catalogIdPrefix = catalogIdLower.split('.')[0];
+      if (catalogIdPrefix.length >= 3) {
+        for (const entry of installedEntries) {
+          if (entry.id.includes('\\') || entry.id.includes('arp')) {
+            // Extract the last path segment of the ARP ID
+            const segments = entry.id.replace(/\\\\/g, '\\').split('\\');
+            const lastSeg = segments[segments.length - 1].replace(/_is\d*$/i, '').toLowerCase();
+            if (lastSeg === catalogIdPrefix || lastSeg === catalogIdLower.replace(/\./g, '')) {
+              found = true;
+              break;
+            }
+          }
+        }
+      }
+      installed[app.id] = found;
+    }
+
+    return { success: true, installed };
+  } catch (error) {
+    console.error('[appinstall:check-installed] Error:', error.message?.substring(0, 200));
+    return { success: false, installed: {} };
+  }
+});
+
+// Install a single app via winget (with progress IPC)
+ipcMain.handle('appinstall:install-app', async (_event, packageId) => {
+  const cleanId = String(packageId).replace(/[^\x20-\x7E]/g, '').trim();
+  console.log('[appinstall:install-app] Installing:', cleanId);
+
+  return new Promise((resolve) => {
+    const win = BrowserWindow.getAllWindows()[0];
+    let fullOutput = '';
+    let phase = 'preparing';
+
+    const sendProgress = (data) => {
+      if (win && !win.isDestroyed()) {
+        win.webContents.send('appinstall:install-progress', { packageId: cleanId, ...data });
+      }
+    };
+
+    sendProgress({ phase: 'preparing', status: 'Preparing installation…', percent: 0 });
+
+    const proc = spawn('cmd.exe', [
+      '/c', `chcp 65001 >nul && winget install --id ${cleanId} --accept-source-agreements --accept-package-agreements`
+    ], { windowsHide: true });
+
+    const timeout = setTimeout(() => {
+      proc.kill();
+      sendProgress({ phase: 'error', status: 'Installation timed out', percent: 0 });
+      resolve({ success: false, message: `Installation timed out for ${cleanId}` });
+    }, 300000);
+
+    const processChunk = (chunk) => {
+      const text = chunk.toString();
+      fullOutput += text;
+      const segments = text.split('\r').map(s => s.trim()).filter(s => s.length > 0);
+
+      for (const seg of segments) {
+        if (/^[-\\|/]$/.test(seg)) {
+          if (phase === 'downloading') {
+            sendProgress({ phase, status: 'Downloading…', percent: -1 });
+          } else if (phase === 'installing') {
+            sendProgress({ phase, status: 'Installing…', percent: -1 });
+          }
+          continue;
+        }
+
+        const urlMatch = seg.match(/^Downloading\s+(https?:\/\/.+)/i);
+        if (urlMatch) {
+          phase = 'downloading';
+          sendProgress({ phase: 'downloading', status: 'Downloading…', percent: -1 });
+          continue;
+        }
+
+        if (/^Found\s/i.test(seg)) {
+          sendProgress({ phase: 'preparing', status: seg.substring(0, 80), percent: 5 });
+        } else if (/verified installer hash/i.test(seg)) {
+          phase = 'verifying';
+          sendProgress({ phase: 'verifying', status: 'Installer verified', percent: 100 });
+        } else if (/Starting package install/i.test(seg)) {
+          phase = 'installing';
+          sendProgress({ phase: 'installing', status: 'Installing…', percent: -1 });
+        } else if (/Successfully installed/i.test(seg)) {
+          phase = 'done';
+          sendProgress({ phase: 'done', status: 'Successfully installed!', percent: 100 });
+        } else if (/already installed/i.test(seg)) {
+          phase = 'done';
+          sendProgress({ phase: 'done', status: 'Already installed', percent: 100 });
+        } else if (/access is denied|administrator/i.test(seg)) {
+          sendProgress({ phase: 'error', status: 'Requires administrator privileges', percent: 0 });
+        } else if (/Installer failed/i.test(seg)) {
+          sendProgress({ phase: 'error', status: 'Installer failed', percent: 0 });
+        } else if (/no package found/i.test(seg)) {
+          sendProgress({ phase: 'error', status: 'Package not found in winget', percent: 0 });
+        } else if (/failed|error|denied|cannot|exit code/i.test(seg)) {
+          sendProgress({ phase: 'error', status: seg.substring(0, 100), percent: 0 });
+        }
+      }
+    };
+
+    proc.stdout.on('data', processChunk);
+    proc.stderr.on('data', processChunk);
+
+    proc.on('close', (code) => {
+      clearTimeout(timeout);
+      const output = fullOutput.toLowerCase();
+      const success = output.includes('successfully installed') || output.includes('already installed');
+      if (success) {
+        sendProgress({ phase: 'done', status: 'Installed!', percent: 100 });
+        resolve({ success: true, message: `${cleanId} installed successfully` });
+      } else {
+        const msg = fullOutput.split('\r').map(s => s.trim()).filter(s => s.length > 0).pop() || `Installation failed (exit code: ${code})`;
+        sendProgress({ phase: 'error', status: msg.substring(0, 120), percent: 0 });
+        resolve({ success: false, message: msg });
+      }
+    });
+
+    proc.on('error', (err) => {
+      clearTimeout(timeout);
+      sendProgress({ phase: 'error', status: err.message, percent: 0 });
+      resolve({ success: false, message: `Failed to start installation: ${err.message}` });
+    });
+  });
+});
+
+// Install multiple apps in sequence
+ipcMain.handle('appinstall:install-batch', async (_event, packageIds) => {
+  const results = [];
+  for (const id of packageIds) {
+    try {
+      const cleanId = String(id).replace(/[^\x20-\x7E]/g, '').trim();
+      const { stdout } = await execAsync(
+        `chcp 65001 >nul && winget install --id ${cleanId} --accept-source-agreements --accept-package-agreements --silent 2>nul`,
+        { timeout: 180000, windowsHide: true, encoding: 'utf8', shell: 'cmd.exe' }
+      );
+      const success = stdout.toLowerCase().includes('successfully installed') || stdout.toLowerCase().includes('already installed');
+      results.push({ id: cleanId, success, message: success ? 'Installed' : 'Failed' });
+    } catch (e) {
+      results.push({ id, success: false, message: e.message?.substring(0, 100) || 'Failed' });
+    }
+  }
+  return { success: true, results };
 });

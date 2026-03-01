@@ -9,6 +9,8 @@ import Settings from './pages/Settings';
 import GameLibrary from './pages/GameLibrary';
 import OBSPresets from './pages/OBSPresets';
 import Network from './pages/Network';
+import SoftwareUpdates from './pages/SoftwareUpdates';
+import AppInstaller from './pages/AppInstaller';
 import { ToastProvider } from './contexts/ToastContext';
 import { ToastContainer } from './components/ToastContainer';
 import { useRealtimeHardware } from './hooks/useRealtimeHardware';
@@ -162,6 +164,12 @@ function App() {
         </div>
         <div style={{ display: currentPage === 'obsPresets' ? 'block' : 'none' }}>
           <OBSPresets />
+        </div>
+        <div style={{ display: currentPage === 'softwareUpdates' ? 'block' : 'none' }}>
+          <SoftwareUpdates isActive={currentPage === 'softwareUpdates'} />
+        </div>
+        <div style={{ display: currentPage === 'appInstaller' ? 'block' : 'none' }}>
+          <AppInstaller isActive={currentPage === 'appInstaller'} />
         </div>
         <div style={{ display: currentPage === 'settings' ? 'block' : 'none' }}>
           <Settings />

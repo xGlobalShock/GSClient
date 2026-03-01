@@ -1,0 +1,356 @@
+/* ═══════════════════════════════════════════════════════════════
+   APP INSTALLER — winget-based App Catalog
+   Void Black · Electric Cyan #00F2FF · Neon Emerald #00FF88
+═══════════════════════════════════════════════════════════════ */
+
+.ai {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── Header ── */
+.ai-header-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.ai-checking {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.ai-installed-count {
+  font-size: 11px;
+  color: var(--text-muted);
+  letter-spacing: 0.5px;
+}
+
+/* ── Generic button ── */
+.ai-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+}
+
+.ai-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.ai-btn--install-selected {
+  background: linear-gradient(135deg, rgba(0, 255, 136, 0.12), rgba(0, 242, 255, 0.08));
+  border-color: rgba(0, 255, 136, 0.25);
+  color: #00FF88;
+}
+.ai-btn--install-selected:hover:not(:disabled) {
+  background: linear-gradient(135deg, rgba(0, 255, 136, 0.2), rgba(0, 242, 255, 0.14));
+  border-color: rgba(0, 255, 136, 0.4);
+  box-shadow: 0 0 20px rgba(0, 255, 136, 0.12);
+}
+
+.ai-btn--clear {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
+  color: var(--text-muted);
+}
+.ai-btn--clear:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
+  color: var(--text-secondary);
+}
+
+.ai-btn--select-cat {
+  padding: 4px 12px;
+  font-size: 11px;
+  background: rgba(0, 242, 255, 0.06);
+  border: 1px solid rgba(0, 242, 255, 0.1);
+  color: rgba(0, 242, 255, 0.6);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+.ai-btn--select-cat:hover {
+  background: rgba(0, 242, 255, 0.12);
+  border-color: rgba(0, 242, 255, 0.25);
+  color: #00F2FF;
+}
+
+/* ── Search ── */
+.ai-search-wrap {
+  position: relative;
+  max-width: 400px;
+}
+
+.ai-search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.ai-search {
+  width: 100%;
+  padding: 9px 36px 9px 38px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(0, 242, 255, 0.08);
+  border-radius: 10px;
+  color: var(--text-primary);
+  font-size: 13px;
+  outline: none;
+  transition: all 0.2s ease;
+}
+.ai-search::placeholder {
+  color: var(--text-muted);
+}
+.ai-search:focus {
+  border-color: rgba(0, 242, 255, 0.25);
+  background: rgba(0, 0, 0, 0.4);
+  box-shadow: 0 0 20px rgba(0, 242, 255, 0.05);
+}
+
+.ai-search-clear {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  border-radius: 4px;
+  transition: color 0.15s ease;
+}
+.ai-search-clear:hover {
+  color: var(--text-primary);
+}
+
+/* ── Toolbar ── */
+.ai-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(0, 242, 255, 0.05);
+  border-radius: 10px;
+}
+.ai-toolbar-count {
+  font-size: 12px;
+  color: var(--text-muted);
+  letter-spacing: 0.5px;
+}
+
+/* ── Catalog ── */
+.ai-catalog {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(0, 242, 255, 0.05);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+/* ── Category ── */
+.ai-category {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(0, 242, 255, 0.05);
+  border-radius: 12px;
+  overflow: hidden;
+  transition: border-color 0.2s ease;
+}
+.ai-category:hover {
+  border-color: rgba(0, 242, 255, 0.1);
+}
+
+.ai-category-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s ease;
+}
+.ai-category-header:hover {
+  background: rgba(0, 242, 255, 0.03);
+}
+
+.ai-category-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+}
+
+.ai-category-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: #00F2FF;
+  letter-spacing: 0.3px;
+}
+
+.ai-category-count {
+  font-size: 11px;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.ai-category-selected {
+  font-size: 11px;
+  color: #00FF88;
+  background: rgba(0, 255, 136, 0.08);
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+/* ── App Grid ── */
+.ai-app-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 6px;
+  padding: 4px 12px 12px;
+  overflow: hidden;
+}
+
+/* ── App Chip ── */
+.ai-app-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+  min-height: 36px;
+}
+
+.ai-app-chip:hover:not(.ai-app-chip--installed):not(.ai-app-chip--installing) {
+  background: rgba(0, 242, 255, 0.05);
+  border-color: rgba(0, 242, 255, 0.12);
+}
+
+.ai-app-chip--selected {
+  background: rgba(0, 242, 255, 0.08) !important;
+  border-color: rgba(0, 242, 255, 0.25) !important;
+}
+
+.ai-app-chip--installed {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.ai-app-chip--installing {
+  border-color: rgba(0, 255, 136, 0.2);
+  cursor: default;
+}
+
+/* ── Checkbox ── */
+.ai-app-check {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+}
+
+.ai-app-checkbox {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
+  background: transparent;
+  transition: all 0.15s ease;
+}
+
+.ai-app-checkbox--checked {
+  background: #00F2FF;
+  border-color: #00F2FF;
+  box-shadow: 0 0 8px rgba(0, 242, 255, 0.3);
+}
+
+.ai-app-check-icon--installed {
+  color: #00FF88;
+}
+
+/* ── App Name ── */
+.ai-app-name {
+  font-size: 12.5px;
+  color: var(--text-primary);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-app-chip--installed .ai-app-name {
+  color: var(--text-muted);
+}
+
+/* ── Inline install button (per chip) ── */
+.ai-app-install-btn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 6px;
+  background: rgba(0, 242, 255, 0.08);
+  color: rgba(0, 242, 255, 0.5);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  opacity: 0;
+}
+.ai-app-chip:hover .ai-app-install-btn {
+  opacity: 1;
+}
+.ai-app-install-btn:hover {
+  background: rgba(0, 242, 255, 0.18);
+  color: #00F2FF;
+  box-shadow: 0 0 10px rgba(0, 242, 255, 0.12);
+}
+
+/* ── Status label ── */
+.ai-app-status {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+.ai-app-status--downloading { color: #00F2FF; }
+.ai-app-status--installing { color: #FFB800; }
+.ai-app-status--verifying { color: #A78BFA; }
+.ai-app-status--done { color: #00FF88; }
+.ai-app-status--error { color: #FF4D6A; }
+
+/* ── Spinner ── */
+.ai-spin {
+  animation: ai-spin 1s linear infinite;
+}
+@keyframes ai-spin {
+  to { transform: rotate(360deg); }
+}

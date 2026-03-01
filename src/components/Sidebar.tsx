@@ -9,6 +9,8 @@ import {
   Zap,
   Video,
   Wifi,
+  RefreshCw,
+  Download,
 } from 'lucide-react';
 import { LucideIcon } from 'lucide-react';
 import '../styles/Sidebar.css';
@@ -159,6 +161,8 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage, online: 
     { id: 'network', label: 'Network Diagnostics', icon: Wifi },
     { id: 'gameLibrary', label: 'Game Presets', icon: Gamepad2 },
     { id: 'obsPresets', label: 'Streaming Presets', icon: Video },
+    { id: 'softwareUpdates', label: 'Software Updates', icon: RefreshCw },
+    { id: 'appInstaller', label: 'App Installer', icon: Download },
     { id: 'cleaner', label: 'Cleanup Toolkit', icon: Trash2 },
     { id: 'settings', label: 'Settings', icon: Settings },
   ], []);

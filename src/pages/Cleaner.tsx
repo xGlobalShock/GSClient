@@ -55,16 +55,22 @@ const Cleaner: React.FC = () => {
     'rocket-league-shaders': 'cleaner:clear-rocket-league-shaders',
     'valorant-shaders': 'cleaner:clear-valorant-shaders',
     'temp-files': 'cleaner:clear-temp-files',
-    'prefetch': 'cleaner:clear-prefetch',
     'update-cache': 'cleaner:clear-update-cache',
     'dns-cache': 'cleaner:clear-dns-cache',
     'ram-cache': 'cleaner:clear-ram-cache',
     'recycle-bin': 'cleaner:empty-recycle-bin',
+    'windows-temp': 'cleaner:clear-windows-temp',
+    'thumbnail-cache': 'cleaner:clear-thumbnail-cache',
+    'windows-logs': 'cleaner:clear-windows-logs',
+    'crash-dumps': 'cleaner:clear-crash-dumps',
+    'error-reports': 'cleaner:clear-error-reports',
+    'delivery-optimization': 'cleaner:clear-delivery-optimization',
+    'recent-files': 'cleaner:clear-recent-files',
   };
 
   // Categorize utilities by tab
   const utilityTabs = {
-    windows: cleanerUtilities.filter(u => ['temp-files', 'prefetch', 'update-cache', 'dns-cache', 'ram-cache', 'recycle-bin'].includes(u.id)),
+    windows: cleanerUtilities.filter(u => ['windows-temp', 'thumbnail-cache', 'windows-logs', 'crash-dumps', 'error-reports', 'delivery-optimization', 'recent-files', 'temp-files', 'update-cache', 'dns-cache', 'ram-cache', 'recycle-bin'].includes(u.id)),
     games: cleanerUtilities.filter(u => ['forza-shaders', 'apex-shaders', 'cod-shaders', 'cs2-shaders', 'fortnite-shaders', 'lol-shaders', 'overwatch-shaders', 'r6-shaders', 'rocket-league-shaders', 'valorant-shaders'].includes(u.id)),
     nvidia: cleanerUtilities.filter(u => ['nvidia-cache'].includes(u.id)),
   };
