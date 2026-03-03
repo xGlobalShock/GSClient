@@ -14,6 +14,7 @@ import '../styles/SystemDetails.css';
 interface SystemDetailsProps {
   systemStats?: {
     cpu: number; ram: number; disk: number; temperature: number;
+    tempSource?: string;
     lhmReady?: boolean;
     gpuTemp?: number; gpuUsage?: number; gpuVramUsed?: number; gpuVramTotal?: number;
   };
@@ -300,50 +301,66 @@ const IOStrip: React.FC<{ up: string; down: string }> = ({ up, down }) => (
 );
 
 /* ═══════════════════════════════════════════
-   Per-Core Equalizer
+   Per-Core Inline Strip
 ═══════════════════════════════════════════ */
-const CoreHeatMap: React.FC<{ cores: number[]; threadCount?: number; loading?: boolean }> = ({
-  cores, threadCount, loading,
+const CoreHeatMap: React.FC<{ cores: number[]; threadCount?: number; coreCount?: number; loading?: boolean }> = ({
+  cores, threadCount, coreCount, loading,
 }) => {
-  const getBarColor = (pct: number) => {
-    if (pct < 30) return '#00F2FF';
+  const getColor = (pct: number) => {
+    if (pct < 25) return '#00F2FF';
     if (pct < 60) return '#00D4AA';
     if (pct < 85) return '#FFD600';
     return '#FF2D55';
   };
 
-  const count = loading ? (threadCount || 8) : cores.length;
+  const totalThreads = loading ? (threadCount || 8) : cores.length;
+  const physCores = coreCount || Math.ceil(totalThreads / 2);
+  const hasHT = totalThreads > physCores;
+
   const avg = !loading && cores.length > 0
     ? Math.round(cores.reduce((a, b) => a + b, 0) / cores.length)
     : 0;
+  const avgColor = getColor(avg);
+
+  const grouped: number[] = [];
+  if (!loading && cores.length > 0) {
+    if (hasHT) {
+      for (let i = 0; i < physCores; i++) {
+        grouped.push(Math.max(cores[i * 2] ?? 0, cores[i * 2 + 1] ?? 0));
+      }
+    } else {
+      cores.forEach(p => grouped.push(p));
+    }
+  } else {
+    for (let i = 0; i < (coreCount || Math.ceil(totalThreads / 2) || 4); i++) {
+      grouped.push(0);
+    }
+  }
 
   return (
-    <div className="hud-eq-wrap">
-      <div className="hud-eq-header">
-        <span className="hud-eq-label">PER-CORE</span>
-        {!loading && cores.length > 0 && (
-          <span className="hud-eq-avg" style={{ color: getBarColor(avg) }}>{avg}%</span>
-        )}
-      </div>
-      <div className="hud-eq-bars">
-        {Array.from({ length: count }).map((_, i) => {
-          const pct = loading ? 0 : Math.min(cores[i] ?? 0, 100);
-          const color = getBarColor(pct);
-          return (
-            <div key={i} className="hud-eq-col" title={`Thread ${i}: ${Math.round(pct)}%`}>
-              <div className="hud-eq-track">
-                <div
-                  className={`hud-eq-fill ${loading ? 'hud-eq-shimmer' : ''}`}
-                  style={{
-                    height: loading ? '0%' : `${pct}%`,
-                    background: loading ? undefined : `linear-gradient(to top, ${color}44, ${color})`,
-                    boxShadow: pct > 50 ? `0 0 8px ${color}40, inset 0 0 4px ${color}20` : 'none',
-                  }}
-                />
-              </div>
-            </div>
-          );
-        })}
+    <div className="hud-usage-rt">
+      <div className="hud-usage-rt-stat">
+        <div className="hud-usage-rt-head">
+          <span className="hud-usage-rt-dot" style={{ background: loading ? 'rgba(255,255,255,0.1)' : avgColor, boxShadow: loading ? 'none' : `0 0 5px ${avgColor}` }} />
+          <span className="hud-usage-rt-key">Per-Core</span>
+        </div>
+        <span className="hud-usage-rt-big" style={{ color: loading ? 'rgba(255,255,255,0.1)' : avgColor }}>
+          {loading ? '—' : `${avg}%`}<small> avg</small>
+        </span>
+        <div className="hud-cstrip-bar">
+          {grouped.map((raw, i) => {
+            const pct = loading ? 0 : Math.min(raw, 100);
+            const color = getColor(pct);
+            return (
+              <div
+                key={i}
+                className={`hud-cstrip-seg ${loading ? 'hud-cstrip-dim' : ''}`}
+                style={{ background: loading ? 'rgba(255,255,255,0.06)' : color, opacity: loading ? 0.3 : Math.max(0.25, pct / 100) }}
+                title={`Core ${i}: ${Math.round(pct)}%`}
+              />
+            );
+          })}
+        </div>
       </div>
     </div>
   );
@@ -439,6 +456,12 @@ const SystemDetails: React.FC<SystemDetailsProps> = ({ systemStats, hardwareInfo
   const gpuPulse: 'high' | 'warn' | false = gpuUsage > 85 ? 'high' : gpuUsage > 65 ? 'warn' : false;
   const ramPulse: 'high' | 'warn' | false = ramLoad > 85 ? 'high' : ramLoad > 65 ? 'warn' : false;
 
+  // Temperature source resolution
+  const tempSource = s?.tempSource ?? 'none';
+  const hasRealTemp = tempSource === 'lhm' && s?.temperature && s.temperature > 0;
+  const isEstimatedTemp = tempSource === 'estimation' && s?.temperature && s.temperature > 0;
+  const hasAnyTemp = hasRealTemp || isEstimatedTemp;
+
   return (
     <motion.section
       className="hud-section"
@@ -465,9 +488,9 @@ const SystemDetails: React.FC<SystemDetailsProps> = ({ systemStats, hardwareInfo
           icon={<Cpu size={18} />}
           title="PROCESSOR"
           subtitle={hw?.cpuName}
-          gaugeValue={s?.temperature && s.temperature > 0 ? Math.min(s.temperature, 100) : undefined}
+          gaugeValue={hasAnyTemp ? Math.min(s!.temperature, 100) : undefined}
           gaugeUnit="°C"
-          gaugeDisplay={s?.temperature && s.temperature > 0 ? Math.trunc(s.temperature) : '—'}
+          gaugeDisplay={hasAnyTemp ? Math.trunc(s!.temperature) : undefined}
           className="hud-tile-cpu"
           delay={0.05}
           pulse={cpuPulse}
@@ -483,10 +506,22 @@ const SystemDetails: React.FC<SystemDetailsProps> = ({ systemStats, hardwareInfo
           ) : extLoading ? (
             <Row label="Current Clock" loading />
           ) : null}
+          {/* Temperature source indicator */}
+          {!hasAnyTemp && !lhmLoading && (
+            <div className="hud-temp-unavail">
+              <div className="hud-temp-unavail-icon">
+                <Gauge size={12} />
+              </div>
+              <div className="hud-temp-unavail-text">
+                <span className="hud-temp-unavail-title">Temperature Unavailable</span>
+                <span className="hud-temp-unavail-sub">Requires LibreHardwareMonitor sensor access (admin)</span>
+              </div>
+            </div>
+          )}
           {ext?.perCoreCpu && ext.perCoreCpu.length > 0 ? (
-            <CoreHeatMap cores={ext.perCoreCpu} />
+            <CoreHeatMap cores={ext.perCoreCpu} coreCount={hw?.cpuCores} />
           ) : (
-            <CoreHeatMap cores={[]} threadCount={hw?.cpuThreads || 8} loading={extLoading} />
+            <CoreHeatMap cores={[]} threadCount={hw?.cpuThreads || 8} coreCount={hw?.cpuCores} loading={extLoading} />
           )}
         </BentoCard>
 

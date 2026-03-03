@@ -61,6 +61,18 @@
   background: linear-gradient(135deg, rgba(0, 255, 136, 0.2), rgba(0, 242, 255, 0.14));
   border-color: rgba(0, 255, 136, 0.45);
 }
+.su-btn--cancel {
+  background: rgba(255, 60, 60, 0.1);
+  border-color: rgba(255, 60, 60, 0.25);
+  color: #ff5c5c;
+}
+.su-btn--cancel:hover:not(:disabled) {
+  background: rgba(255, 60, 60, 0.18);
+  border-color: rgba(255, 60, 60, 0.45);
+}
+.su-btn--cancel:disabled {
+  opacity: 0.5;
+}
 
 /* ── Spinner animation ── */
 .su-spin {

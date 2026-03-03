@@ -27,6 +27,7 @@ export interface RealtimeHWPayload {
   perCoreCpu: number[];
   cpuClock: number;
   temperature: number;
+  tempSource: string;
   lhmReady: boolean;
 
   // GPU (from LHM)
@@ -66,6 +67,7 @@ export interface RealtimeSystemStats {
   ram: number;
   disk: number;
   temperature: number;
+  tempSource?: string;
   lhmReady?: boolean;
   gpuTemp?: number;
   gpuUsage?: number;
@@ -95,7 +97,7 @@ export interface RealtimeExtendedStats {
 }
 
 const EMPTY_STATS: RealtimeSystemStats = {
-  cpu: 0, ram: 0, disk: 0, temperature: 0,
+  cpu: 0, ram: 0, disk: 0, temperature: 0, tempSource: 'none',
 };
 
 const EMPTY_EXT: RealtimeExtendedStats = {
@@ -143,6 +145,7 @@ export function useRealtimeHardware(options: UseRealtimeHardwareOptions = {}) {
         ram: p.ram,
         disk: p.disk,
         temperature: p.temperature,
+        tempSource: p.tempSource,
         lhmReady: p.lhmReady,
         gpuTemp: p.gpuTemp,
         gpuUsage: p.gpuUsage,

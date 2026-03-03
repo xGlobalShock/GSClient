@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { RefreshCw, Download, CheckCircle, Package, Loader2 } from 'lucide-react';
+import { RefreshCw, Download, CheckCircle, Package, Loader2, X } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import { useToast } from '../contexts/ToastContext';
 import '../styles/SoftwareUpdates.css';
@@ -33,6 +33,8 @@ const SoftwareUpdates: React.FC<SoftwareUpdatesProps> = ({ isActive = false }) =
   const [lastChecked, setLastChecked] = useState<string | null>(null);
   const [progress, setProgress] = useState<UpdateProgress | null>(null);
   const [packageSizes, setPackageSizes] = useState<Record<string, string>>({});
+  const [cancelRequested, setCancelRequested] = useState(false);
+  const cancelAllRef = useRef(false);
   const hasScanned = useRef(false);
   const { addToast } = useToast();
 
@@ -95,50 +97,64 @@ const SoftwareUpdates: React.FC<SoftwareUpdatesProps> = ({ isActive = false }) =
     }
   }, [isActive, checkUpdates]);
 
+  const handleCancelUpdate = async () => {
+    if (!window.electron?.ipcRenderer) return;
+    setCancelRequested(true);
+    cancelAllRef.current = true;
+    try {
+      await window.electron.ipcRenderer.invoke('software:cancel-update');
+    } catch {}
+  };
+
   const handleUpdate = async (pkg: PackageUpdate) => {
     if (!window.electron?.ipcRenderer) return;
     setUpdatingId(pkg.id);
     setProgress(null);
+    setCancelRequested(false);
+    cancelAllRef.current = false;
     try {
       const result = await window.electron.ipcRenderer.invoke('software:update-app', pkg.id);
       if (result.success) {
         addToast(`${pkg.name} updated successfully`, 'success');
         setUpdatedIds(prev => new Set(prev).add(pkg.id));
-        // Remove from list after brief delay so user sees "done" state
         setTimeout(() => {
           setPackages(prev => prev.filter(p => p.id !== pkg.id));
         }, 2000);
-        // Re-scan for updates after successful update
         setTimeout(() => {
           hasScanned.current = false;
           checkUpdates();
         }, 4000);
+      } else if (result.cancelled) {
+        addToast(`Update of ${pkg.name} cancelled`, 'info');
       } else {
         addToast(result.message || `Failed to update ${pkg.name}`, 'error');
       }
     } catch (err) {
       addToast(`Error updating ${pkg.name}`, 'error');
     } finally {
-      // Keep progress visible briefly after completion, then clear
       setTimeout(() => setProgress(null), 3000);
       setUpdatingId(null);
+      setCancelRequested(false);
     }
   };
 
   const handleUpdateAll = async () => {
     if (!window.electron?.ipcRenderer) return;
     setUpdatingAll(true);
+    setCancelRequested(false);
+    cancelAllRef.current = false;
     let successCount = 0;
     let failCount = 0;
     for (const pkg of pendingPackages) {
+      if (cancelAllRef.current) break;
       setUpdatingId(pkg.id);
       setProgress(null);
       try {
         const result = await window.electron.ipcRenderer.invoke('software:update-app', pkg.id);
+        if (cancelAllRef.current || result.cancelled) break;
         if (result.success) {
           successCount++;
           setUpdatedIds(prev => new Set(prev).add(pkg.id));
-          // Remove completed package from list immediately
           setPackages(prev => prev.filter(p => p.id !== pkg.id));
         } else {
           failCount++;
@@ -149,8 +165,13 @@ const SoftwareUpdates: React.FC<SoftwareUpdatesProps> = ({ isActive = false }) =
     }
     setUpdatingId(null);
     setTimeout(() => setProgress(null), 3000);
+    const wasCancelled = cancelAllRef.current;
     setUpdatingAll(false);
-    if (failCount === 0) {
+    setCancelRequested(false);
+    cancelAllRef.current = false;
+    if (wasCancelled) {
+      addToast(`Update cancelled — ${successCount} updated before cancel`, 'info');
+    } else if (failCount === 0) {
       addToast(`All ${successCount} package${successCount !== 1 ? 's' : ''} updated successfully`, 'success');
     } else if (successCount > 0) {
       addToast(`${successCount} updated, ${failCount} failed`, 'info');
@@ -191,14 +212,24 @@ const SoftwareUpdates: React.FC<SoftwareUpdatesProps> = ({ isActive = false }) =
               <RefreshCw size={14} className={loading ? 'su-spin' : ''} />
               {loading ? 'Scanning…' : 'Check for Updates'}
             </button>
-            {pendingPackages.length > 1 && (
+            {pendingPackages.length > 1 && !updatingAll && (
               <button
                 className="su-btn su-btn--update-all"
                 onClick={handleUpdateAll}
                 disabled={updatingAll || updatingId !== null}
               >
                 <Download size={14} />
-                {updatingAll ? 'Updating All…' : `Update All (${pendingPackages.length})`}
+                {`Update All (${pendingPackages.length})`}
+              </button>
+            )}
+            {(updatingAll || updatingId !== null) && (
+              <button
+                className="su-btn su-btn--cancel"
+                onClick={handleCancelUpdate}
+                disabled={cancelRequested}
+              >
+                <X size={14} />
+                {cancelRequested ? 'Cancelling…' : 'Cancel Update'}
               </button>
             )}
           </div>

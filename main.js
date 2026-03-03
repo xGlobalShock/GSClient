@@ -134,10 +134,9 @@ function createWindow() {
   const isDev = !app.isPackaged;
 
   mainWindow = new BrowserWindow({
-    width: 1420,
-    height: 820,
-    minWidth: 1000,
-    minHeight: 600,
+    width: 1480,
+    height: 860,
+    resizable: false,
     frame: false,
     autoHideMenuBar: true,
     webPreferences: {
@@ -4232,6 +4231,29 @@ ipcMain.handle('software:get-package-size', async (_event, packageId) => {
 });
 
 // Update a single app
+let activeUpdateProc = null;
+let cancelledUpdatePids = new Set();
+let updateAllCancelled = false;
+
+ipcMain.handle('software:cancel-update', async () => {
+  // Flag to stop "update all" loop
+  updateAllCancelled = true;
+  if (activeUpdateProc && !activeUpdateProc.killed) {
+    const pid = activeUpdateProc.pid;
+    cancelledUpdatePids.add(pid);
+    activeUpdateProc = null;
+    try {
+      spawn('taskkill', ['/F', '/T', '/PID', String(pid)], { windowsHide: true });
+    } catch (e) {}
+    const win = BrowserWindow.getAllWindows()[0];
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('software:update-progress', { packageId: '__cancelled__', phase: 'error', status: 'Update cancelled', percent: 0 });
+    }
+    return { success: true };
+  }
+  return { success: false, message: 'No active update' };
+});
+
 ipcMain.handle('software:update-app', async (_event, packageId) => {
   const cleanId = String(packageId).replace(/[^\x20-\x7E]/g, '').trim();
 
@@ -4254,6 +4276,8 @@ ipcMain.handle('software:update-app', async (_event, packageId) => {
     const proc = spawn('cmd.exe', [
       '/c', `chcp 65001 >nul && winget upgrade --id ${cleanId} --accept-source-agreements --accept-package-agreements${extraFlags}`
     ], { windowsHide: true });
+
+    activeUpdateProc = proc;
 
     const timeout = setTimeout(() => {
       proc.kill();
@@ -4319,6 +4343,13 @@ ipcMain.handle('software:update-app', async (_event, packageId) => {
 
     proc.on('close', (code) => {
       clearTimeout(timeout);
+      if (activeUpdateProc === proc) activeUpdateProc = null;
+      const wasCancelled = proc.killed || cancelledUpdatePids.delete(proc.pid);
+      if (wasCancelled) {
+        sendProgress({ phase: 'error', status: 'Update cancelled', percent: 0 });
+        resolve({ success: false, cancelled: true, message: 'Update cancelled by user' });
+        return;
+      }
       const output = fullOutput.toLowerCase();
       const success = output.includes('successfully installed') ||
                       output.includes('no available upgrade') ||
@@ -4338,6 +4369,7 @@ ipcMain.handle('software:update-app', async (_event, packageId) => {
       };
 
       if (success) {
+        _wingetListCache = null; _wingetCacheTime = 0; _regNamesCache = null; _regCacheTime = 0;
         sendProgress({ phase: 'done', status: 'Update complete!', percent: 100 });
         resolve({ success: true, message: `${packageId} updated successfully` });
       } else if (needsReinstall) {
@@ -4361,10 +4393,8 @@ ipcMain.handle('software:update-app', async (_event, packageId) => {
   // First attempt — normal upgrade
   const result = await runUpgrade(false);
   if (result.retryWithUninstallPrevious) {
-    // Packaging format mismatch — retry with --force --uninstall-previous
-    const retry = await runUpgrade(true);
-    if (retry.success) return retry;
-    // Final fallback: fresh install with --force (handles system apps like Edge)
+    // Packaging format mismatch — skip --uninstall-previous (which removes the app first
+    // and can leave it uninstalled if reinstall fails). Go straight to fresh install.
     return new Promise((resolve) => {
       const win = BrowserWindow.getAllWindows()[0];
       const sendProgress = (data) => {
@@ -4378,6 +4408,7 @@ ipcMain.handle('software:update-app', async (_event, packageId) => {
       const proc = spawn('cmd.exe', [
         '/c', `chcp 65001 >nul && winget install --id ${cleanId} --accept-source-agreements --accept-package-agreements --force`
       ], { windowsHide: true });
+      activeUpdateProc = proc;
       const timeout = setTimeout(() => { proc.kill(); resolve({ success: false, message: 'Install timed out' }); }, 180000);
       const processChunk = (chunk) => {
         const text = chunk.toString();
@@ -4395,8 +4426,16 @@ ipcMain.handle('software:update-app', async (_event, packageId) => {
       proc.stderr.on('data', processChunk);
       proc.on('close', (code) => {
         clearTimeout(timeout);
+        if (activeUpdateProc === proc) activeUpdateProc = null;
+        const wasCancelled = proc.killed || cancelledUpdatePids.delete(proc.pid);
+        if (wasCancelled) {
+          sendProgress({ phase: 'error', status: 'Update cancelled', percent: 0 });
+          resolve({ success: false, cancelled: true, message: 'Update cancelled by user' });
+          return;
+        }
         const out = fullOutput.toLowerCase();
         if (out.includes('successfully installed') || out.includes('no applicable')) {
+          _wingetListCache = null; _wingetCacheTime = 0; _regNamesCache = null; _regCacheTime = 0;
           sendProgress({ phase: 'done', status: 'Update complete!', percent: 100 });
           resolve({ success: true, message: `${packageId} updated successfully` });
         } else {
@@ -4440,6 +4479,11 @@ ipcMain.handle('software:update-all', async () => {
 let _regNamesCache = null;   // Set<string> | null
 let _regCacheTime = 0;       // timestamp
 const REG_CACHE_TTL = 60000; // 60 s
+
+// ── Winget list cache (avoids re-running expensive `winget list` on every Phase 2 call) ──
+let _wingetListCache = null;  // { installedEntries: [{name,id}], installedIdSet: Set, installedNameSet: Set } | null
+let _wingetCacheTime = 0;
+const WINGET_CACHE_TTL = 60000; // 60 s
 
 async function getRegistryDisplayNames() {
   const now = Date.now();
@@ -4502,58 +4546,67 @@ ipcMain.handle('appinstall:check-installed-fast', async (_event, catalogApps) =>
   }
 });
 
-// ── Full winget + registry check (Phase 2) — thorough but slower ──
+// ── Full winget + registry check (Phase 2) — thorough, cached like Phase 1 ──
 ipcMain.handle('appinstall:check-installed', async (_event, catalogApps) => {
   try {
-    const { stdout } = await execAsync(
-      'chcp 65001 >nul && winget list --accept-source-agreements 2>nul',
-      { timeout: 30000, windowsHide: true, encoding: 'utf8', shell: 'cmd.exe', maxBuffer: 1024 * 1024 * 5, env: process.env, cwd: process.env.SYSTEMROOT || 'C:\\Windows' }
-    );
+    const now = Date.now();
+    let installedEntries, installedIdSet, installedNameSet;
 
-    // ── Clean \r spinner characters, then rejoin wrapped lines ──
-    // winget uses \r for progress spinners — take last non-empty \r segment per line.
-    // Then rejoin continuation lines (which start with whitespace).
-    const rawLines = stdout.split('\n').map(l => {
-      const parts = l.split('\r').map(p => p.trimEnd()).filter(p => p.length > 0);
-      return parts.length > 0 ? parts[parts.length - 1] : '';
-    }).filter(l => l.length > 0);
+    // Use cached winget list if available and fresh
+    if (_wingetListCache && (now - _wingetCacheTime) < WINGET_CACHE_TTL) {
+      installedEntries = _wingetListCache.installedEntries;
+      installedIdSet = _wingetListCache.installedIdSet;
+      installedNameSet = _wingetListCache.installedNameSet;
+    } else {
+      const { stdout } = await execAsync(
+        'chcp 65001 >nul && winget list --accept-source-agreements 2>nul',
+        { timeout: 30000, windowsHide: true, encoding: 'utf8', shell: 'cmd.exe', maxBuffer: 1024 * 1024 * 5, env: process.env, cwd: process.env.SYSTEMROOT || 'C:\\Windows' }
+      );
 
-    const lines = [];
-    for (const l of rawLines) {
-      if (/^\s+\S/.test(l) && lines.length > 0 && lines[lines.length - 1] !== '') {
-        lines[lines.length - 1] += l;
-      } else {
-        lines.push(l);
-      }
-    }
+      // ── Clean \r spinner characters, then rejoin wrapped lines ──
+      const rawLines = stdout.split('\n').map(l => {
+        const parts = l.split('\r').map(p => p.trimEnd()).filter(p => p.length > 0);
+        return parts.length > 0 ? parts[parts.length - 1] : '';
+      }).filter(l => l.length > 0);
 
-    // ── Parse the winget table: extract both Name and Id columns ──
-    const headerIdx = lines.findIndex(l => /Name\s+Id\s+Version/i.test(l));
-    const installedEntries = []; // { name: string, id: string }
-
-    if (headerIdx !== -1) {
-      const headerLine = lines[headerIdx];
-      const nameStart = 0;
-      const idStart = headerLine.search(/\bId\b/i);
-      const versionStart = headerLine.search(/\bVersion\b/i);
-
-      // Data starts after the separator line (dashes)
-      const dataStart = headerIdx + 2;
-      for (let i = dataStart; i < lines.length; i++) {
-        const line = lines[i];
-        if (line.length < idStart + 2) continue;
-        const rawName = line.substring(nameStart, idStart).trim();
-        const rawId = line.substring(idStart, versionStart > idStart ? versionStart : line.length).trim();
-        if (rawId && rawId !== '---' && rawName) {
-          installedEntries.push({ name: rawName.toLowerCase(), id: rawId.toLowerCase() });
+      const lines = [];
+      for (const l of rawLines) {
+        if (/^\s+\S/.test(l) && lines.length > 0 && lines[lines.length - 1] !== '') {
+          lines[lines.length - 1] += l;
+        } else {
+          lines.push(l);
         }
       }
+
+      // ── Parse the winget table: extract both Name and Id columns ──
+      const headerIdx = lines.findIndex(l => /Name\s+Id\s+Version/i.test(l));
+      installedEntries = [];
+
+      if (headerIdx !== -1) {
+        const headerLine = lines[headerIdx];
+        const nameStart = 0;
+        const idStart = headerLine.search(/\bId\b/i);
+        const versionStart = headerLine.search(/\bVersion\b/i);
+
+        const dataStart = headerIdx + 2;
+        for (let i = dataStart; i < lines.length; i++) {
+          const line = lines[i];
+          if (line.length < idStart + 2) continue;
+          const rawName = line.substring(nameStart, idStart).trim();
+          const rawId = line.substring(idStart, versionStart > idStart ? versionStart : line.length).trim();
+          if (rawId && rawId !== '---' && rawName) {
+            installedEntries.push({ name: rawName.toLowerCase(), id: rawId.toLowerCase() });
+          }
+        }
+      }
+
+      installedIdSet = new Set(installedEntries.map(e => e.id));
+      installedNameSet = new Set(installedEntries.map(e => e.name));
+
+      // Cache the results
+      _wingetListCache = { installedEntries, installedIdSet, installedNameSet };
+      _wingetCacheTime = Date.now();
     }
-
-
-    // Build fast lookup sets
-    const installedIdSet = new Set(installedEntries.map(e => e.id));
-    const installedNameSet = new Set(installedEntries.map(e => e.name));
 
     // catalogApps is either [{id, name}] (new) or [string] (legacy fallback)
     const apps = Array.isArray(catalogApps)
@@ -4751,6 +4804,7 @@ ipcMain.handle('appinstall:install-app', async (_event, packageId) => {
       const output = fullOutput.toLowerCase();
       const success = output.includes('successfully installed') || output.includes('already installed');
       if (success) {
+        _wingetListCache = null; _wingetCacheTime = 0; _regNamesCache = null; _regCacheTime = 0;
         sendProgress({ phase: 'done', status: 'Installed!', percent: 100 });
         resolve({ success: true, message: `${cleanId} installed successfully` });
       } else {
