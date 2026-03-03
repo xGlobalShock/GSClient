@@ -4235,7 +4235,9 @@ ipcMain.handle('software:get-package-size', async (_event, packageId) => {
 ipcMain.handle('software:update-app', async (_event, packageId) => {
   const cleanId = String(packageId).replace(/[^\x20-\x7E]/g, '').trim();
 
-  return new Promise((resolve) => {
+  /* Run a winget upgrade attempt. If useUninstallPrevious is true, 
+     appends --uninstall-previous to handle "install technology is different" errors. */
+  const runUpgrade = (useUninstallPrevious = false) => new Promise((resolve) => {
     const win = BrowserWindow.getAllWindows()[0];
     let fullOutput = '';
     let phase = 'preparing';
@@ -4246,10 +4248,11 @@ ipcMain.handle('software:update-app', async (_event, packageId) => {
       }
     };
 
-    sendProgress({ phase: 'preparing', status: 'Preparing update…', percent: 0 });
+    const extraFlags = useUninstallPrevious ? ' --uninstall-previous' : '';
+    sendProgress({ phase: 'preparing', status: useUninstallPrevious ? 'Retrying with reinstall…' : 'Preparing update…', percent: 0 });
 
     const proc = spawn('cmd.exe', [
-      '/c', `chcp 65001 >nul && winget upgrade --id ${cleanId} --accept-source-agreements --accept-package-agreements`
+      '/c', `chcp 65001 >nul && winget upgrade --id ${cleanId} --accept-source-agreements --accept-package-agreements${extraFlags}`
     ], { windowsHide: true });
 
     const timeout = setTimeout(() => {
@@ -4321,6 +4324,10 @@ ipcMain.handle('software:update-app', async (_event, packageId) => {
                       output.includes('no available upgrade') ||
                       output.includes('no applicable');
 
+      // Detect "install technology is different" — can be retried with --uninstall-previous
+      const needsReinstall = !useUninstallPrevious &&
+        output.includes('install technology is different');
+
       const friendlyError = (output) => {
         if (output.includes('no installed package found')) return 'Package not found — update manually or via its own updater';
         if (output.includes('cannot be upgraded using winget') || output.includes('use the method provided by the publisher')) return 'This app must be updated through its own updater';
@@ -4333,6 +4340,9 @@ ipcMain.handle('software:update-app', async (_event, packageId) => {
       if (success) {
         sendProgress({ phase: 'done', status: 'Update complete!', percent: 100 });
         resolve({ success: true, message: `${packageId} updated successfully` });
+      } else if (needsReinstall) {
+        // Automatically retry with --uninstall-previous
+        resolve({ success: false, retryWithUninstallPrevious: true });
       } else {
         const friendly = friendlyError(output);
         const msg = friendly || fullOutput.split('\r').map(s=>s.trim()).filter(s=>s.length>0).pop() || `Update failed (exit code: ${code})`;
@@ -4347,6 +4357,14 @@ ipcMain.handle('software:update-app', async (_event, packageId) => {
       resolve({ success: false, message: `Failed to start update: ${err.message}` });
     });
   });
+
+  // First attempt — normal upgrade
+  const result = await runUpgrade(false);
+  if (result.retryWithUninstallPrevious) {
+    // Packaging format mismatch — retry with --uninstall-previous
+    return runUpgrade(true);
+  }
+  return result;
 });
 
 // Update all apps

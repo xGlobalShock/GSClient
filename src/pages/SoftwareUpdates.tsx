@@ -104,6 +104,11 @@ const SoftwareUpdates: React.FC<SoftwareUpdatesProps> = ({ isActive = false }) =
       if (result.success) {
         addToast(`${pkg.name} updated successfully`, 'success');
         setUpdatedIds(prev => new Set(prev).add(pkg.id));
+        // Re-scan for updates after successful update
+        setTimeout(() => {
+          hasScanned.current = false;
+          checkUpdates();
+        }, 2000);
       } else {
         addToast(result.message || `Failed to update ${pkg.name}`, 'error');
       }
@@ -119,19 +124,38 @@ const SoftwareUpdates: React.FC<SoftwareUpdatesProps> = ({ isActive = false }) =
   const handleUpdateAll = async () => {
     if (!window.electron?.ipcRenderer) return;
     setUpdatingAll(true);
-    try {
-      const result = await window.electron.ipcRenderer.invoke('software:update-all');
-      if (result.success) {
-        addToast('All packages updated successfully', 'success');
-        setUpdatedIds(new Set(packages.map(p => p.id)));
-      } else {
-        addToast(result.message || 'Failed to update all', 'error');
+    let successCount = 0;
+    let failCount = 0;
+    for (const pkg of pendingPackages) {
+      setUpdatingId(pkg.id);
+      setProgress(null);
+      try {
+        const result = await window.electron.ipcRenderer.invoke('software:update-app', pkg.id);
+        if (result.success) {
+          successCount++;
+          setUpdatedIds(prev => new Set(prev).add(pkg.id));
+        } else {
+          failCount++;
+        }
+      } catch {
+        failCount++;
       }
-    } catch (err) {
-      addToast('Error updating all packages', 'error');
-    } finally {
-      setUpdatingAll(false);
     }
+    setUpdatingId(null);
+    setTimeout(() => setProgress(null), 3000);
+    setUpdatingAll(false);
+    if (failCount === 0) {
+      addToast(`All ${successCount} package${successCount !== 1 ? 's' : ''} updated successfully`, 'success');
+    } else if (successCount > 0) {
+      addToast(`${successCount} updated, ${failCount} failed`, 'info');
+    } else {
+      addToast('Failed to update packages', 'error');
+    }
+    // Re-scan for remaining updates
+    setTimeout(() => {
+      hasScanned.current = false;
+      checkUpdates();
+    }, 2000);
   };
 
   const pendingPackages = packages.filter(p => !updatedIds.has(p.id));
@@ -222,6 +246,7 @@ const SoftwareUpdates: React.FC<SoftwareUpdatesProps> = ({ isActive = false }) =
               {packages.map((pkg, i) => {
                 const isUpdated = updatedIds.has(pkg.id);
                 const isUpdating = updatingId === pkg.id;
+                const isBatchUpdating = updatingAll && isUpdating;
                 const pkgProgress = progress && progress.packageId === pkg.id ? progress : null;
                 const showProgress = isUpdating || (pkgProgress && (pkgProgress.phase === 'done' || pkgProgress.phase === 'error'));
 
@@ -263,7 +288,7 @@ const SoftwareUpdates: React.FC<SoftwareUpdatesProps> = ({ isActive = false }) =
                           disabled={isUpdating || updatingAll}
                         >
                           {isUpdating ? (
-                            <><Loader2 size={14} className="su-spin" /> Updating…</>
+                            <><Loader2 size={14} className="su-spin" /> {isBatchUpdating ? 'Updating…' : 'Updating…'}</>
                           ) : (
                             <><Download size={14} /> Update</>
                           )}

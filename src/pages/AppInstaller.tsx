@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Download,
@@ -58,11 +58,13 @@ const AppInstaller: React.FC<AppInstallerProps> = ({ isActive = false }) => {
   const [activeCat, setActiveCat] = useState('All');
   const hasChecked = useRef(false);
   const gridRef = useRef<HTMLDivElement>(null);
-  const [cols, setCols] = useState(1);
+  const [cols, setCols] = useState(0);
   const { addToast } = useToast();
 
-  /* Track how many columns the grid actually renders */
-  useEffect(() => {
+  /* Track how many columns the grid actually renders.
+     useLayoutEffect ensures measurement happens before first paint,
+     so cards never appear with a stale column count. */
+  useLayoutEffect(() => {
     const el = gridRef.current;
     if (!el) return;
     const measure = () => {
@@ -179,7 +181,7 @@ const AppInstaller: React.FC<AppInstallerProps> = ({ isActive = false }) => {
     return apps;
   }, [activeCat, searchQuery]);
 
-  const rows = Math.ceil(visibleApps.length / cols);
+  const rows = cols > 0 ? Math.ceil(visibleApps.length / cols) : visibleApps.length;
 
   /* Badge counts for tabs */
   const catCounts = useMemo(() => {
@@ -244,12 +246,11 @@ const AppInstaller: React.FC<AppInstallerProps> = ({ isActive = false }) => {
       <motion.div
         className="ai-grid"
         ref={gridRef}
-        key={activeCat + searchQuery}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ duration: 0.2 }}
+        transition={{ duration: 0.15 }}
       >
-          {visibleApps.map((app, i) => {
+          {cols > 0 && visibleApps.map((app, i) => {
             const done = installed.has(app.id);
             const sel = selected.has(app.id);
             const busy = installingId === app.id;
@@ -309,7 +310,7 @@ const AppInstaller: React.FC<AppInstallerProps> = ({ isActive = false }) => {
             );
           })}
 
-        {visibleApps.length === 0 && (
+        {cols > 0 && visibleApps.length === 0 && (
           <div className="ai-empty">
             <Search size={28} strokeWidth={1} />
             <p>No apps found</p>

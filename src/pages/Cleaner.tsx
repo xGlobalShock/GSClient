@@ -107,25 +107,15 @@ const Cleaner: React.FC = () => {
         const result: CleanResult = await window.electron.ipcRenderer.invoke(channel);
         
         if (result.success) {
-          let message: string;
-          if (result.filesDeleted !== undefined && result.filesBefore !== undefined) {
-            // File-based cleaners: show count + size
-            if (result.filesDeleted > 0) {
-              const sizeStr = result.spaceSaved && /^\d/.test(result.spaceSaved) ? ` — ${result.spaceSaved} freed` : '';
-              message = `Cleared ${result.filesDeleted} file${result.filesDeleted !== 1 ? 's' : ''}${sizeStr}`;
-            } else {
-              message = 'Already clean — nothing to remove';
-            }
-          } else if (result.spaceSaved && /^\d+.*entries/i.test(result.spaceSaved)) {
-            // DNS: "45 DNS entries removed"
-            message = `${result.message} — ${result.spaceSaved}`;
-          } else if (result.spaceSaved && /^\d+(\.\d+)?\s*(MB|GB|KB|B)\b/i.test(result.spaceSaved)) {
-            // RAM or similar with numeric size
-            message = `${result.message} — ${result.spaceSaved} freed`;
-          } else {
-            // Simple result (recycle bin, etc) — just the primary message
-            message = result.message;
+          // Build a single consistent message: "files deleted — size freed"
+          const parts: string[] = [];
+          if (result.filesDeleted !== undefined && result.filesDeleted > 0) {
+            parts.push(`${result.filesDeleted} file${result.filesDeleted !== 1 ? 's' : ''} deleted`);
           }
+          if (result.spaceSaved && /^\d/.test(result.spaceSaved)) {
+            parts.push(`${result.spaceSaved} freed`);
+          }
+          const message = parts.length > 0 ? parts.join(' — ') : (result.message || 'Cleanup complete');
           addToast(message, 'success');
         } else {
           addToast(result.message || 'Cleanup failed', 'error');
