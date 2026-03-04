@@ -4733,8 +4733,6 @@ function getAvailableDrives() {
   return drives;
 }
 
-// ── Known directory/exe patterns for catalog apps that differ from their display name ──
-// Maps winget ID → array of relative directory names to check inside Program Files / user dirs
 const KNOWN_APP_DIRS = {
   'Brave.Brave':                            ['BraveSoftware\\Brave-Browser'],
   'Google.Chrome':                          ['Google\\Chrome'],
@@ -4754,7 +4752,7 @@ const KNOWN_APP_DIRS = {
   'Blizzard.BattleNet':                     ['Battle.net'],
   'Nvidia.GeForceNow':                      ['NVIDIA Corporation\\GeForceNOW'],
   'Guru3D.Afterburner':                     ['MSI Afterburner'],
-  'REALiX.HWiNFO':                         ['HWiNFO64', 'HWiNFO32'],
+  'REALiX.HWiNFO':                          ['HWiNFO64', 'HWiNFO32'],
   'TechPowerUp.GPU-Z':                      ['GPU-Z'],
   'CPUID.CPU-Z':                            ['CPUID\\CPU-Z'],
   'OBSProject.OBSStudio':                   ['obs-studio'],
