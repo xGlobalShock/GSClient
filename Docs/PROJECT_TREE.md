@@ -1,4 +1,4 @@
-# GS Optimizer - Complete Project Tree
+# GS Control Center - Complete Project Tree
 
 ## 📁 Directory Structure
 
@@ -169,8 +169,8 @@ Services Layer:
 
 Data Storage:
     └─ localStorage
-        ├─ pc-optimizer-settings
-        └─ pc-optimizer-profiles
+        ├─ pc-controlcenter-settings
+        └─ pc-controlcenter-profiles
 ```
 
 ---
@@ -317,8 +317,8 @@ Global Context State (NotificationContext):
       }
 
 LocalStorage:
-├─ pc-optimizer-settings (AppSettings JSON)
-└─ pc-optimizer-profiles (OptimizationProfile[] JSON)
+├─ pc-controlcenter-settings (AppSettings JSON)
+└─ pc-controlcenter-profiles (OptimizationProfile[] JSON)
 ```
 
 ---
@@ -348,7 +348,7 @@ Electron Builder
   ↓
 release/ folder
   ↓
-GS Optimizer Setup.exe (Installer)
+GS Control Center Setup.exe (Installer)
 ```
 
 ---

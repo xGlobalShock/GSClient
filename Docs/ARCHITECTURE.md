@@ -1,4 +1,4 @@
-# GS Optimizer - Architecture Overview
+# GS Control Center - Architecture Overview
 
 ## System Architecture
 
@@ -272,10 +272,10 @@ Services
 
 ```
 LocalStorage
-├── pc-optimizer-settings
+├── pc-controlcenter-settings
 │   └── {settings JSON}
 │
-└── pc-optimizer-profiles
+└── pc-controlcenter-profiles
     └── [{profile1}, {profile2}, ...]
 
 Electron Storage (Future)

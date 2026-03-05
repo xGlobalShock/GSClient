@@ -1,4 +1,4 @@
-# 🧑‍💻 Copilot Instructions for GS Optimizer
+# 🧑‍💻 Copilot Instructions for GS Control Center
 
 ## Big Picture Architecture
 - **Frontend:** React + TypeScript (src/) with modular components and pages.

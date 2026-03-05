@@ -1,8 +1,8 @@
-# GS Optimizer - Complete Feature Documentation
+# GS Control Center - Complete Feature Documentation
 
 ## 🎯 Project Overview
 
-GS Optimizer is a professional League of Legends-inspired desktop client for Windows PC optimization. It provides gaming tweaks, game profiles, system cleanup, and performance monitoring with a modern, animated UI.
+GS Control Center is a professional League of Legends-inspired desktop client for Windows PC optimization. It provides gaming tweaks, game profiles, system cleanup, and performance monitoring with a modern, animated UI.
 
 **Tech Stack:**
 - Frontend: React 18.2.0 + TypeScript 4.9.5

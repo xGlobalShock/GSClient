@@ -231,7 +231,7 @@ npm run client                 # Launch
 Currently used environment variables:
 ```
 REACT_APP_VERSION=1.0.0
-REACT_APP_NAME=GS Optimizer
+REACT_APP_NAME=GS Control Center
 BROWSER=none                   # Prevents browser opening with npm start
 ELECTRON_START_URL=http://localhost:3000  # Dev only
 ```

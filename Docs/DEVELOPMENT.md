@@ -1,4 +1,4 @@
-# GS Optimizer - Quick Start Guide
+# GS Control Center - Quick Start Guide
 
 ## Project Complete! ✨
 
@@ -183,4 +183,4 @@ For issues or questions about the project structure, refer to:
 
 ---
 
-**GS Optimizer v1.0.0** - Advanced System Optimization Tool with LoL-Inspired UI
+**GS Control Center v1.0.0** - Advanced System Optimization Tool with LoL-Inspired UI

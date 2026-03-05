@@ -41,7 +41,7 @@ const Header: React.FC = React.memo(() => {
   return (
     <header className="header">
       <div className="header-left header-drag-region">
-        <h1 className="header-title">GS Optimizer</h1>
+        <h1 className="header-title">GS Control Center</h1>
         <p className="header-subtitle">System Performance Control Center</p>
       </div>
 

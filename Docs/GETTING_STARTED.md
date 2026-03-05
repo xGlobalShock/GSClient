@@ -1,4 +1,4 @@
-# GS Optimizer - Getting Started Checklist
+# GS Control Center - Getting Started Checklist
 
 ## 🎯 Initial Setup (Do First)
 
@@ -30,7 +30,7 @@ npm run dev
 
 ### Visual Elements
 - [ ] Sidebar visible with 5 icons
-- [ ] Header shows "GS Optimizer"
+- [ ] Header shows "GS Control Center"
 - [ ] Dashboard displays 4 stat cards
 - [ ] Stats update every second (animation)
 - [ ] Colors match design (Gold/Cyan/Red)

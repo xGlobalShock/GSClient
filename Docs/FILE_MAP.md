@@ -1,4 +1,4 @@
-# GS Optimizer - Complete File Map
+# GS Control Center - Complete File Map
 
 ```
 c:\Users\xSGCo\Desktop\Client\

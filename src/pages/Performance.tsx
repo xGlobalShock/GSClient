@@ -70,7 +70,7 @@ const Performance: React.FC = () => {
     setCreatingRestore(true);
     try {
       if (window.electron?.ipcRenderer) {
-        const restoreDesc = `GS Optimizer - Before Tweak Application`;
+        const restoreDesc = `GS Control Center - Before Tweak Application`;
         const maxAttempts = 3;
         let attempt = 0;
         let success = false;

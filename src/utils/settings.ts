@@ -10,7 +10,7 @@ interface AppSettings {
   lastCleanup?: string;
 }
 
-const SETTINGS_KEY = 'pc-optimizer-settings';
+const SETTINGS_KEY = 'pc-controlcenter-settings';
 const DEFAULT_SETTINGS: AppSettings = {
   autoClean: true,
   notifications: true,
@@ -89,7 +89,7 @@ export interface OptimizationProfile {
   settings: Record<string, boolean>;
 }
 
-const PROFILES_KEY = 'pc-optimizer-profiles';
+const PROFILES_KEY = 'pc-controlcenter-profiles';
 
 export function loadProfiles(): OptimizationProfile[] {
   try {

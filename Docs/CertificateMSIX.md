@@ -8,7 +8,7 @@ Your package.json likely has `electron-builder` already. Update it for MSIX outp
 {
   "build": {
     "appId": "com.yourcompany.gsoptimizer",
-    "productName": "GS Optimizer",
+    "productName": "GS Control Center",
     "win": {
       "target": [
         {
@@ -35,13 +35,13 @@ MSIX requires a manifest in public or auto-generated:
 <Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10">
   <Identity Name="YourPublisherID.GSOptimizer" Publisher="CN=YourPublisher" Version="1.0.0.0"/>
   <Properties>
-    <DisplayName>GS Optimizer</DisplayName>
+    <DisplayName>GS Control Center</DisplayName>
     <PublisherDisplayName>Your Company</PublisherDisplayName>
     <Logo>Assets/StoreLogo.png</Logo>
   </Properties>
   <Applications>
     <Application StartPage="app.html">
-      <VisualElements DisplayName="GS Optimizer" Square150x150Logo="Assets/Square150x150Logo.png"/>
+      <VisualElements DisplayName="GS Control Center" Square150x150Logo="Assets/Square150x150Logo.png"/>
     </Application>
   </Applications>
 </Package>
@@ -76,7 +76,7 @@ This generates a `.msix` file in your dist folder.
 
 ```powershell
 # Install locally to test
-Add-AppxPackage -Path "dist/GS Optimizer 1.0.0.msix"
+Add-AppxPackage -Path "dist/GS Control Center 1.0.0.msix"
 ```
 
 ## 7. **Submit to Microsoft Store**

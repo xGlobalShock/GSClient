@@ -1,4 +1,4 @@
-# GS Optimizer - Quick Start Guide
+# GS Control Center - Quick Start Guide
 
 ## 🚀 Launch Instructions
 

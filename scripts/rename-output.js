@@ -4,7 +4,7 @@ const { execSync } = require('child_process');
 
 const distDir = path.join(__dirname, '..', 'dist');
 const oldName = path.join(distDir, 'win-unpacked');
-const newName = path.join(distDir, 'GS Optimizer');
+const newName = path.join(distDir, 'GS Control Center');
 
 function sleep(ms) {
   return new Promise(r => setTimeout(r, ms));
@@ -44,13 +44,13 @@ async function removeWithRetry(target, retries = 3) {
       console.log('Destination already exists, removing it first...');
       const removed = await removeWithRetry(newName);
       if (!removed) {
-        console.warn(`Could not remove 'dist/GS Optimizer' — build output is in 'dist/win-unpacked' instead.`);
+        console.warn(`Could not remove 'dist/GS Control Center' — build output is in 'dist/win-unpacked' instead.`);
         return;
       }
     }
 
     fs.renameSync(oldName, newName);
-    console.log(`Renamed 'dist/win-unpacked' -> 'dist/GS Optimizer'`);
+    console.log(`Renamed 'dist/win-unpacked' -> 'dist/GS Control Center'`);
   } catch (err) {
     console.warn('Rename skipped:', err.message || err);
     console.warn('Build output is available at: dist/win-unpacked');

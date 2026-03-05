@@ -1,8 +1,8 @@
 {
-  "name": "gs-optimizer",
+  "name": "gs-control-center",
   "version": "1.0.0",
-  "description": "GS Optimizer - Advanced System Optimization Tool",
-  "author": "GS Optimizer Team",
+  "description": "GS Control Center - Advanced System Optimization Tool",
+  "author": "GS Control Center Team",
   "main": "main.js",
   "homepage": "./",
   "private": true,
@@ -45,8 +45,8 @@
     "wait-on": "^7.0.1"
   },
   "build": {
-    "appId": "com.gsoptimizer.app",
-    "productName": "GS Optimizer",
+    "appId": "com.gscontrolcenter.app",
+    "productName": "GS Control Center",
     "asar": false,
     "files": [
       "build/**/*",
@@ -89,7 +89,7 @@
       "target": [
         "dir"
       ],
-      "executableName": "GS Optimizer",
+      "executableName": "GS Control Center",
       "requestedExecutionLevel": "requireAdministrator"
     },
     "nsis": {
@@ -97,7 +97,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "GS Optimizer"
+      "shortcutName": "GS Control Center"
     }
   },
   "browserslist": {

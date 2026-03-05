@@ -263,7 +263,7 @@ ipcMain.handle('preset:save-video-settings', async (event, filename, content) =>
 ipcMain.handle('system:create-restore-point', async (event, description) => {
   try {
     // Default description (kept as requested) and allow override via the description argument
-    const descBase = description || 'GS Optimizer - Before Tweak Application';
+    const descBase = description || 'GS Control Center - Before Tweak Application';
 
     // Require admin privileges to create restore points
     if (!isElevated) {
@@ -4587,7 +4587,7 @@ ipcMain.handle('software:update-app', async (_event, packageId) => {
           resolve({ success: true, message: `${packageId} updated successfully` });
         } else if (lower.includes('cannot be run from an administrator')) {
           // De-elevation didn't actually work — task still ran elevated
-          sendProgress({ phase: 'error', status: 'This app must be updated outside GS Optimizer', percent: 0 });
+          sendProgress({ phase: 'error', status: 'This app must be updated outside GS Control Center', percent: 0 });
           resolve({ success: false, message: 'This app\'s installer refuses elevated context. Update it directly from its own updater.' });
         } else if (elapsed >= maxWait) {
           sendProgress({ phase: 'error', status: 'Update timed out', percent: 0 });

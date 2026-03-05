@@ -1,4 +1,4 @@
-# 📖 GS Optimizer - Documentation Index
+# 📖 GS Control Center - Documentation Index
 
 ## 🎯 START HERE
 
@@ -247,7 +247,7 @@ npm run client
 ## 📊 DOCUMENTATION STRUCTURE
 
 ```
-GS Optimizer/
+GS Control Center/
 ├── README.md                      ← Start here for overview
 ├── QUICK_START.md                 ← Start here to use the app
 ├── FEATURE_DOCUMENTATION.md       ← Detailed technical info
@@ -357,7 +357,7 @@ GS Optimizer/
 ## 🎯 TL;DR (Too Long; Didn't Read)
 
 ### One-Sentence Summary
-GS Optimizer is a professional Electron/React desktop app that provides one-click gaming optimizations with registry tweaks, game profiles, and system cleanup for Windows.
+GS Control Center is a professional Electron/React desktop app that provides one-click gaming optimizations with registry tweaks, game profiles, and system cleanup for Windows.
 
 ### 30-Second Summary
 1. **What**: Gaming optimization app inspired by League of Legends

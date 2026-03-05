@@ -1,4 +1,4 @@
-# GS Optimizer - UI/UX Guide
+# GS Control Center - UI/UX Guide
 
 ## Visual Style Reference
 

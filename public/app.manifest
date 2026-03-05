@@ -3,10 +3,10 @@
   <assemblyIdentity
     version="1.0.0.0"
     processorArchitecture="*"
-    name="GS Optimizer"
+    name="GS Control Center"
     type="win32"
   />
-  <description>GS Optimizer - System Maintenance and Performance Tools</description>
+  <description>GS Control Center - System Maintenance and Performance Tools</description>
   <trustInfo xmlns="urn:schemas-microsoft-com:compatibility.v1">
     <security>
       <requestedPrivileges>
