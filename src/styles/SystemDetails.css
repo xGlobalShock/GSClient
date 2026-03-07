@@ -3,6 +3,21 @@
    Deep Space (#050505) · Electric Cyan (#00F2FF) · Neon Emerald
 ═══════════════════════════════════════════════════════════════ */
 
+/* ── Network info blur toggle ── */
+.hud-blurrable {
+  cursor: pointer;
+  transition: filter 0.25s ease;
+}
+.hud-blurred {
+  filter: blur(6px);
+  user-select: none;
+  cursor: pointer;
+  display: inline-block;
+  padding: 2px 6px;
+  clip-path: inset(0 round 15px);
+  transition: filter 0.25s ease, clip-path 0.25s ease;
+}
+
 /* ── Section ── */
 .hud-section {
   padding: 0;

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
   Cpu, MonitorSpeaker, MemoryStick, HardDrive,
@@ -432,6 +432,12 @@ const SystemDetails: React.FC<SystemDetailsProps> = ({ systemStats, hardwareInfo
   const ext = extendedStats;
   const s = systemStats;
 
+  // ── Network info blur toggle (double-click to hide/show) ──
+  const [blurredFields, setBlurredFields] = useState<Record<string, boolean>>({});
+  const toggleBlur = useCallback((field: string) => {
+    setBlurredFields(prev => ({ ...prev, [field]: !prev[field] }));
+  }, []);
+
   // ── Show skeleton while no meaningful data has arrived ──
   const hasAnyData = (s && s.cpu > 0) || hw || ext;
   if (!hasAnyData) return <SkeletonLoading hideHeader={hideHeader} />;
@@ -744,11 +750,27 @@ const SystemDetails: React.FC<SystemDetailsProps> = ({ systemStats, hardwareInfo
           className="hud-tile-net"
           delay={0.25}
         >
-          {/* Static info — standard rows */}
-          <Row label="Local IP Address" value={hw?.ipAddress} loading={hwLoading} />
-          <Row label="Gateway" value={hw?.gateway} loading={hwLoading} />
-          <Row label="DNS" value={hw?.dns} loading={hwLoading} />
-          {hw?.macAddress ? <Row label="MAC" value={hw.macAddress} /> : hwLoading && <Row label="MAC" loading />}
+          {/* Static info — standard rows (double-click to blur/unblur) */}
+          <Row label="Local IP Address" loading={hwLoading} value={
+            <span className={blurredFields['ip'] ? 'hud-blurred' : 'hud-blurrable'} onDoubleClick={() => toggleBlur('ip')} title="Double-click to blur">
+              {hw?.ipAddress ?? '—'}
+            </span>
+          } />
+          <Row label="Gateway" loading={hwLoading} value={
+            <span className={blurredFields['gateway'] ? 'hud-blurred' : 'hud-blurrable'} onDoubleClick={() => toggleBlur('gateway')} title="Double-click to blur">
+              {hw?.gateway ?? '—'}
+            </span>
+          } />
+          <Row label="DNS" loading={hwLoading} value={
+            <span className={blurredFields['dns'] ? 'hud-blurred' : 'hud-blurrable'} onDoubleClick={() => toggleBlur('dns')} title="Double-click to blur">
+              {hw?.dns ?? '—'}
+            </span>
+          } />
+          {hw?.macAddress ? <Row label="MAC" value={
+            <span className={blurredFields['mac'] ? 'hud-blurred' : 'hud-blurrable'} onDoubleClick={() => toggleBlur('mac')} title="Double-click to blur">
+              {hw.macAddress}
+            </span>
+          } /> : hwLoading && <Row label="MAC" loading />}
           {ext?.ssid && <Row label="Wi‑Fi SSID" value={ext.ssid} />}
 
           {/* ── Active connection ── */}
@@ -895,10 +917,10 @@ const SystemDetails: React.FC<SystemDetailsProps> = ({ systemStats, hardwareInfo
               {/* Power & Resources */}
               <div className="hud-sys-rt-stat">
                 <div className="hud-sys-rt-head">
-                  <Zap size={10} className="hud-sys-rt-zap" />
+                  <span className="hud-sys-rt-dot" style={{ background: '#00F2FF', boxShadow: '0 0 5px #00F2FF' }} />
                   <span className="hud-sys-rt-key">Power Plan</span>
                 </div>
-                <span className="hud-sys-rt-plan">{hw?.powerPlan ?? '—'}</span>
+                <span className="hud-sys-rt-big">{hw?.powerPlan ?? '—'}</span>
                 {hw?.hasBattery && (
                   <div className="hud-sys-rt-batt">
                     <Battery size={11} />

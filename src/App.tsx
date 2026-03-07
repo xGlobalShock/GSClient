@@ -121,7 +121,7 @@ function App() {
   }, [isLoading, connected]);
 
   useEffect(() => {
-    // Fetch hardware info once (static data, cached on disk for 7 days)
+    // Fetch hardware info once (always fresh, no disk cache)
     const fetchHardwareInfo = async () => {
       if (window.electron?.ipcRenderer) {
         try {
@@ -133,11 +133,6 @@ function App() {
       }
     };
     fetchHardwareInfo();
-
-    // Listen for background-refreshed hardware info (replaces stale cache)
-    const onHwUpdated = (info: HardwareInfo) => { setHardwareInfo(info); };
-    const unsub = window.electron?.ipcRenderer?.on?.('hardware-info-updated', onHwUpdated);
-    return () => { unsub?.(); };
   }, []);
 
   // Pre-computed display styles to avoid creating new objects on every render

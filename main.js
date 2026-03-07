@@ -1193,67 +1193,28 @@ ipcMain.handle('system:stop-realtime', () => {
 });
 
 // ──────────────────────────────────────────────────────
-// Hardware Info — cached to disk for instant subsequent launches.
-// On first launch: 3 parallel PS scripts + nvidia-smi (~5-8s).
-// On subsequent launches: returns disk cache (<10ms), refreshes in background.
+// Hardware Info — always fetched fresh (no disk caching).
+// 3 parallel PS scripts + nvidia-smi (~5-8s on first call).
 // ──────────────────────────────────────────────────────
-const HW_CACHE_VERSION = 2; // Bump when schema changes to invalidate old cache
-let _hwInfoResult = null;    // resolved HardwareInfo object (from cache or fresh fetch)
-let _hwInfoPromise = null;   // pending fetch promise (so IPC handler can await if no cache)
-
-function _getHwCachePath() {
-  try { return path.join(app.getPath('userData'), 'gs_hw_cache.json'); }
-  catch { return path.join(os.tmpdir(), 'gs_hw_cache.json'); }
-}
-
-function _loadHwCache() {
-  try {
-    const raw = fs.readFileSync(_getHwCachePath(), 'utf8');
-    const obj = JSON.parse(raw);
-    // Cache valid for 7 days AND must match current schema version
-    if (obj.data && (obj._v || 1) === HW_CACHE_VERSION && Date.now() - (obj._ts || 0) < 7 * 86400000) {
-      return obj.data;
-    }
-  } catch {}
-  return null;
-}
-
-function _saveHwCache(data) {
-  try {
-    fs.writeFileSync(_getHwCachePath(), JSON.stringify({ _v: HW_CACHE_VERSION, _ts: Date.now(), data }), 'utf8');
-  } catch (e) {
-  }
-}
+let _hwInfoResult = null;    // resolved HardwareInfo object
+let _hwInfoPromise = null;   // pending fetch promise (so IPC handler can await)
 
 // Pre-fetch: called from app.on('ready') to overlap with window/React loading
 function _initHardwareInfo() {
-  // 1. Load from disk cache (synchronous, <1ms)
-  const cached = _loadHwCache();
-  if (cached) {
-    _hwInfoResult = cached;
-    // HW info loaded from cache
-  }
-
-  // 2. Always start a fresh fetch in background (updates cache for next time)
   _hwInfoPromise = _fetchHardwareInfoImpl().then(info => {
-    const hadOldCache = !!_hwInfoResult;
     _hwInfoResult = info;
-    _saveHwCache(info);
-    // Push fresh data to renderer if we served stale cache initially
-    if (hadOldCache) {
-      try { BrowserWindow.getAllWindows().forEach(w => w.webContents.send('hardware-info-updated', info)); } catch {}
-    }
     return info;
   }).catch(err => {
-    return _hwInfoResult; // return stale cache if available
+    console.error('[HW Info] fetch failed:', err.message);
+    return null;
   });
 }
 
-// IPC handler: returns cached data instantly, or awaits pending fetch
+// IPC handler: returns result if ready, or awaits pending fetch
 ipcMain.handle('system:get-hardware-info', async () => {
   if (_hwInfoResult) return _hwInfoResult;
   if (_hwInfoPromise) return _hwInfoPromise;
-  // Shouldn't reach here, but fallback to direct fetch
+  // Fallback to direct fetch
   return _fetchHardwareInfoImpl();
 });
 
@@ -5092,23 +5053,24 @@ ipcMain.handle('appinstall:cancel-install', async () => {
 
 ipcMain.handle('appinstall:install-app', async (_event, packageId) => {
   const cleanId = String(packageId).replace(/[^\x20-\x7E]/g, '').trim();
+  const win = BrowserWindow.getAllWindows()[0];
 
-  return new Promise((resolve) => {
-    const win = BrowserWindow.getAllWindows()[0];
+  const sendProgress = (data) => {
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('appinstall:install-progress', { packageId: cleanId, ...data });
+    }
+  };
+
+  /* ── Run a winget install command and collect output ── */
+  const runInstall = (cmd, label = 'Preparing installation…') => new Promise((resolve) => {
     let fullOutput = '';
     let phase = 'preparing';
     let cancelled = false;
 
-    const sendProgress = (data) => {
-      if (win && !win.isDestroyed()) {
-        win.webContents.send('appinstall:install-progress', { packageId: cleanId, ...data });
-      }
-    };
-
-    sendProgress({ phase: 'preparing', status: 'Preparing installation…', percent: 0 });
+    sendProgress({ phase: 'preparing', status: label, percent: 0 });
 
     const proc = spawn('cmd.exe', [
-      '/c', `chcp 65001 >nul && winget install --id ${cleanId} --accept-source-agreements --accept-package-agreements`
+      '/c', `chcp 65001 >nul && ${cmd}`
     ], { windowsHide: true, env: process.env, cwd: process.env.SYSTEMROOT || 'C:\\Windows' });
 
     activeInstallProc = proc;
@@ -5117,7 +5079,7 @@ ipcMain.handle('appinstall:install-app', async (_event, packageId) => {
       cancelled = true;
       proc.kill();
       sendProgress({ phase: 'error', status: 'Installation timed out', percent: 0 });
-      resolve({ success: false, message: `Installation timed out for ${cleanId}` });
+      resolve({ success: false, message: `Installation timed out for ${cleanId}`, output: fullOutput });
     }, 300000);
 
     const processChunk = (chunk) => {
@@ -5156,14 +5118,6 @@ ipcMain.handle('appinstall:install-app', async (_event, packageId) => {
         } else if (/already installed/i.test(seg)) {
           phase = 'done';
           sendProgress({ phase: 'done', status: 'Already installed', percent: 100 });
-        } else if (/access is denied/i.test(seg)) {
-          sendProgress({ phase: 'error', status: isElevated ? seg.substring(0, 100) : 'Run the app as administrator', percent: 0 });
-        } else if (/Installer failed/i.test(seg)) {
-          sendProgress({ phase: 'error', status: 'Installer failed', percent: 0 });
-        } else if (/no package found/i.test(seg)) {
-          sendProgress({ phase: 'error', status: 'Package not found in winget', percent: 0 });
-        } else if (/failed|error|denied|cannot|exit code/i.test(seg)) {
-          sendProgress({ phase: 'error', status: seg.substring(0, 100), percent: 0 });
         }
       }
     };
@@ -5177,7 +5131,7 @@ ipcMain.handle('appinstall:install-app', async (_event, packageId) => {
       const wasCancelled = cancelled || proc.killed || cancelledPids.delete(proc.pid);
       if (wasCancelled) {
         sendProgress({ phase: 'error', status: 'Installation cancelled', percent: 0 });
-        resolve({ success: false, message: 'Installation cancelled by user' });
+        resolve({ success: false, cancelled: true, message: 'Installation cancelled by user', output: fullOutput });
         return;
       }
       const output = fullOutput.toLowerCase();
@@ -5185,20 +5139,201 @@ ipcMain.handle('appinstall:install-app', async (_event, packageId) => {
       if (success) {
         _wingetListCache = null; _wingetCacheTime = 0; _regNamesCache = null; _regCacheTime = 0;
         sendProgress({ phase: 'done', status: 'Installed!', percent: 100 });
-        resolve({ success: true, message: `${cleanId} installed successfully` });
+        resolve({ success: true, message: `${cleanId} installed successfully`, output: fullOutput });
       } else {
         const msg = fullOutput.split('\r').map(s => s.trim()).filter(s => s.length > 0).pop() || `Installation failed (exit code: ${code})`;
-        sendProgress({ phase: 'error', status: msg.substring(0, 120), percent: 0 });
-        resolve({ success: false, message: msg });
+        resolve({ success: false, message: msg, output: fullOutput });
       }
     });
 
     proc.on('error', (err) => {
       clearTimeout(timeout);
       sendProgress({ phase: 'error', status: err.message, percent: 0 });
-      resolve({ success: false, message: `Failed to start installation: ${err.message}` });
+      resolve({ success: false, message: `Failed to start installation: ${err.message}`, output: fullOutput });
     });
   });
+
+  /* ── De-elevate install for apps that refuse admin context (e.g. Spotify) ── */
+  const runDeElevatedInstall = (cmd) => new Promise((resolve) => {
+    sendProgress({ phase: 'preparing', status: 'Retrying as standard user…', percent: 0 });
+
+    const tmpLog = path.join(os.tmpdir(), `gs_appinst_${cleanId.replace(/[^a-zA-Z0-9]/g, '_')}.log`);
+    const tmpBat = path.join(os.tmpdir(), `gs_appinst_de_${process.pid}.bat`);
+    const taskName = `GSAppInstall_${process.pid}`;
+
+    try { fs.unlinkSync(tmpLog); } catch {}
+    fs.writeFileSync(tmpBat,
+      `@echo off\r\nchcp 65001 >nul\r\n${cmd} --disable-interactivity > "${tmpLog}" 2>&1\r\necho __GS_DONE__ >> "${tmpLog}"\r\n`, 'utf8');
+
+    const tmpVbs = path.join(os.tmpdir(), `gs_appinst_de_${process.pid}.vbs`);
+    fs.writeFileSync(tmpVbs,
+      `CreateObject("WScript.Shell").Run "cmd.exe /c """"${tmpBat.replace(/\\/g, '\\\\')}""""", 0, True\r\n`, 'utf8');
+
+    let launchOk = false;
+
+    // Method 1: PowerShell Register-ScheduledTask (RunLevel Limited)
+    if (!launchOk) {
+      try {
+        const userName = (process.env.USERDOMAIN && process.env.USERNAME)
+          ? `${process.env.USERDOMAIN}\\${process.env.USERNAME}`
+          : process.env.USERNAME || 'CURRENT_USER';
+        const ps1 = path.join(os.tmpdir(), `gs_de_inst_${process.pid}.ps1`);
+        const ps1Body = [
+          `$taskName = '${taskName}'`,
+          `$vbsPath  = '${tmpVbs.replace(/'/g, "''")}'`,
+          `try { Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -EA SilentlyContinue } catch {}`,
+          `$action    = New-ScheduledTaskAction -Execute 'wscript.exe' -Argument ('"""' + $vbsPath + '"""')`,
+          `$principal = New-ScheduledTaskPrincipal -UserId '${userName.replace(/'/g, "''")}' -RunLevel Limited -LogonType Interactive`,
+          `$settings  = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries`,
+          `Register-ScheduledTask -TaskName $taskName -Action $action -Principal $principal -Settings $settings -Force | Out-Null`,
+          `Start-ScheduledTask -TaskName $taskName`,
+          `Write-Host 'LAUNCHED'`
+        ].join('\n');
+        fs.writeFileSync(ps1, ps1Body, 'utf8');
+        const psOut = execSync(
+          `powershell -NoProfile -ExecutionPolicy Bypass -File "${ps1}"`,
+          { encoding: 'utf8', windowsHide: true, timeout: 20000 }
+        );
+        try { fs.unlinkSync(ps1); } catch {}
+        if (psOut.includes('LAUNCHED')) launchOk = true;
+      } catch (err) {
+        console.error('[App Install] PS ScheduledTask failed:', (err.stderr || err.message || '').substring(0, 300));
+      }
+    }
+
+    // Method 2: runas /trustlevel:0x20000
+    if (!launchOk) {
+      try {
+        const r = spawnSync('runas.exe', ['/trustlevel:0x20000', 'wscript.exe', tmpVbs],
+          { windowsHide: true, timeout: 10000 });
+        if (r.error) throw r.error;
+        launchOk = true;
+      } catch (err) {
+        console.error('[App Install] runas /trustlevel failed:', err.message || err);
+      }
+    }
+
+    if (!launchOk) {
+      try { execSync(`schtasks /delete /tn "${taskName}" /f`, { stdio: 'ignore', windowsHide: true }); } catch {}
+      try { fs.unlinkSync(tmpBat); } catch {}
+      try { fs.unlinkSync(tmpVbs); } catch {}
+      sendProgress({ phase: 'error', status: 'Installation failed — cannot de-elevate', percent: 0 });
+      resolve({ success: false, message: 'This app\'s installer refuses elevated context. Install it directly outside GS Control Center.' });
+      return;
+    }
+
+    sendProgress({ phase: 'installing', status: 'Installing (standard user)…', percent: -1 });
+
+    let elapsed = 0;
+    const pollMs = 2000;
+    const maxWait = 300000;
+    let lastLogSize = 0;
+    let staleSince = 0;
+    const staleLimit = 30000;
+    let installStarted = false;
+
+    const poll = setInterval(() => {
+      elapsed += pollMs;
+      let log = '';
+      try { log = fs.readFileSync(tmpLog, 'utf8'); } catch {}
+      const lower = log.toLowerCase();
+
+      if (log.length === lastLogSize) { staleSince += pollMs; }
+      else { lastLogSize = log.length; staleSince = 0; }
+
+      if (lower.includes('downloading')) {
+        sendProgress({ phase: 'downloading', status: 'Downloading…', percent: -1 });
+      }
+      if (lower.includes('starting package install')) {
+        sendProgress({ phase: 'installing', status: 'Installing…', percent: -1 });
+        installStarted = true;
+      }
+
+      const finished = lower.includes('successfully installed') ||
+                       lower.includes('already installed') ||
+                       lower.includes('installer failed') ||
+                       lower.includes('failed to install') ||
+                       lower.includes('cannot be run from an administrator') ||
+                       lower.includes('__gs_done__') ||
+                       (lower.includes('exit code') && lower.includes('failed'));
+
+      const staleFinish = installStarted && staleSince >= staleLimit;
+
+      if (finished || staleFinish || elapsed >= maxWait) {
+        clearInterval(poll);
+        try { execSync(`schtasks /delete /tn "${taskName}" /f`, { stdio: 'ignore', windowsHide: true }); } catch {}
+        try { fs.unlinkSync(tmpBat); } catch {}
+        try { fs.unlinkSync(tmpVbs); } catch {}
+
+        const success = lower.includes('successfully installed');
+        if (success) {
+          _wingetListCache = null; _wingetCacheTime = 0; _regNamesCache = null; _regCacheTime = 0;
+          sendProgress({ phase: 'done', status: 'Installed!', percent: 100 });
+          resolve({ success: true, message: `${cleanId} installed successfully` });
+        } else if (lower.includes('cannot be run from an administrator')) {
+          sendProgress({ phase: 'error', status: 'This app must be installed outside GS Control Center', percent: 0 });
+          resolve({ success: false, message: 'This app\'s installer refuses elevated context. Install it directly.' });
+        } else if (elapsed >= maxWait) {
+          sendProgress({ phase: 'error', status: 'Installation timed out', percent: 0 });
+          resolve({ success: false, message: 'Installation timed out' });
+        } else {
+          const lines = log.split(/[\r\n]/).map(s => s.trim()).filter(Boolean);
+          const lastLine = lines.filter(l => l.length > 3 && !/^[-\\|/]$/.test(l) && !/^__GS_DONE__$/i.test(l)).pop() || 'Installation failed';
+          sendProgress({ phase: 'error', status: lastLine.substring(0, 120), percent: 0 });
+          resolve({ success: false, message: lastLine.substring(0, 120) });
+        }
+        try { fs.unlinkSync(tmpLog); } catch {}
+      }
+    }, pollMs);
+  });
+
+  // ── Step 1: Normal install ──
+  let result = await runInstall(
+    `winget install --id ${cleanId} --accept-source-agreements --accept-package-agreements`,
+    'Preparing installation…'
+  );
+  if (result.success || result.cancelled) return result;
+
+  const output = (result.output || '').toLowerCase();
+
+  // ── Step 2: 404 / Not Found → update sources and retry ──
+  if (output.includes('0x80190194') || output.includes('not found (404)') || output.includes('download failed')) {
+    sendProgress({ phase: 'preparing', status: 'Updating sources…', percent: 0 });
+    try { await execAsync('winget source update', { timeout: 30000, windowsHide: true }); } catch {}
+    result = await runInstall(
+      `winget install --id ${cleanId} --accept-source-agreements --accept-package-agreements --force`,
+      'Retrying installation…'
+    );
+    if (result.success || result.cancelled) return result;
+  }
+
+  // ── Step 3: Hash mismatch → retry with --ignore-security-hash (requires admin) ──
+  if (output.includes('installer hash does not match') || output.includes('hash mismatch') ||
+      (result.output || '').toLowerCase().includes('installer hash does not match')) {
+    if (isElevated) {
+      result = await runInstall(
+        `winget install --id ${cleanId} --accept-source-agreements --accept-package-agreements --ignore-security-hash`,
+        'Retrying with hash override…'
+      );
+      if (result.success || result.cancelled) return result;
+    } else {
+      sendProgress({ phase: 'error', status: 'Hash mismatch — run app as administrator to override', percent: 0 });
+      return { success: false, message: 'Installer hash mismatch. Run GS Control Center as administrator to bypass.' };
+    }
+  }
+
+  // ── Step 4: Installer refuses admin context → de-elevate (e.g. Spotify) ──
+  if (isElevated && (output.includes('cannot be run from an administrator') ||
+      (result.output || '').toLowerCase().includes('cannot be run from an administrator'))) {
+    return await runDeElevatedInstall(
+      `winget install --id ${cleanId} --accept-source-agreements --accept-package-agreements --force`
+    );
+  }
+
+  // ── Final: report error ──
+  const finalMsg = (result.message || 'Installation failed').substring(0, 120);
+  sendProgress({ phase: 'error', status: finalMsg, percent: 0 });
+  return { success: false, message: finalMsg };
 });
 
 // Install multiple apps in sequence
