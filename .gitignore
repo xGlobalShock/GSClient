@@ -1,29 +1,46 @@
-# Ignore Node modules
+# ── Dependencies ──
 node_modules/
-dist/
-build/
+package-lock.json
 
-# IDE
+# ── Build output ──
+build/
+dist/
+out/
+release/
+
+# ── Source code (closed-source) ──
+src/
+public/
+main.js
+admin-check.js
+dev-launcher.js
+launcher.js
+scripts/
+lib/
+
+# ── Config / tooling ──
+tsconfig.json
+tsconfig.node.json
+tailwind.config.js
+postcss.config.js
+
+# ── IDE ──
 .vscode/
 .idea/
 *.swp
 *.swo
-*ToDoList.md
 
-# OS
+# ── OS ──
 .DS_Store
 Thumbs.db
 
-# Environment
+# ── Environment ──
 .env
 .env.local
 .env.*.local
 
-# Build
-out/
-release/
-
-# Logs
+# ── Misc ──
+ToDoList.md
 *.log
 npm-debug.log*
 yarn-debug.log*
