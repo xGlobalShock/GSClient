@@ -16,7 +16,7 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
       tag_name: ${{ steps.version.outputs.tag_name }}
-      created: ${{ steps.check_tag.outputs.exists == 'false' }}
+      created: ${{ steps.create_tag.outcome == 'success' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -40,6 +40,7 @@ jobs:
           fi
 
       - name: Create tag
+        id: create_tag
         if: steps.check_tag.outputs.exists == 'false'
         run: |
           git config user.name "github-actions[bot]"
@@ -76,7 +77,7 @@ jobs:
 
   build:
     needs: release
-    if: needs.release.outputs.created == 'true'
+    if: always() && needs.release.result == 'success' && needs.release.outputs.created == 'true'
     runs-on: windows-latest
 
     steps:
