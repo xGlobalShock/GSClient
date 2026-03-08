@@ -11,10 +11,22 @@ An all-in-one Windows desktop utility for PC optimization, real-time hardware mo
 
 ---
 
+## 📥 Download
+
+Get the latest installer from the most recent release:
+
+[GS‑Control‑Center‑Setup‑1.1.0.exe](https://github.com/xGlobalShock/GS-Control-Center/releases/download/v1.1.0/GS-Control-Center-Setup-1.1.0.exe)
+
+(this link will change for each release, so you can also point to `latest`)
+
+[🟢 Download latest release](https://github.com/xGlobalShock/GS-Control-Center/releases/latest)
+
+---
+
 ## 🎯 Quick Start
 
 ### Install
-Download the latest **GS-Control-Center-Setup-x.x.x.exe** from [GitHub Releases](https://github.com/xGlobalShock/GSClient/releases) and run it. The installer requires administrator privileges.
+Download the latest **GS-Control-Center-Setup-x.x.x.exe** from [GitHub Releases](https://github.com/xGlobalShock/GS-Control-Center/releases) and run it. The installer requires administrator privileges.
 
 ### Development
 ```bash
