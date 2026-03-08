@@ -1,7 +1,10 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useLayoutEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, X, Monitor, Cpu, ArrowLeft, Copy, Info, Shield, Gamepad2, Download, Check, FileVideo } from 'lucide-react';
+import { Search, X, Monitor, Cpu, ArrowLeft, Copy, Info, Shield, Gamepad2, Download, Check, FileVideo, HardDrive, CheckCircle, XCircle, Zap } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
+import type { HardwareInfo } from '../App';
+import { GAME_REQUIREMENTS } from '../data/gameRequirements';
+import { compareHardware, quickVerdict, predictFps, type ComparisonResult, type OverallVerdict } from '../utils/hardwareCompare';
 import '../styles/GameLibrary.css';
 import valorantImg from '../assets/Valorant.jpg';
 import rocketLeagueImg from '../assets/Rocket League Banner.jpg';
@@ -300,16 +303,31 @@ const games: Game[] = [
   }
 ];
 
-const GameLibrary: React.FC = () => {
+interface GameLibraryProps {
+  hardwareInfo?: HardwareInfo;
+}
+
+const GameLibrary: React.FC<GameLibraryProps> = ({ hardwareInfo }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
   const [showCommandsModal, setShowCommandsModal] = useState(false);
+  const [showSpecsModal, setShowSpecsModal] = useState(false);
   const [selectedResPreset, setSelectedResPreset] = useState('Native');
   const [selectedAspectRatio, setSelectedAspectRatio] = useState('16:9');
   const [activeTab, setActiveTab] = useState<'graphics' | 'launch' | 'presets'>('graphics');
   const [downloadedPresets, setDownloadedPresets] = useState<Record<string, boolean>>({});
   const [downloadingPreset, setDownloadingPreset] = useState<string | null>(null);
+  const tabsRef = useRef<HTMLDivElement>(null);
+  const [sliderStyle, setSliderStyle] = useState({ left: 0, width: 0 });
+
+  useLayoutEffect(() => {
+    if (!tabsRef.current) return;
+    const activeBtn = tabsRef.current.querySelector('.gl-tab--active') as HTMLElement;
+    if (activeBtn) {
+      setSliderStyle({ left: activeBtn.offsetLeft, width: activeBtn.offsetWidth });
+    }
+  }, [activeTab, selectedGame]);
 
   const categories = useMemo(() => ['All', ...Array.from(new Set(games.map(game => game.category)))], []);
 
@@ -366,6 +384,23 @@ const GameLibrary: React.FC = () => {
       presets: presets.length,
     };
   }, [selectedGame]);
+
+  // Hardware comparison for selected game
+  const comparisonResult: ComparisonResult | null = useMemo(() => {
+    if (!selectedGame || !hardwareInfo) return null;
+    const req = GAME_REQUIREMENTS[selectedGame.id];
+    if (!req) return null;
+    return compareHardware(hardwareInfo, req);
+  }, [selectedGame, hardwareInfo]);
+
+  // Quick verdicts for all games (card rings)
+  const gameVerdicts = useMemo(() => {
+    const map: Record<string, OverallVerdict | 'unknown'> = {};
+    for (const g of games) {
+      map[g.id] = quickVerdict(hardwareInfo, GAME_REQUIREMENTS[g.id]);
+    }
+    return map;
+  }, [hardwareInfo]);
 
   const handleDownloadPreset = useCallback(async (preset: VideoPreset) => {
     if (!window.electron?.ipcRenderer) return;
@@ -440,6 +475,15 @@ const GameLibrary: React.FC = () => {
                     <div className="gl-card__corner gl-card__corner--tr" />
                     <div className="gl-card__corner gl-card__corner--bl" />
                     <div className="gl-card__corner gl-card__corner--br" />
+                    {/* Compatibility ring */}
+                    {gameVerdicts[game.id] !== 'unknown' && (
+                      <span className={`gl-card__compat gl-card__compat--${gameVerdicts[game.id]}`} title={
+                        gameVerdicts[game.id] === 'exceeds' ? 'Exceeds recommended specs' :
+                        gameVerdicts[game.id] === 'meets-recommended' ? 'Meets recommended specs' :
+                        gameVerdicts[game.id] === 'meets-minimum' ? 'Meets minimum specs' :
+                        'Below minimum specs'
+                      } />
+                    )}
                   </div>
 
                   <div className="gl-card__body">
@@ -472,37 +516,78 @@ const GameLibrary: React.FC = () => {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.25 }}
           >
-            {/* Dash Header */}
+            {/* Hero Banner Header */}
             <div className="gl-dash__header">
+              <div className="gl-dash__header-bg">
+                <img src={selectedGame.image} alt="" className="gl-dash__header-bg-img" />
+                <div className="gl-dash__header-gradient" />
+                <div className="gl-dash__header-scanline" />
+              </div>
               <button className="gl-dash__back" onClick={() => setSelectedGame(null)}>
                 <ArrowLeft size={18} />
               </button>
-              <div className="gl-dash__hero-img-wrap">
-                <img src={selectedGame.image} alt={selectedGame.title} className="gl-dash__hero-img" />
-              </div>
-              <div className="gl-dash__info">
-                <span className="gl-dash__category">{selectedGame.category}</span>
-                <h2 className="gl-dash__title">{selectedGame.title}</h2>
-                <p className="gl-dash__desc">{selectedGame.description}</p>
-              </div>
-              <div className="gl-dash__stats">
-                <div className="gl-dash__stat">
-                  <span className="gl-dash__stat-val">{settingsCounts.graphics}</span>
-                  <span className="gl-dash__stat-label">Graphics</span>
+              <div className="gl-dash__header-content">
+                <div className="gl-dash__info">
+                  <span className="gl-dash__category">{selectedGame.category}</span>
+                  <h2 className="gl-dash__title">{selectedGame.title}</h2>
+                  <p className="gl-dash__desc">{selectedGame.description}</p>
                 </div>
-                <div className="gl-dash__stat">
-                  <span className="gl-dash__stat-val">{settingsCounts.launch}</span>
-                  <span className="gl-dash__stat-label">Launch</span>
-                </div>
-                <div className="gl-dash__stat">
-                  <span className="gl-dash__stat-val">{settingsCounts.presets}</span>
-                  <span className="gl-dash__stat-label">Presets</span>
+                <div className="gl-dash__chips">
+                  <button className="gl-test-specs-btn" onClick={() => setShowSpecsModal(true)}>
+                    <div className="gl-btn__wrap">
+                      <div className="gl-btn__reflex"></div>
+                      <div className="gl-btn__content">
+                        <span className="gl-btn__text">
+                          {'GAME BENCHMARK'.split('').map((ch, i) => (
+                            <span key={i} style={{ '--i': i + 1 } as React.CSSProperties} data-label={ch === ' ' ? '\u00A0' : ch}>
+                              {ch === ' ' ? '\u00A0' : ch}
+                            </span>
+                          ))}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="gl-btn__gears-clip">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 635 523">
+                        <defs>
+                          <filter id="gearFilter">
+                            <feGaussianBlur result="blur" stdDeviation="5" in="SourceGraphic" />
+                            <feColorMatrix result="goo" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 19 -8" type="matrix" in="blur" />
+                            <feBlend in2="goo" in="SourceGraphic" />
+                          </filter>
+                        </defs>
+                        <g filter="url(#gearFilter)">
+                          <path className="gl-gear-lg gl-gear-shadow" d="M635 192V171L606 167C605 157 603 148 600 139L625 125L617 106L589 113C584 105 579 97 573 89L592 66L577 51L554 68C547 62 539 57 530 52L537 24L518 16L504 41C495 38 486 36 476 35L472 8H451L447 37C437 38 428 40 419 43L405 18L386 26L393 54C385 59 377 64 369 70L346 53L331 66L348 89C342 96 337 104 332 113L304 106L296 125L321 139C318 148 316 157 315 167L286 171V192L315 196C316 206 318 215 321 224L296 238L304 257L332 250C337 258 342 266 348 274L331 297L346 312L369 295C376 301 384 306 393 311L386 339L405 347L419 322C428 325 437 327 447 328L451 357H472L476 328C486 327 495 325 504 322L518 347L537 339L530 311C538 306 546 301 554 295L577 312L592 297L575 274C581 267 586 259 591 250L619 257L627 238L602 224C605 215 607 206 608 196L635 192ZM461 292C400 292 351 243 351 182C351 121 401 72 461 72C521 72 571 121 571 182C571 243 522 292 461 292Z" />
+                          <path className="gl-gear-md gl-gear-shadow" d="M392 398V377L364 373C363 363 360 354 357 345L380 328L369 310L342 321C336 313 329 307 322 301L333 275L315 264L298 287C289 283 280 281 270 280L266 252H245L241 280C231 281 222 284 213 287L196 264L178 275L189 301C181 307 175 314 169 321L143 310L132 328L155 345C151 354 149 363 148 373L120 377V398L148 402C149 412 152 421 155 430L132 447L143 465L169 454C175 462 182 468 189 474L178 500L196 511L213 488C222 492 231 494 241 495L245 523H266L270 495C280 494 289 491 298 488L315 511L333 500L322 474C330 468 336 461 342 454L368 465L379 447L356 430C360 421 362 412 363 402L392 398ZM255 461C214 461 181 428 181 387C181 346 214 313 255 313C296 313 329 346 329 387C328 428 295 461 255 461Z" />
+                          <path className="gl-gear-sm gl-gear-shadow" d="M200 244V223L171 219C169 209 165 201 160 193L178 170L163 155L140 173C132 168 123 164 114 162L110 133H90L86 162C76 164 68 168 60 173L37 155L22 170L40 193C35 201 31 210 29 219L0 223V244L29 248C31 258 35 266 40 274L22 297L37 312L60 294C68 299 77 303 86 305L90 334H111L115 305C125 303 133 299 141 294L164 312L179 297L161 274C166 266 170 257 172 248L200 244ZM100 270C80 270 63 253 63 233C63 213 80 196 100 196C120 196 137 213 137 233C137 253 121 270 100 270Z" />
+                          <path className="gl-gear-lg" d="M635 184V163L606 159C605 149 603 140 600 131L625 117L617 98L589 105C584 97 579 89 573 81L592 58L577 43L554 60C547 54 539 49 530 44L537 16L518 8L504 33C495 30 486 28 476 27L472 0H451L447 29C437 30 428 32 419 35L405 9L386 17L393 45C385 50 377 55 369 61L346 44L331 58L348 81C342 88 337 96 332 105L304 98L296 117L321 131C318 140 316 149 315 159L286 163V184L315 188C316 198 318 207 321 216L296 230L304 249L332 242C337 250 342 258 348 266L331 289L346 304L369 287C376 293 384 298 393 303L386 331L405 339L419 314C428 317 437 319 447 320L451 349H472L476 320C486 319 495 317 504 314L518 339L537 331L530 303C538 298 546 293 554 287L577 304L592 289L575 266C581 259 586 251 591 242L619 249L627 230L602 216C605 207 607 198 608 188L635 184ZM461 284C400 284 351 235 351 174C351 113 401 64 461 64C521 64 571 113 571 174C571 235 522 284 461 284Z" />
+                          <path className="gl-gear-md" d="M392 390V369L364 365C363 355 360 346 357 337L380 320L369 302L342 313C336 305 329 299 322 293L333 267L315 256L298 279C289 275 280 273 270 272L266 244H245L241 272C231 273 222 276 213 279L196 256L178 267L189 293C181 299 175 306 169 313L143 302L132 320L155 337C151 346 149 355 148 365L120 369V390L148 394C149 404 152 413 155 422L132 439L143 457L169 446C175 454 182 460 189 466L178 492L196 503L213 480C222 484 231 486 241 487L245 515H266L270 487C280 486 289 483 298 480L315 503L333 492L322 466C330 460 336 453 342 446L368 457L379 439L356 422C360 413 362 404 363 394L392 390ZM255 453C214 453 181 420 181 379C181 338 214 305 255 305C296 305 329 338 329 379C328 420 295 453 255 453Z" />
+                          <path className="gl-gear-sm" d="M200 236V215L171 211C169 201 165 193 160 185L178 162L163 147L140 165C132 160 123 156 114 154L110 125H90L86 154C76 156 68 160 60 165L37 147L22 162L40 185C35 193 31 202 29 211L0 215V236L29 240C31 250 35 258 40 266L22 289L37 304L60 286C68 291 77 295 86 297L90 326H111L115 297C125 295 133 291 141 286L164 304L179 289L161 266C166 258 170 249 172 240L200 236ZM100 262C80 262 63 245 63 225C63 205 80 188 100 188C120 188 137 205 137 225C137 245 121 262 100 262Z" />
+                        </g>
+                      </svg>
+                    </div>
+                  </button>
+                  <div className="gl-dash__stats">
+                    <div className="gl-dash__stat">
+                      <span className="gl-dash__stat-val">{settingsCounts.graphics}</span>
+                      <span className="gl-dash__stat-label">Graphics</span>
+                    </div>
+                    <div className="gl-dash__stat">
+                      <span className="gl-dash__stat-val">{settingsCounts.launch}</span>
+                      <span className="gl-dash__stat-label">Launch</span>
+                    </div>
+                    <div className="gl-dash__stat">
+                      <span className="gl-dash__stat-val">{settingsCounts.presets}</span>
+                      <span className="gl-dash__stat-label">Presets</span>
+                    </div>
+                  </div>
                 </div>
               </div>
+              <div className="gl-dash__header-border" />
             </div>
 
             {/* Tab Navigation */}
-            <div className="gl-tabs">
+            <div className="gl-tabs" ref={tabsRef}>
+              <div className="gl-tab-slider" style={{ left: sliderStyle.left, width: sliderStyle.width }} />
               <button className={`gl-tab ${activeTab === 'graphics' ? 'gl-tab--active' : ''}`} onClick={() => setActiveTab('graphics')}>
                 <Monitor size={15} />
                 Graphics
@@ -542,6 +627,7 @@ const GameLibrary: React.FC = () => {
                     <div className="gl-settings-grid">
                       {displayedGraphicsSettings.map((s, i) => (
                         <div key={`${s.name}-${i}`} className="gl-setting">
+                          <span className="gl-setting__idx">{String(i + 1).padStart(2, '0')}</span>
                           <div className="gl-setting__top">
                             <span className="gl-setting__name">{s.name}</span>
                             <span className="gl-setting__val">{s.value}</span>
@@ -627,8 +713,150 @@ const GameLibrary: React.FC = () => {
                     )}
                   </motion.div>
                 )}
+
               </AnimatePresence>
             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Specs Modal */}
+      <AnimatePresence>
+        {showSpecsModal && selectedGame && (
+          <motion.div
+            className="gl-modal-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowSpecsModal(false)}
+          >
+            <motion.div
+              className="gl-modal gl-modal--bench"
+              initial={{ scale: 0.92, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.92, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* ── Header bar ── */}
+              <div className="gl-bench__topbar">
+                <div className="gl-bench__topbar-left">
+                  <Zap size={16} />
+                  <span className="gl-bench__topbar-title">Game Benchmark</span>
+                  <span className="gl-bench__topbar-sep">—</span>
+                  <span className="gl-bench__topbar-game">{selectedGame.title}</span>
+                </div>
+                <button className="gl-modal__close" onClick={() => setShowSpecsModal(false)}>
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="gl-bench__body">
+                {comparisonResult ? (() => {
+                  const req = GAME_REQUIREMENTS[selectedGame.id];
+                  const rows: { label: string; icon: React.ReactNode; result: import('../utils/hardwareCompare').ComponentResult; minSpec: string; recSpec: string }[] = [
+                    { label: 'CPU', icon: <Cpu size={14} />, result: comparisonResult.cpu, minSpec: req.minimum.cpu, recSpec: req.recommended.cpu },
+                    { label: 'GPU', icon: <Monitor size={14} />, result: comparisonResult.gpu, minSpec: req.minimum.gpu, recSpec: req.recommended.gpu },
+                    { label: 'RAM', icon: <HardDrive size={14} />, result: comparisonResult.ram, minSpec: `${req.minimum.ramGB} GB`, recSpec: `${req.recommended.ramGB} GB` },
+                    { label: 'Storage', icon: <HardDrive size={14} />, result: comparisonResult.storage, minSpec: `${req.minimum.storageGB} GB`, recSpec: `${req.recommended.storageGB} GB` },
+                  ];
+                  if (comparisonResult.vram) {
+                    rows.splice(2, 0, {
+                      label: 'VRAM', icon: <Monitor size={14} />, result: comparisonResult.vram!,
+                      minSpec: `${req.minimum.vramGB || 0} GB`, recSpec: `${req.recommended.vramGB || 0} GB`,
+                    });
+                  }
+                  const fps = predictFps(comparisonResult, req);
+                  const verdict = comparisonResult.overall;
+                  const cap = Math.max(fps.yours.low, 300);
+                  const verdictLabel = verdict === 'exceeds' ? 'Exceeds' : verdict === 'meets-recommended' ? 'Recommended' : verdict === 'meets-minimum' ? 'Minimum' : 'Below';
+                  const verdictSub = verdict === 'exceeds' ? 'Your PC exceeds all recommended specs.' : verdict === 'meets-recommended' ? 'Meets recommended requirements.' : verdict === 'meets-minimum' ? 'Meets minimum specs only.' : 'Does not meet minimum specs.';
+                  const passCount = rows.filter(r => r.result.verdict === 'exceeds' || r.result.verdict === 'meets').length;
+                  const ringPct = Math.round((passCount / rows.length) * 100);
+
+                  return (
+                    <>
+                      {/* ── Score + FPS row ── */}
+                      <div className="gl-bench__hero">
+                        {/* Circular score */}
+                        <div className={`gl-bench__ring gl-bench__ring--${verdict}`}>
+                          <svg viewBox="0 0 120 120" className="gl-bench__ring-svg">
+                            <circle cx="60" cy="60" r="52" className="gl-bench__ring-track" />
+                            <circle cx="60" cy="60" r="52" className="gl-bench__ring-fill"
+                              strokeDasharray={`${(ringPct / 100) * 327} 327`}
+                              strokeDashoffset="0"
+                            />
+                          </svg>
+                          <div className="gl-bench__ring-inner">
+                            <span className="gl-bench__ring-pct">{ringPct}%</span>
+                            <span className="gl-bench__ring-label">{verdictLabel}</span>
+                          </div>
+                        </div>
+
+                        {/* FPS tiers */}
+                        <div className="gl-bench__fps-col">
+                          <span className="gl-bench__fps-heading">Estimated FPS <span className="gl-bench__fps-res">1080p</span></span>
+                          <div className="gl-fps-tiers">
+                            {(['low', 'medium', 'high'] as const).map((q) => {
+                              const yours = fps.yours[q];
+                              const pct = Math.min(100, Math.max(0, (yours / cap) * 100));
+                              return (
+                                <div key={q} className={`gl-fps-tier gl-fps-tier--${verdict}`}>
+                                  <span className="gl-fps-tier__quality">{q}</span>
+                                  <div className="gl-fps-tier__hero">
+                                    <span className="gl-fps-tier__tilde">~</span>
+                                    <span className="gl-fps-tier__value">{yours}</span>
+                                  </div>
+                                  <span className="gl-fps-tier__unit">FPS</span>
+                                  <div className="gl-fps-tier__bar">
+                                    <div className="gl-fps-tier__fill" style={{ width: `${pct}%` }} />
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                          <span className="gl-bench__verdict-sub">{verdictSub}</span>
+                        </div>
+                      </div>
+
+                      {/* ── Hardware rows ── */}
+                      <div className="gl-bench__hw">
+                        {rows.map(row => {
+                          const passed = row.result.verdict === 'exceeds' || row.result.verdict === 'meets';
+                          return (
+                            <div key={row.label} className={`gl-bench__hw-row gl-bench__hw-row--${row.result.verdict}`}>
+                              <div className="gl-bench__hw-header">
+                                <div className="gl-bench__hw-label">
+                                  {row.icon}
+                                  <span>{row.label}</span>
+                                </div>
+                                <span className={`gl-bench__hw-badge gl-bench__hw-badge--${passed ? 'pass' : 'fail'}`}>
+                                  {passed ? <><CheckCircle size={11} /> Pass</> : <><XCircle size={11} /> Fail</>}
+                                </span>
+                              </div>
+                              <span className="gl-bench__hw-val" title={row.result.userValue}>{row.result.userValue}</span>
+                              <div className="gl-bench__hw-bar-wrap">
+                                <div className={`gl-bench__hw-bar gl-bench__hw-bar--${row.result.verdict}`} style={{ width: `${row.result.percent}%` }} />
+                              </div>
+                              <div className="gl-bench__hw-specs">
+                                <span title={row.minSpec}><em>Minimum:</em> {row.minSpec}</span>
+                                <span title={row.recSpec}><em>Recommended:</em> {row.recSpec}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      <span className="gl-fps-disclaimer">* FPS estimates are approximate at 1080p. Actual performance may vary.</span>
+                    </>
+                  );
+                })() : (
+                  <div className="gl-empty gl-empty--sm">
+                    <HardDrive size={32} />
+                    <p>{!hardwareInfo ? 'Detecting hardware…' : 'No requirement data available for this game.'}</p>
+                  </div>
+                )}
+              </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>

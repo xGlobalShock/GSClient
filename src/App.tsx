@@ -160,7 +160,6 @@ function App() {
       <div style={pageStyle('performance')}><Performance /></div>
       <div style={pageStyle('cleaner')}><Cleaner /></div>
       <div style={pageStyle('network')}><Network /></div>
-      <div style={pageStyle('gameLibrary')}><GameLibrary /></div>
       <div style={pageStyle('obsPresets')}><OBSPresets /></div>
       <div style={pageStyle('settings')}><Settings /></div>
     </>
@@ -177,6 +176,9 @@ function App() {
           />
         </div>
         {staticPages}
+        <div style={pageStyle('gameLibrary')}>
+          <GameLibrary hardwareInfo={hardwareInfo} />
+        </div>
         <div style={pageStyle('softwareUpdates')}>
           <SoftwareUpdates isActive={currentPage === 'softwareUpdates'} />
         </div>
