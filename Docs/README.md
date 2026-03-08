@@ -1,152 +1,272 @@
 # GS Control Center ⚡
 
-A professional League of Legends-inspired PC optimization desktop client for Windows, featuring gaming tweaks, game profiles, system cleanup, and real-time performance monitoring.
+An all-in-one Windows desktop utility for PC optimization, real-time hardware monitoring, game tuning, system cleanup, software management, and streaming setup — built with Electron, React, and TypeScript.
 
 ![Status](https://img.shields.io/badge/Status-Production%20Ready-brightgreen)
-![Version](https://img.shields.io/badge/Version-1.0.0-blue)
+![Version](https://img.shields.io/badge/Version-2.0.0-blue)
 ![Platform](https://img.shields.io/badge/Platform-Windows%2010%2F11%20x64-blue)
+![Electron](https://img.shields.io/badge/Electron-27-blueviolet)
+![React](https://img.shields.io/badge/React-18-61dafb)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
 ---
 
 ## 🎯 Quick Start
 
-### Launch the Application
+### Install
+Download the latest **GS-Control-Center-Setup-x.x.x.exe** from [GitHub Releases](https://github.com/xGlobalShock/GSClient/releases) and run it. The installer requires administrator privileges.
+
+### Development
 ```bash
-cd "C:\Users\xSGCo\Desktop\Client"
-npm run client
+npm install            # Install dependencies (first time)
+npm run dev            # Development mode with hot reload
+npm run client         # Launch desktop app via dev-launcher
+npm run build          # Production build + NSIS installer
 ```
 
-The desktop application will launch in ~3 seconds.
-
-### First Time?
-1. Read [QUICK_START.md](QUICK_START.md) for setup guide
-2. Grant admin privileges when prompted
-3. Select a game profile or individual tweaks
-4. Click "Apply" to optimize your system
-5. Monitor performance improvements on Dashboard
+See [NPM_COMMANDS.md](NPM_COMMANDS.md) for the full command reference.
 
 ---
 
-## 📚 Documentation
+## ✨ Features at a Glance
 
-### Essential Guides
-| Document | Purpose | Read Time |
-|----------|---------|-----------|
-| [QUICK_START.md](QUICK_START.md) | Setup & usage guide | 10 min |
-| [FEATURE_DOCUMENTATION.md](FEATURE_DOCUMENTATION.md) | Complete feature list | 15 min |
-| [COMPLETION_REPORT.md](COMPLETION_REPORT.md) | Implementation status | 5 min |
-| [NPM_COMMANDS.md](NPM_COMMANDS.md) | Command reference | 5 min |
-
-### For Different Users
-
-**👨‍💻 End Users**: Start with [QUICK_START.md](QUICK_START.md)
-
-**👨‍💼 Project Managers**: Read [COMPLETION_REPORT.md](COMPLETION_REPORT.md)
-
-**🔧 Developers**: Check [FEATURE_DOCUMENTATION.md](FEATURE_DOCUMENTATION.md)
-
-**🎮 Gamers**: Follow [QUICK_START.md](QUICK_START.md) > Gaming section
+| Feature | Description |
+|---------|-------------|
+| **Dashboard** | Real-time CPU, RAM, GPU, disk, network & temperature monitoring |
+| **PC Tweaks** | 7 registry-level Windows & gaming optimizations |
+| **Network Diagnostics** | Latency tests against 12 DNS & gaming server endpoints |
+| **Game Library** | Per-game graphics settings, launch options, video presets & resolution calculator for 8 titles |
+| **Streaming Presets** | One-click OBS Studio scene/profile setup for gaming & multi-streaming |
+| **Software Updates** | Winget-powered scan, individual or batch update for all installed packages |
+| **App Installer** | 47+ curated apps installable via winget, organized by category |
+| **App Uninstaller** | Full uninstall with leftover scanner (registry, files, services, tasks) |
+| **System Cleanup** | 23 cleanup operations across Windows cache, game shaders & NVIDIA cache |
+| **Settings** | Theme, startup, auto-update, notification & auto-clean preferences |
+| **Auto-Updater** | GitHub Releases integration with download progress, cancel & restart-to-install |
 
 ---
 
-## ✨ Features
+## 📊 Dashboard — Real-Time Hardware Monitoring
 
-### 🎮 Gaming Optimizations (8 Tweaks)
-- **IRQ Priority** - System timer responsiveness
-- **Network Optimization** - Reduce network throttling
-- **GPU Hardware Scheduling** - Lower GPU latency
-- **CPU Priority** - CPU resource allocation
-- **USB Optimization** - Input device latency reduction
-- **HPET Optimization** - High precision event timer
-- **Disable Game DVR** - FPS improvement
-- **Fullscreen Optimization** - Exclusive fullscreen mode
+A full HUD-style system overview powered by the `systeminformation` library with 1-second refresh:
 
-### 🎯 Game Profiles (8 Games)
-One-click optimization for:
-- Valorant 🎯
-- League of Legends 🗡️
-- Apex Legends 🎮
-- Counter-Strike 2 💥
-- Overwatch 2 ⚔️
-- Rainbow Six Siege 🛡️
-- Fortnite 🎪
-- Rocket League ⚽
+- **CPU** — Usage %, per-core breakdown, clock speed (MHz), temperature (°C)
+- **Memory** — Usage %, used / available / total / cached (GB)
+- **GPU** — Temperature, usage %, VRAM utilization (if detected)
+- **Disk** — Read/write speeds, usage %, total/free space
+- **Network** — Upload/download speeds, latency, packet loss, WiFi signal, SSID, adapter, local IP, MAC, gateway
+- **System** — Process count, uptime, motherboard & serial info
+- **Hardware Details** — CPU model/cores/threads/clocks, RAM model/frequency/CAS, GPU model, storage model/capacity
 
-### 🧹 System Cleanup (8 Operations)
-- Temporary Files
-- Prefetch Cache
-- DNS Cache
-- DirectX Shader Cache
-- Windows Update Cache
-- Memory Dumps
-- Recycle Bin
-- Event Logs
-
-### 📊 Real-Time Monitoring
-- **Dashboard** - Live CPU, RAM, Disk, Temperature stats
-- **Performance Monitor** - Process manager & network activity
-- **System Charts** - 24-hour performance history
-- **Status Indicators** - Color-coded health metrics
-
-### ⚙️ Configuration
-- **Gaming Tweaks** - Individual registry optimizations
-- **Game Profiles** - Preset game configurations
-- **Settings** - Application preferences
-- **Cleanup Scheduler** - Automated maintenance
+Gauges use animated SVG arcs with color-coded thresholds: green (< 60%), amber (60–80%), red (> 80%).
 
 ---
 
-## 🚀 Commands
+## 🎮 PC Tweaks — Registry Optimizations
 
-### Main Commands
-```bash
-npm run client       # Launch desktop app (Recommended)
-npm run dev          # Development mode with hot reload
-npm run build        # Create production build
-npm start            # React dev server only
-npm install          # Install dependencies
-```
+7 Windows registry tweaks with one-click apply/reset and real-time status indicators:
 
-See [NPM_COMMANDS.md](NPM_COMMANDS.md) for full command reference.
+| # | Tweak | What It Does |
+|---|-------|-------------|
+| 1 | **IRQ Priority** | Raises system timer interrupt priority |
+| 2 | **Network Interrupts** | Stabilizes network interrupts for lower ping |
+| 3 | **GPU Scheduling** | Enables hardware-accelerated GPU scheduling |
+| 4 | **Fullscreen Optimization** | Disables DWM composition for true fullscreen |
+| 5 | **USB Suspend** | Prevents USB selective suspend for input devices |
+| 6 | **Game DVR** | Disables Xbox Game Bar background recording |
+| 7 | **Win32 Priority** | Prioritizes foreground application CPU scheduling |
+
+- Creates a **System Restore Point** before applying (with retry logic)
+- Status auto-refreshes on window focus
+- Applied count displayed (e.g. "5/7 Applied")
+
+---
+
+## 🌐 Network Diagnostics
+
+Live latency testing against **12 endpoints** with 1-second auto-refresh:
+
+**DNS Resolvers:** Google (8.8.8.8), Cloudflare (1.1.1.1), Quad9, OpenDNS, AdGuard, NextDNS
+
+**AWS Gaming Regions:** US East (Virginia), US West (Oregon), EU Central (Frankfurt), EU West (Ireland), Asia (Tokyo), Oceania (Sydney)
+
+**Metrics:** Average latency, best/worst latency, jitter, online count, quality label (Excellent / Good / Moderate / Poor) — displayed with an animated SVG gauge.
+
+---
+
+## 🕹️ Game Library — Per-Game Optimization
+
+In-depth optimization guides for **8 competitive titles**:
+
+Apex Legends · Valorant · Counter-Strike 2 · Fortnite · Overwatch 2 · Call of Duty · League of Legends · Rocket League
+
+Each game includes:
+
+- **Graphics Settings** — 10+ individually documented settings with recommended values
+- **Launch Options** — Game-specific command-line flags
+- **Video Presets** — Downloadable config files (Competitive / Balanced tiers)
+- **Performance Tweaks** — System-level tips (Game Mode, NVIDIA Reflex, background apps)
+- **Resolution Calculator** — Native through 4K for 16:9, 16:10, 4:3 and stretched custom aspect ratios
+
+Searchable and filterable by name or category.
+
+---
+
+## 🎙️ Streaming Presets — OBS Studio
+
+Two one-click OBS Studio preset packs:
+
+| Preset | Focus | Highlights |
+|--------|-------|-----------|
+| **Gaming OBS** | Gameplay recording & streaming | Game capture optimized, performance profiles, BRB/Ending scenes, Twitch-ready |
+| **Multi Streaming OBS** | Simultaneous multi-platform streaming | StreamElements integration, Twitch + YouTube + Facebook, chat overlay, alert system |
+
+Applies scenes and profiles directly to OBS, then auto-launches it.
+
+---
+
+## 🔄 Software Updates
+
+Powered by **winget** (Windows Package Manager):
+
+- Scans all installed packages for available updates
+- Individual or **batch "Update All"** with per-package progress
+- Phases: Preparing → Downloading → Verifying → Installing → Done
+- Cancel any in-progress update
+- Displays last-checked timestamp and available update count
+
+---
+
+## 📦 App Installer
+
+**47+ curated applications** installable via winget in one click:
+
+| Category | Apps |
+|----------|------|
+| **Browsers** | Brave, Chrome, Edge, Firefox, Opera GX, Tor |
+| **Communications** | Discord, Teams, Telegram, Zoom |
+| **Gaming** | Steam, Epic Games, EA App, Ubisoft Connect, Battle.net, GeForce NOW |
+| **Gaming Tools** | MSI Afterburner, HWiNFO, GPU-Z, CPU-Z, Ryzen Master |
+| **Streaming & Audio** | OBS Studio, Streamlabs, EarTrumpet, SteelSeries Sonar, VLC |
+| **Development** | VS Code, Git, GitHub Desktop, Node.js, Python 3, Visual Studio 2022, Windows Terminal, Notepad++ |
+| **Utilities** | 7-Zip, WinRAR, Revo Uninstaller, Bitwarden, Spotify |
+
+- Search across all apps
+- Category filter with count badges
+- Multi-select with floating install dock
+- Progress tracking per app with cancel support
+
+---
+
+## 🗑️ App Uninstaller
+
+Full uninstall workflow with deep leftover scanning:
+
+1. Lists all installed apps from the Windows registry (with icons, size, version, publisher, install date)
+2. Uninstalls the selected app via its native uninstaller
+3. Scans for leftovers in **3 modes** — Safe, Moderate, Advanced:
+   - Registry keys & values
+   - Files & folders
+   - Windows services
+   - Scheduled tasks
+4. Removes detected residuals with size reporting
+
+**Icon resolution:** Native exe icons → Publisher domain lookup → Clearbit → Google favicon → colored initial fallback.
+
+---
+
+## 🧹 System Cleanup
+
+**23 cleanup operations** organized in 3 tabs:
+
+| Tab | Operations |
+|-----|-----------|
+| **Windows Cache** (12) | Temp files, thumbnail cache, event logs, crash dumps, error reports, Delivery Optimization, recent files, temp files, Windows Update cache, DNS cache, RAM cache, Recycle Bin |
+| **Game Shader Cache** (10) | Apex Legends, Forza Horizon 5, Call of Duty, CS2, Fortnite, League of Legends, Overwatch 2, Rainbow Six Siege, Rocket League, Valorant |
+| **NVIDIA Cache** (1) | DXCache & GLCache cleanup |
+
+Each operation shows files deleted and space freed. Animated card transitions with real-time toast feedback.
+
+---
+
+## ⚙️ Settings
+
+| Setting | Description |
+|---------|-------------|
+| **Auto Clean** | Run weekly cleanup automatically |
+| **Notifications** | Enable system health alerts |
+| **Auto Optimize on Startup** | Apply optimizations at game launch |
+| **Launch on Startup** | Start with Windows |
+| **Auto Update** | Check for new versions automatically |
+| **Theme** | Dark (default) or Light |
+
+Displays current app version fetched from Electron.
+
+---
+
+## 🔄 Auto-Updater
+
+Built on **electron-updater** with GitHub Releases as the update provider:
+
+- Green indicator in the header bar when an update is available
+- Click to reveal popup → **Download** with live progress bar → **Cancel** or **Restart & Install**
+- State machine: Idle → Checking → Available → Downloading → Downloaded → Error (with retry)
+- Configurable via the Auto Update toggle in Settings
 
 ---
 
 ## 🏗️ Architecture
 
-### Technology Stack
-- **Frontend**: React 18.2.0 + TypeScript 4.9.5
-- **Desktop**: Electron 27.0.0
-- **Animations**: Framer Motion 10.16.4
-- **Styling**: Tailwind CSS 3.3.5 + Custom CSS
-- **Charts**: Recharts 2.10.3
-- **Icons**: Lucide React 0.292.0
-- **Backend**: Node.js child_process for Windows integration
+### Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| **Frontend** | React 18 · TypeScript 4.9 · Tailwind CSS 3.3 |
+| **Desktop** | Electron 27 · NSIS installer · asar packaging |
+| **Animations** | Framer Motion 10 |
+| **Charts & Gauges** | Recharts 2.10 · Custom SVG |
+| **Icons** | Lucide React · Phosphor React |
+| **System Data** | systeminformation · Node.js child_process (PowerShell / registry) |
+| **Package Management** | winget (Windows Package Manager) |
+| **Updates** | electron-updater · GitHub Releases |
 
 ### Project Structure
+
 ```
 src/
-├── pages/              # 7 page components
-├── components/         # 3 UI components
-├── services/           # Backend services
-├── styles/             # 12 CSS files
-└── utils/              # Utility functions
+├── pages/           # 11 page components (Dashboard, Performance, Network, GameLibrary,
+│                    #   OBSPresets, SoftwareUpdates, AppInstaller, AppUninstaller,
+│                    #   AppsPage, Cleaner, Settings)
+├── components/      # Reusable UI (Header, Sidebar, StatCard, SystemDetails, ToastContainer, etc.)
+├── contexts/        # ToastContext for app-wide notifications
+├── data/            # Static data catalogs (tweaks, cleaner ops, app catalog, OBS presets)
+├── hooks/           # useRealtimeHardware custom hook
+├── services/        # OBS preset application service
+├── styles/          # Per-component & global CSS
+├── utils/           # Settings persistence & helpers
+└── assets/          # Icon packs
 
-electron/              # Electron main process
-public/                # Static assets
+public/
+├── index.html       # Electron renderer entry
+├── preload.js       # Context bridge (IPC → renderer API)
+├── splash.html      # Animated splash screen with dynamic version
+└── app.manifest     # Windows admin elevation manifest
+
+main.js              # Electron main process (IPC handlers, updater, system ops)
 ```
-
-Full structure details in [FEATURE_DOCUMENTATION.md](FEATURE_DOCUMENTATION.md#-file-structure)
 
 ---
 
 ## 💻 System Requirements
 
-- **OS**: Windows 10 or Windows 11 (x64)
-- **RAM**: 4 GB minimum (8 GB recommended)
-- **Disk**: 500 MB free space
-- **GPU**: Dedicated GPU recommended
-- **Admin**: Administrator privileges required for tweaks
+| Requirement | Minimum | Recommended |
+|-------------|---------|-------------|
+| **OS** | Windows 10 x64 | Windows 11 x64 |
+| **RAM** | 4 GB | 8 GB |
+| **Disk** | 500 MB free | 1 GB free |
+| **GPU** | Integrated | Dedicated (for GPU monitoring) |
+| **Privileges** | Administrator | Administrator |
+| **Runtime** | — | winget (for app install/update features) |
 
 ---
 
