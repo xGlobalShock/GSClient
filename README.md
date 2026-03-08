@@ -137,9 +137,9 @@ Powered by **winget** (Windows Package Manager):
 
 ---
 
-## 📦 App Installer
+## 📦 Apps Manager
 
-**47+ curated applications** installable via winget in one click:
+**47+ curated applications** installable or removable via winget in one place.  Use the **Install Apps** and **Uninstall Apps** tabs to deploy or remove software.
 
 | Category | Apps |
 |----------|------|
@@ -159,6 +159,8 @@ Powered by **winget** (Windows Package Manager):
 ---
 
 ## 🗑️ App Uninstaller
+
+(Part of **Apps Manager**; see the opposite tab for installation.)
 
 Full uninstall workflow with deep leftover scanning:
 

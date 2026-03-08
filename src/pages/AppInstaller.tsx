@@ -23,6 +23,7 @@ import {
 
 import { useToast } from '../contexts/ToastContext';
 import { APP_CATALOG, APP_CATEGORIES, CatalogApp } from '../data/appCatalog';
+import PageHeader from '../components/PageHeader';
 import '../styles/AppInstaller.css';
 
 interface InstallProgress {
@@ -113,6 +114,7 @@ const AppInstaller: React.FC<AppInstallerProps> = ({ isActive = false, activeTab
   const [activeCat, setActiveCat] = useState('All');
   const hasChecked = useRef(false);
   const { addToast } = useToast();
+
 
   useEffect(() => {
     if (!window.electron?.ipcRenderer) return;
@@ -254,6 +256,9 @@ const AppInstaller: React.FC<AppInstallerProps> = ({ isActive = false, activeTab
 
   return (
     <motion.div className="ai" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.15 }}>
+      {/* ── Page header ── */}
+      <PageHeader icon={<LayoutGrid size={16} />} title="Apps Manager" />
+
       {/* ── Toolbar ── */}
       <div className="ai-toolbar">
         <div className="ai-toolbar-l">

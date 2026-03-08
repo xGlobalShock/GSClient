@@ -38,7 +38,7 @@ See [NPM_COMMANDS.md](NPM_COMMANDS.md) for the full command reference.
 | **Game Library** | Per-game graphics settings, launch options, video presets & resolution calculator for 8 titles |
 | **Streaming Presets** | One-click OBS Studio scene/profile setup for gaming & multi-streaming |
 | **Software Updates** | Winget-powered scan, individual or batch update for all installed packages |
-| **App Installer** | 47+ curated apps installable via winget, organized by category |
+| **Apps Manager** | 47+ curated apps installable or uninstallable via winget, organized by category |
 | **App Uninstaller** | Full uninstall with leftover scanner (registry, files, services, tasks) |
 | **System Cleanup** | 23 cleanup operations across Windows cache, game shaders & NVIDIA cache |
 | **Settings** | Theme, startup, auto-update, notification & auto-clean preferences |
@@ -137,7 +137,7 @@ Powered by **winget** (Windows Package Manager):
 
 ---
 
-## 📦 App Installer
+## 📦 Apps Manager
 
 **47+ curated applications** installable via winget in one click:
 

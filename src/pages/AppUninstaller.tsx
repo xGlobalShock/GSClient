@@ -19,9 +19,11 @@ import {
   ShieldAlert,
   ShieldCheck,
   Check,
+  LayoutGrid,
 } from 'lucide-react';
 
 import { useToast } from '../contexts/ToastContext';
+import PageHeader from '../components/PageHeader';
 import '../styles/AppUninstaller.css';
 
 /* ─── Types ──────────────────────────────────────────────────────── */
@@ -467,6 +469,9 @@ const AppUninstaller: React.FC<AppUninstallerProps> = ({ isActive = false, activ
 
   return (
     <motion.div className="au" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.15 }}>
+      {/* ── Page header ── */}
+      <PageHeader icon={<LayoutGrid size={16} />} title="Apps Manager" />
+
       {/* ── Toolbar ── */}
       <div className="au-toolbar">
         <div className="au-toolbar-l">
