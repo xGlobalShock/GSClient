@@ -4884,12 +4884,15 @@ function matchCatalogToRegistry(apps, regNames) {
   for (const app of apps) {
     const catalogName = (app.name || '').toLowerCase();
     if (!catalogName) { installed[app.id] = false; continue; }
+    // Exact match
     if (regNames.has(catalogName)) { installed[app.id] = true; continue; }
     let found = false;
     for (const rn of regNames) {
-      if (rn.startsWith(catalogName) || (catalogName.length >= 4 && rn.includes(catalogName))) {
-        found = true; break;
-      }
+      // Registry entry starts with catalog name (e.g. "discord" matches "discord update helper")
+      if (rn.startsWith(catalogName)) { found = true; break; }
+      // Catalog name starts with registry entry only if very close in length
+      // (avoids "git" matching "github desktop")
+      if (catalogName.startsWith(rn) && rn.length >= catalogName.length - 3) { found = true; break; }
     }
     installed[app.id] = found;
   }
@@ -4948,6 +4951,32 @@ const KNOWN_APP_DIRS = {
   'Spotify.Spotify': ['Spotify'],
 };
 
+// Check if a directory exists AND contains at least one .exe (avoids leftover config folders)
+function dirHasExe(dirPath) {
+  try {
+    if (!fs.existsSync(dirPath)) return false;
+    const stat = fs.statSync(dirPath);
+    if (!stat.isDirectory()) return false;
+    const entries = fs.readdirSync(dirPath);
+    for (const entry of entries) {
+      if (entry.toLowerCase().endsWith('.exe')) return true;
+    }
+    // Check one level of subdirectories (e.g. app/bin/app.exe)
+    for (const entry of entries) {
+      try {
+        const sub = path.join(dirPath, entry);
+        if (fs.statSync(sub).isDirectory()) {
+          const subEntries = fs.readdirSync(sub);
+          for (const se of subEntries) {
+            if (se.toLowerCase().endsWith('.exe')) return true;
+          }
+        }
+      } catch {}
+    }
+    return false;
+  } catch { return false; }
+}
+
 // â”€â”€ Filesystem-based detection for apps not found by registry/winget â”€â”€
 function scanFilesystemForApps(undetectedApps) {
   const drives = getAvailableDrives();
@@ -4976,14 +5005,14 @@ function scanFilesystemForApps(undetectedApps) {
 
       // Check per-user install locations (Discord, Spotify, etc.)
       for (const base of [localAppData, userPrograms, appData]) {
-        if (base && fs.existsSync(path.join(base, dirName))) { detected = true; break; }
+        if (base && dirHasExe(path.join(base, dirName))) { detected = true; break; }
       }
       if (detected) break;
 
       // Check Program Files / Program Files (x86) on EVERY drive
       for (const drive of drives) {
         for (const pfDir of ['Program Files', 'Program Files (x86)']) {
-          if (fs.existsSync(path.join(`${drive}\\`, pfDir, dirName))) { detected = true; break; }
+          if (dirHasExe(path.join(`${drive}\\`, pfDir, dirName))) { detected = true; break; }
         }
         if (detected) break;
       }
@@ -5761,12 +5790,15 @@ ipcMain.handle('appuninstall:uninstall-app', async (_event, appInfo) => {
   try {
     const nameEscSnap = name.replace(/'/g, "''").replace(/[/"\\]/g, '').trim();
     const pubEscSnap  = (appInfo.publisher || '').replace(/'/g, "''").replace(/[/"\\]/g, '').trim();
+    const installLocEsc = (appInfo.installLocation || '').replace(/'/g, "''").trim();
 
-    // Use PowerShell to search HKCU+HKLM SOFTWARE trees for any key whose name
-    // or full path contains the app name — this catches protocol handlers, App Paths, etc.
+    // Use PowerShell to:
+    // 1. Search HKCU+HKLM SOFTWARE trees for keys whose name matches the app name
+    // 2. Search known Windows hives for VALUES whose data references the install path (Revo-style)
     const psSnap = `
 $appName = '${nameEscSnap}'
 $pubName  = '${pubEscSnap}'
+$installLoc = '${installLocEsc}'
 $tokens   = @($appName)
 if ($pubName -and $pubName -ne $appName) { $tokens += $pubName }
 $roots = @('HKCU:\\SOFTWARE','HKLM:\\SOFTWARE')
@@ -5781,7 +5813,8 @@ foreach ($root in $roots) {
     }
   } catch {}
 }
-# Also check Run keys for matching values
+
+# Check Run keys for matching values
 $runKeys = @(
   'HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run',
   'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run'
@@ -5803,10 +5836,63 @@ foreach ($rk in $runKeys) {
     }
   } catch {}
 }
-$out = @{ keys = @($found); runValues = $runMatches }
+
+# ── PATH-BASED VALUE SCAN (Revo-style) ──
+# Search known Windows hives for values whose data references the install path or app exe
+$pathMatches = @()
+if ($installLoc -and $installLoc.Length -gt 5) {
+  $searchStr = $installLoc.TrimEnd('\\')
+  $pathHives = @(
+    'HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\FeatureUsage\\AppSwitched',
+    'HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\FeatureUsage\\AppLaunch',
+    'HKCU:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\AppCompatFlags\\Compatibility Assistant\\Store',
+    'HKCU:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\AppCompatFlags\\Layers',
+    'HKCU:\\SOFTWARE\\Classes\\Local Settings\\Software\\Microsoft\\Windows\\Shell\\MuiCache',
+    'HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Search\\JumplistData',
+    'HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\ComDlg32\\OpenSavePidlMRU',
+    'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\AppCompatFlags\\Compatibility Assistant\\Store'
+  )
+  foreach ($hive in $pathHives) {
+    try {
+      if (-not (Test-Path $hive)) { continue }
+      $props = Get-ItemProperty -Path $hive -ErrorAction SilentlyContinue
+      if ($props) {
+        $props.PSObject.Properties | Where-Object { $_.MemberType -eq 'NoteProperty' -and $_.Name -notlike 'PS*' } | ForEach-Object {
+          $vn = $_.Name
+          $vd = if ($_.Value) { $_.Value.ToString() } else { '' }
+          if ($vn -like "*$searchStr*" -or $vd -like "*$searchStr*") {
+            $rp = $hive.Replace('HKCU:\\','HKEY_CURRENT_USER\\').Replace('HKLM:\\','HKEY_LOCAL_MACHINE\\')
+            $detail = $hive.Split('\\')[-1]
+            $pathMatches += "$rp|$vn|$detail"
+          }
+        }
+      }
+      # Also recurse one level for hives with subkeys
+      Get-ChildItem -Path $hive -ErrorAction SilentlyContinue | ForEach-Object {
+        try {
+          $childKey = $_
+          $subProps = Get-ItemProperty -Path $childKey.PSPath -ErrorAction SilentlyContinue
+          if ($subProps) {
+            $subProps.PSObject.Properties | Where-Object { $_.MemberType -eq 'NoteProperty' -and $_.Name -notlike 'PS*' } | ForEach-Object {
+              $vn = $_.Name
+              $vd = if ($_.Value) { $_.Value.ToString() } else { '' }
+              if ($vn -like "*$searchStr*" -or $vd -like "*$searchStr*") {
+                $rp = $childKey.Name.Replace('HKEY_CURRENT_USER','HKCU').Replace('HKEY_LOCAL_MACHINE','HKLM')
+                $detail = $childKey.PSChildName
+                $pathMatches += "$rp|$vn|$detail"
+              }
+            }
+          }
+        } catch {}
+      }
+    } catch {}
+  }
+}
+
+$out = @{ keys = @($found); runValues = $runMatches; pathValues = $pathMatches }
 $out | ConvertTo-Json -Compress -Depth 2
 `;
-    const snapRaw = await runPSScript(psSnap, 15000);
+    const snapRaw = await runPSScript(psSnap, 25000);
     try {
       const snapData = JSON.parse(snapRaw || '{}');
       const keys = Array.isArray(snapData.keys) ? snapData.keys : [];
@@ -5819,6 +5905,23 @@ $out | ConvertTo-Json -Compress -Depth 2
         const [parentKey, valueName] = rv.split('|');
         const norm = parentKey.replace(/^HKEY_LOCAL_MACHINE/i, 'HKLM').replace(/^HKEY_CURRENT_USER/i, 'HKCU');
         _preUninstallSnapshot.push({ path: `${norm}\\${valueName}`, type: 'value', parentKey: norm, valueName });
+      }
+      // Path-based value entries (Revo-style)
+      const pathVals = Array.isArray(snapData.pathValues) ? snapData.pathValues : [];
+      for (const pv of pathVals) {
+        const parts = pv.split('|');
+        if (parts.length >= 2) {
+          const parentKey = parts[0].replace(/^HKEY_LOCAL_MACHINE/i, 'HKLM').replace(/^HKEY_CURRENT_USER/i, 'HKCU');
+          const valueName = parts[1];
+          const detail = parts[2] || 'Path reference';
+          _preUninstallSnapshot.push({
+            path: `${parentKey} → ${valueName}`,
+            type: 'value',
+            parentKey,
+            valueName,
+            detail,
+          });
+        }
       }
     } catch { /* malformed JSON – snapshot stays empty */ }
 
@@ -6019,6 +6122,9 @@ ipcMain.handle('appuninstall:scan-leftovers', async (_event, appInfo, scanMode, 
   const mode = scanMode || 'moderate'; // safe | moderate | advanced
   console.log(TAG, `Scanning leftovers for "${name}" (mode: ${mode})`);
 
+  // Brief delay: let native uninstaller background cleanup finish before scanning
+  await new Promise(r => setTimeout(r, 3000));
+
   const leftovers = [];
   const appNameLower = (name || '').toLowerCase().trim();
   const publisherLower = (publisher || '').toLowerCase().trim();
@@ -6156,7 +6262,7 @@ ipcMain.handle('appuninstall:scan-leftovers', async (_event, appInfo, scanMode, 
               path: entry.path,
               size: 0,
               selected: true,
-              detail: 'Startup entry',
+              detail: entry.detail || 'Startup entry',
             });
           } else {
             execSync(`reg query "${entry.path}"`, { timeout: 3000, windowsHide: true, stdio: 'pipe' });
@@ -6235,6 +6341,90 @@ ipcMain.handle('appuninstall:scan-leftovers', async (_event, appInfo, scanMode, 
         } catch {}
       }
     }
+
+    // ── 2b. PATH-BASED REGISTRY VALUE SCAN (Revo-style) ──
+    // Search known Windows hives for values whose data references the install path.
+    // This catches AppCompatFlags, FeatureUsage, MUICache, etc. — entries that Revo finds.
+    if (installLocation && installLocation.trim()) {
+      try {
+        const installLocEsc = installLocation.trim().replace(/'/g, "''");
+        const existingPaths = new Set(leftovers.filter(l => l.type === 'registry').map(l => l.path.toLowerCase()));
+
+        const psPathScan = `
+$searchStr = '${installLocEsc}'.TrimEnd('\\')
+$pathHives = @(
+  'HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\FeatureUsage\\AppSwitched',
+  'HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\FeatureUsage\\AppLaunch',
+  'HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\FeatureUsage\\AppBadgeUpdated',
+  'HKCU:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\AppCompatFlags\\Compatibility Assistant\\Store',
+  'HKCU:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\AppCompatFlags\\Layers',
+  'HKCU:\\SOFTWARE\\Classes\\Local Settings\\Software\\Microsoft\\Windows\\Shell\\MuiCache',
+  'HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Search\\JumplistData',
+  'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\AppCompatFlags\\Compatibility Assistant\\Store'
+)
+$results = @()
+foreach ($hive in $pathHives) {
+  try {
+    if (-not (Test-Path $hive)) { continue }
+    $props = Get-ItemProperty -Path $hive -ErrorAction SilentlyContinue
+    if ($props) {
+      $props.PSObject.Properties | Where-Object { $_.MemberType -eq 'NoteProperty' -and $_.Name -notlike 'PS*' } | ForEach-Object {
+        $vn = $_.Name
+        $vd = if ($_.Value) { $_.Value.ToString() } else { '' }
+        if ($vn -like "*$searchStr*" -or $vd -like "*$searchStr*") {
+          $rp = $hive.Replace('HKCU:\\','HKCU\\').Replace('HKLM:\\','HKLM\\')
+          $detail = $hive.Split('\\')[-1]
+          $results += "$rp|$vn|$detail"
+        }
+      }
+    }
+    Get-ChildItem -Path $hive -ErrorAction SilentlyContinue | ForEach-Object {
+      try {
+        $childKey = $_
+        $subProps = Get-ItemProperty -Path $childKey.PSPath -ErrorAction SilentlyContinue
+        if ($subProps) {
+          $subProps.PSObject.Properties | Where-Object { $_.MemberType -eq 'NoteProperty' -and $_.Name -notlike 'PS*' } | ForEach-Object {
+            $vn = $_.Name
+            $vd = if ($_.Value) { $_.Value.ToString() } else { '' }
+            if ($vn -like "*$searchStr*" -or $vd -like "*$searchStr*") {
+              $rp = $childKey.Name.Replace('HKEY_CURRENT_USER','HKCU').Replace('HKEY_LOCAL_MACHINE','HKLM')
+              $detail = $childKey.PSChildName
+              $results += "$rp|$vn|$detail"
+            }
+          }
+        }
+      } catch {}
+    }
+  } catch {}
+}
+$results -join '<<<SEP>>>'
+`;
+        const pathRaw = await runPSScript(psPathScan, 20000);
+        if (pathRaw) {
+          const entries = pathRaw.split('<<<SEP>>>').filter(Boolean);
+          for (const entry of entries) {
+            const parts = entry.split('|');
+            if (parts.length >= 2) {
+              const parentKey = parts[0];
+              const valueName = parts[1];
+              const detail = parts[2] || 'Path reference';
+              const entryPath = `${parentKey} → ${valueName}`;
+              if (!existingPaths.has(entryPath.toLowerCase())) {
+                leftovers.push({
+                  type: 'registry',
+                  path: entryPath,
+                  size: 0,
+                  selected: true,
+                  detail,
+                });
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.log(TAG, 'Path-based registry scan error:', e.message);
+      }
+    }
   }
 
   // ── 3. SERVICES (advanced only) ──
@@ -6290,9 +6480,20 @@ ipcMain.handle('appuninstall:scan-leftovers', async (_event, appInfo, scanMode, 
     }
   }
 
-  const totalSize = uniqueLeftovers.reduce((sum, l) => sum + (l.size || 0), 0);
-  console.log(TAG, `Found ${uniqueLeftovers.length} leftovers (${Math.round(totalSize / 1024)} KB)`);
-  return { success: true, leftovers: uniqueLeftovers, totalSize };
+  // Re-verify filesystem entries still exist (native uninstallers may clean up asynchronously)
+  const verifiedLeftovers = uniqueLeftovers.filter(item => {
+    if (item.type === 'file' || item.type === 'folder') {
+      if (!fs.existsSync(item.path)) {
+        console.log(TAG, `Dropping stale entry (no longer exists): ${item.path}`);
+        return false;
+      }
+    }
+    return true;
+  });
+
+  const totalSize = verifiedLeftovers.reduce((sum, l) => sum + (l.size || 0), 0);
+  console.log(TAG, `Found ${verifiedLeftovers.length} leftovers (${Math.round(totalSize / 1024)} KB)`);
+  return { success: true, leftovers: verifiedLeftovers, totalSize };
 });
 
 /* ---- Delete selected leftovers ---- */
@@ -6319,8 +6520,12 @@ ipcMain.handle('appuninstall:delete-leftovers', async (_event, items) => {
           break;
         case 'registry': {
           const regPath = item.path;
-          // Check if this is a value under a key (contains value name after last backslash in Run keys)
-          if (/\\Run\\/i.test(regPath)) {
+          // Path-based value entries use "→" separator (e.g., "HKCU\...\Store → C:\...\app.exe")
+          if (regPath.includes(' → ')) {
+            const [parentKey, valueName] = regPath.split(' → ');
+            execSync(`reg delete "${parentKey.trim()}" /v "${valueName.trim()}" /f`, { timeout: 5000, windowsHide: true, stdio: 'pipe' });
+          } else if (/\\Run\\/i.test(regPath)) {
+            // Run key values: value name is after the last backslash
             const lastSlash = regPath.lastIndexOf('\\');
             const parentKey = regPath.substring(0, lastSlash);
             const valueName = regPath.substring(lastSlash + 1);

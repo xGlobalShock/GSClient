@@ -38,6 +38,8 @@ interface AppInstallerProps {
   isActive?: boolean;
   activeTab?: AppTab;
   onTabChange?: (tab: AppTab) => void;
+  refreshSignal?: number;
+  onAppInstalled?: () => void;
 }
 
 /* Category → icon */
@@ -101,7 +103,7 @@ const AppIcon: React.FC<{ domain?: string; name: string; size?: number }> = ({ d
   );
 };
 
-const AppInstaller: React.FC<AppInstallerProps> = ({ isActive = false, activeTab = 'install', onTabChange }) => {
+const AppInstaller: React.FC<AppInstallerProps> = ({ isActive = false, activeTab = 'install', onTabChange, refreshSignal = 0, onAppInstalled }) => {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [installed, setInstalled] = useState<Set<string>>(new Set());
   const [installingId, setInstallingId] = useState<string | null>(null);
@@ -151,26 +153,19 @@ const AppInstaller: React.FC<AppInstallerProps> = ({ isActive = false, activeTab
     finally { setCheckingInstalled(false); }
   }, []);
 
-  // Fallback: if preloaded data hasn't arrived when page becomes active, scan silently
+  // Re-check installed apps every time this tab becomes active
   useEffect(() => {
-    if (isActive && !hasChecked.current) {
+    if (!isActive) return;
+    if (!hasChecked.current) {
       hasChecked.current = true;
-      (async () => {
-        if (!window.electron?.ipcRenderer) return;
-        try {
-          const allApps = APP_CATALOG.map(a => ({ id: a.id, name: a.name }));
-          const result = await window.electron.ipcRenderer.invoke('appinstall:check-installed', allApps, false);
-          if (result.success) {
-            setInstalled(prev => {
-              const merged = new Set<string>(prev);
-              for (const [id, ok] of Object.entries(result.installed)) { if (ok) merged.add(id); }
-              return merged;
-            });
-          }
-        } catch {}
-      })();
     }
-  }, [isActive]);
+    checkInstalled(false);
+  }, [isActive, checkInstalled]);
+
+  // Silent refresh triggered by the other tab (e.g. app was uninstalled)
+  useEffect(() => {
+    if (refreshSignal > 0) checkInstalled(false);
+  }, [refreshSignal, checkInstalled]);
 
   const refreshInstalled = useCallback(() => {
     hasChecked.current = false; setInstalled(new Set()); checkInstalled(true);
@@ -192,6 +187,7 @@ const AppInstaller: React.FC<AppInstallerProps> = ({ isActive = false, activeTab
         addToast(`${app.name} installed successfully!`, 'success');
         setInstalled(prev => new Set(prev).add(app.id));
         setSelected(prev => { const n = new Set(prev); n.delete(app.id); return n; });
+        onAppInstalled?.();
       } else if (result.message !== 'Installation cancelled by user') {
         addToast(result.message || `Failed to install ${app.name}`, 'error');
       }
@@ -221,6 +217,7 @@ const AppInstaller: React.FC<AppInstallerProps> = ({ isActive = false, activeTab
         if (r.success) {
           setInstalled(prev => new Set(prev).add(id));
           setSelected(prev => { const n = new Set(prev); n.delete(id); return n; });
+          onAppInstalled?.();
         } else if (r.message === 'Installation cancelled by user') {
           wasCancelled = true;
           break;

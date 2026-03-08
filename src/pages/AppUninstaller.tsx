@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Trash2,
@@ -54,6 +55,8 @@ interface AppUninstallerProps {
   isActive?: boolean;
   activeTab?: AppTab;
   onTabChange?: (tab: AppTab) => void;
+  refreshSignal?: number;
+  onAppUninstalled?: () => void;
 }
 
 /* ─── Helpers ────────────────────────────────────────────────────── */
@@ -264,7 +267,7 @@ function getAppDomain(name: string, publisher?: string): string | undefined {
 }
 
 /* ─── Component ──────────────────────────────────────────────────── */
-const AppUninstaller: React.FC<AppUninstallerProps> = ({ isActive = false, activeTab = 'uninstall', onTabChange }) => {
+const AppUninstaller: React.FC<AppUninstallerProps> = ({ isActive = false, activeTab = 'uninstall', onTabChange, refreshSignal = 0, onAppUninstalled }) => {
   const [apps, setApps] = useState<InstalledApp[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -303,11 +306,16 @@ const AppUninstaller: React.FC<AppUninstallerProps> = ({ isActive = false, activ
   }, []);
 
   useEffect(() => {
-    if (isActive && !hasLoaded.current && !loading) {
+    if (isActive && !loading) {
       hasLoaded.current = true;
       fetchApps();
     }
-  }, [isActive, loading, fetchApps]);
+  }, [isActive, fetchApps]);
+
+  // Silent refresh triggered by the other tab (e.g. app was installed)
+  useEffect(() => {
+    if (refreshSignal > 0) fetchApps();
+  }, [refreshSignal, fetchApps]);
 
   /* ── Listen for uninstall progress ── */
   useEffect(() => {
@@ -431,6 +439,7 @@ const AppUninstaller: React.FC<AppUninstallerProps> = ({ isActive = false, activ
     setLeftovers([]);
     setDeleteResult(null);
     fetchApps(); // Refresh the list
+    onAppUninstalled?.(); // Notify installer tab to re-check
   };
 
   /* ── Filtered app list ── */
@@ -550,173 +559,270 @@ const AppUninstaller: React.FC<AppUninstallerProps> = ({ isActive = false, activ
         )}
       </div>
 
-      {/* ══ UNIFIED UNINSTALL OVERLAY ══ */}
-      <AnimatePresence>
-        {phase !== 'list' && targetApp && (
-          <motion.div
-            className="au-overlay"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.18 }}
-          >
+      {/* ══ POPUP WIZARD OVERLAY ══ */}
+      {createPortal(
+        <AnimatePresence>
+          {phase !== 'list' && targetApp && (
             <motion.div
-              className={`au-ovl-card${phase === 'leftovers' ? ' au-ovl-card--lg' : ''}`}
-              initial={{ opacity: 0, scale: 0.90, y: 18 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.90, y: 18 }}
-              transition={{ type: 'spring', stiffness: 380, damping: 26 }}
+              className="au-wiz-backdrop"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              onClick={(e) => { if (e.target === e.currentTarget && phase === 'confirm') backToList(); }}
             >
-              {/* App identity — always visible */}
-              <div className="au-ovl-header">
-                <div className="au-ovl-app-icon">
-                  <AppIconNative app={targetApp} size={22} />
-                </div>
-                <div>
-                  <p className="au-ovl-app-name">{targetApp.name}</p>
-                  {targetApp.publisher && <p className="au-ovl-app-pub">{targetApp.publisher}</p>}
-                </div>
-              </div>
-
-              {/* Phase-switching content */}
-              <AnimatePresence mode="wait">
-                {/* ── Choose mode ── */}
-                {phase === 'confirm' && (
-                  <motion.div key="confirm" className="au-ovl-body"
-                    initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
-                    transition={{ duration: 0.15 }}>
-                    <p className="au-ovl-prompt">How would you like to uninstall?</p>
-                    <div className="au-ovl-opts">
-                      <button className="au-ovl-opt" onClick={() => confirmUninstall('safe')}>
-                        <span className="au-ovl-opt-ico au-ovl-opt-ico--safe"><ShieldCheck size={18} /></span>
-                        <span className="au-ovl-opt-body">
-                          <span className="au-ovl-opt-title">Uninstall App Only</span>
-                          <span className="au-ovl-opt-desc">Run native uninstaller, no leftover scan</span>
-                        </span>
-                        <ChevronRight size={14} className="au-ovl-opt-arrow" />
-                      </button>
-                      <button className="au-ovl-opt au-ovl-opt--deep" onClick={() => confirmUninstall('moderate')}>
-                        <span className="au-ovl-opt-ico au-ovl-opt-ico--deep"><ShieldAlert size={18} /></span>
-                        <span className="au-ovl-opt-body">
-                          <span className="au-ovl-opt-title">Uninstall + Clean Leftovers</span>
-                          <span className="au-ovl-opt-desc">Uninstall then deep-scan files, registry &amp; tasks</span>
-                        </span>
-                        <ChevronRight size={14} className="au-ovl-opt-arrow" />
-                      </button>
+              <motion.div
+                className={`au-wiz${phase === 'leftovers' ? ' au-wiz--wide' : ''}`}
+                initial={{ opacity: 0, scale: 0.95, y: 16 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 16 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+              >
+                {/* ── Header bar ── */}
+                <div className="au-wiz-header">
+                  <div className="au-wiz-header-left">
+                    <div className="au-wiz-header-icon">
+                      <AppIconNative app={targetApp} size={22} />
                     </div>
-                    <button className="au-ovl-cancel" onClick={backToList}>Cancel</button>
-                  </motion.div>
-                )}
-
-                {/* ── In progress ── */}
-                {(phase === 'uninstalling' || phase === 'scanning' || phase === 'deleting') && (
-                  <motion.div key="progress" className="au-ovl-body au-ovl-body--center"
-                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                    transition={{ duration: 0.15 }}>
-                    <Loader2 size={28} className="au-spin au-ovl-spinner" />
-                    <p className="au-ovl-progress-msg">{progressMsg}</p>
-                    {phase === 'uninstalling' && (
-                      <button className="au-ovl-cancel" onClick={cancelUninstall}>Cancel</button>
-                    )}
-                  </motion.div>
-                )}
-
-                {/* ── Leftovers found ── */}
-                {phase === 'leftovers' && (
-                  <motion.div key="leftovers" className="au-ovl-body"
-                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                    transition={{ duration: 0.15 }}>
-                    <div className="au-ovl-leftover-meta">
-                      <AlertTriangle size={14} className="au-warn-icon" />
-                      <span>{leftovers.length} leftover items found</span>
-                      <span className="au-leftover-summary">&middot; {fmtSize(leftoverTotalSize)}</span>
-                    </div>
-                    <div className="au-leftover-groups au-ovl-groups">
-                      {Object.entries(groupedLeftovers).map(([type, items]) => {
-                        const collapsed = collapsedGroups.has(type);
-                        const allSelected = items.every(i => i.selected);
-                        const someSelected = items.some(i => i.selected);
-                        return (
-                          <div key={type} className="au-group">
-                            <div className="au-group-header">
-                              <button className="au-group-toggle" onClick={() => toggleGroup(type)}>
-                                {collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
-                                <span className="au-group-icon">{TYPE_ICONS[type]}</span>
-                                <span className="au-group-label">{TYPE_LABELS[type] || type}</span>
-                                <span className="au-group-count">{items.length}</span>
-                              </button>
-                              <button
-                                className={`au-group-check${allSelected ? ' au-group-check--all' : someSelected ? ' au-group-check--some' : ''}`}
-                                onClick={() => selectAllOfType(type, !allSelected)}
-                                title={allSelected ? 'Deselect all' : 'Select all'}
-                              >
-                                <Check size={10} />
-                              </button>
-                            </div>
-                            {!collapsed && (
-                              <div className="au-group-items">
-                                {items.map((item, idx) => {
-                                  const globalIdx = leftovers.indexOf(item);
-                                  return (
-                                    <div
-                                      key={idx}
-                                      className={`au-leftover-item${item.selected ? ' au-leftover-item--sel' : ''}`}
-                                      onClick={() => toggleLeftover(globalIdx)}
-                                    >
-                                      <div className={`au-item-check${item.selected ? ' au-item-check--on' : ''}`}>
-                                        {item.selected && <Check size={9} />}
-                                      </div>
-                                      <span className="au-item-path" title={item.path}>{item.path}</span>
-                                      {item.detail && <span className="au-item-detail">{item.detail}</span>}
-                                      {item.size > 0 && <span className="au-item-size">{fmtSize(item.size)}</span>}
-                                    </div>
-                                  );
-                                })}
+                    <div className="au-wiz-header-info">
+                      <span className="au-wiz-header-name">{targetApp.name}</span>
+                      <div className="au-wiz-steps">
+                        {[
+                          { key: 'select', label: 'Select', num: 1 },
+                          { key: 'remove', label: 'Remove', num: 2 },
+                          { key: 'clean',  label: 'Clean',  num: 3 },
+                          { key: 'finish', label: 'Done',   num: 4 },
+                        ].map((step, i) => {
+                          const stepPhases: Record<string, string[]> = {
+                            select: ['confirm'],
+                            remove: ['uninstalling'],
+                            clean: ['scanning', 'deleting', 'leftovers'],
+                            finish: ['done'],
+                          };
+                          const isActive = stepPhases[step.key].includes(phase);
+                          const isPast = (() => {
+                            const order = ['confirm', 'uninstalling', 'scanning', 'leftovers', 'deleting', 'done'];
+                            const stepFirstPhase = stepPhases[step.key][0];
+                            return order.indexOf(phase) > order.indexOf(stepFirstPhase);
+                          })();
+                          const cls = `au-wiz-step${isActive ? ' au-wiz-step--active' : ''}${isPast ? ' au-wiz-step--done' : ''}`;
+                          return (
+                            <React.Fragment key={step.key}>
+                              {i > 0 && <div className={`au-wiz-step-line${isPast ? ' au-wiz-step-line--done' : ''}${isActive ? ' au-wiz-step-line--active' : ''}`} />}
+                              <div className={cls}>
+                                <span className="au-wiz-step-dot">
+                                  {isPast ? <Check size={10} strokeWidth={3} /> : step.num}
+                                </span>
+                                <span className="au-wiz-step-label">{step.label}</span>
                               </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <div className="au-ovl-leftover-footer">
-                      <span className="au-leftover-sel">{selectedCount} selected &middot; {fmtSize(selectedSize)}</span>
-                      <div className="au-panel-actions">
-                        <button className="au-btn au-btn--secondary" onClick={backToList}>Skip</button>
-                        <button className="au-btn au-btn--danger" onClick={deleteLeftovers} disabled={selectedCount === 0}>
-                          <Trash2 size={13} /> Delete Selected
-                        </button>
+                            </React.Fragment>
+                          );
+                        })}
                       </div>
                     </div>
-                  </motion.div>
-                )}
+                  </div>
+                  {(phase === 'confirm' || phase === 'uninstalling') && (
+                    <button className="au-wiz-close" onClick={phase === 'confirm' ? backToList : cancelUninstall}>
+                      <X size={16} />
+                    </button>
+                  )}
+                </div>
 
-                {/* ── Done ── */}
-                {phase === 'done' && (
-                  <motion.div key="done" className="au-ovl-body au-ovl-body--center"
-                    initial={{ opacity: 0, scale: 0.90 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
-                    transition={{ duration: 0.20 }}>
-                    <CheckCircle size={32} className="au-done-icon" />
-                    <h3 className="au-ovl-done-title">
-                      {scanMode === 'safe' ? 'Uninstalled Successfully' : 'Cleanup Complete'}
-                    </h3>
-                    {scanMode === 'safe' ? (
-                      <p className="au-done-detail">{targetApp?.name} has been uninstalled</p>
-                    ) : deleteResult && deleteResult.deletedCount > 0 ? (
-                      <p className="au-done-detail">
-                        Removed {deleteResult.deletedCount} leftover items
-                        {deleteResult.freedBytes > 0 ? ` — freed ${fmtSize(deleteResult.freedBytes)}` : ''}
-                      </p>
-                    ) : (
-                      <p className="au-done-detail">No leftovers found — clean uninstall</p>
+                {/* ── Body ── */}
+                <div className="au-wiz-body">
+                  <AnimatePresence mode="wait">
+                    {/* ── STEP 1: Choose method ── */}
+                    {phase === 'confirm' && (
+                      <motion.div key="confirm" className="au-wiz-panel"
+                        initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }}
+                        transition={{ type: 'spring', stiffness: 350, damping: 32 }}>
+                        <div className="au-wiz-section-header">
+                          <h2 className="au-wiz-title">How do you want to remove this app?</h2>
+                          <p className="au-wiz-subtitle">Choose a removal method for <strong>{targetApp.name}</strong></p>
+                        </div>
+
+                        <div className="au-wiz-methods">
+                          <button className="au-method au-method--safe" onClick={() => confirmUninstall('safe')}>
+                            <div className="au-method-glow" />
+                            <div className="au-method-icon"><ShieldCheck size={24} /></div>
+                            <div className="au-method-info">
+                              <span className="au-method-name">Quick Remove</span>
+                              <span className="au-method-desc">Runs the app's native uninstaller. Fast and straightforward.</span>
+                            </div>
+                            <div className="au-method-tag">Recommended</div>
+                            <ChevronRight size={16} className="au-method-arrow" />
+                          </button>
+
+                          <button className="au-method au-method--deep" onClick={() => confirmUninstall('moderate')}>
+                            <div className="au-method-glow" />
+                            <div className="au-method-icon"><ShieldAlert size={24} /></div>
+                            <div className="au-method-info">
+                              <span className="au-method-name">Deep Clean</span>
+                              <span className="au-method-desc">Uninstall then scan for leftover files, registry keys &amp; scheduled tasks.</span>
+                            </div>
+                            <div className="au-method-tag">Thorough</div>
+                            <ChevronRight size={16} className="au-method-arrow" />
+                          </button>
+                        </div>
+                      </motion.div>
                     )}
-                    <button className="au-btn au-btn--primary" onClick={backToList}>Back to App List</button>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+
+                    {/* ── STEP 2: In progress ── */}
+                    {(phase === 'uninstalling' || phase === 'scanning' || phase === 'deleting') && (
+                      <motion.div key="progress" className="au-wiz-panel au-wiz-panel--center"
+                        initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }}
+                        transition={{ type: 'spring', stiffness: 350, damping: 32 }}>
+                        <div className="au-wiz-progress-stage">
+                          <div className="au-wiz-progress-orb">
+                            <div className="au-wiz-orb-pulse" />
+                            <svg className="au-wiz-orb-svg" viewBox="0 0 100 100">
+                              <circle className="au-wiz-orb-track" cx="50" cy="50" r="42" />
+                              <circle className="au-wiz-orb-arc" cx="50" cy="50" r="42" />
+                            </svg>
+                            <div className="au-wiz-orb-center">
+                              <AppIconNative app={targetApp} size={22} />
+                            </div>
+                          </div>
+
+                          <div className="au-wiz-progress-text">
+                            <h2 className="au-wiz-progress-title">
+                              {phase === 'uninstalling' ? 'Removing application...' : phase === 'scanning' ? 'Scanning for leftovers...' : 'Cleaning selected items...'}
+                            </h2>
+                            <p className="au-wiz-progress-detail">{progressMsg}</p>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+
+                    {/* ── STEP 3: Leftovers ── */}
+                    {phase === 'leftovers' && (
+                      <motion.div key="leftovers" className="au-wiz-panel"
+                        initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }}
+                        transition={{ type: 'spring', stiffness: 350, damping: 32 }}>
+                        <div className="au-wiz-section-header">
+                          <div className="au-wiz-leftovers-title-row">
+                            <h2 className="au-wiz-title">Leftover files detected</h2>
+                            <div className="au-wiz-leftover-badge">
+                              <AlertTriangle size={12} />
+                              <span>{leftovers.length} items</span>
+                              <span className="au-wiz-leftover-size">{fmtSize(leftoverTotalSize)}</span>
+                            </div>
+                          </div>
+                          <p className="au-wiz-subtitle">Select items to remove, or skip to finish.</p>
+                        </div>
+
+                        <div className="au-wiz-leftover-list au-ovl-groups">
+                          {Object.entries(groupedLeftovers).map(([type, items]) => {
+                            const collapsed = collapsedGroups.has(type);
+                            const allSelected = items.every(i => i.selected);
+                            const someSelected = items.some(i => i.selected);
+                            return (
+                              <div key={type} className="au-group">
+                                <div className="au-group-header">
+                                  <button className="au-group-toggle" onClick={() => toggleGroup(type)}>
+                                    {collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
+                                    <span className="au-group-icon">{TYPE_ICONS[type]}</span>
+                                    <span className="au-group-label">{TYPE_LABELS[type] || type}</span>
+                                    <span className="au-group-count">{items.length}</span>
+                                  </button>
+                                  <button
+                                    className={`au-group-check${allSelected ? ' au-group-check--all' : someSelected ? ' au-group-check--some' : ''}`}
+                                    onClick={() => selectAllOfType(type, !allSelected)}
+                                    title={allSelected ? 'Deselect all' : 'Select all'}
+                                  >
+                                    <Check size={10} />
+                                  </button>
+                                </div>
+                                {!collapsed && (
+                                  <div className="au-group-items">
+                                    {items.map((item, idx) => {
+                                      const globalIdx = leftovers.indexOf(item);
+                                      return (
+                                        <div
+                                          key={idx}
+                                          className={`au-leftover-item${item.selected ? ' au-leftover-item--sel' : ''}`}
+                                          onClick={() => toggleLeftover(globalIdx)}
+                                        >
+                                          <div className={`au-item-check${item.selected ? ' au-item-check--on' : ''}`}>
+                                            {item.selected && <Check size={9} />}
+                                          </div>
+                                          <span className="au-item-path" title={item.path}>
+                                            {item.path.includes(' → ') ? item.path.split(' → ')[1] : item.path}
+                                          </span>
+                                          {item.detail && <span className="au-item-detail">{item.detail}</span>}
+                                          {item.size > 0 && <span className="au-item-size">{fmtSize(item.size)}</span>}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        <div className="au-wiz-leftover-actions">
+                          <span className="au-wiz-sel-info">{selectedCount} selected &middot; {fmtSize(selectedSize)}</span>
+                          <div className="au-panel-actions">
+                            <button className="au-btn au-btn--ghost" onClick={backToList}>Skip</button>
+                            <button className="au-btn au-btn--danger" onClick={deleteLeftovers} disabled={selectedCount === 0}>
+                              <Trash2 size={12} /> Delete Selected
+                            </button>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+
+                    {/* ── STEP 4: Done ── */}
+                    {phase === 'done' && (
+                      <motion.div key="done" className="au-wiz-panel au-wiz-panel--center"
+                        initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
+                        transition={{ type: 'spring', stiffness: 260, damping: 22 }}>
+                        <div className="au-wiz-done-stage">
+                          <motion.div className="au-wiz-done-ring"
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            transition={{ type: 'spring', stiffness: 300, damping: 18, delay: 0.1 }}>
+                            <motion.div
+                              initial={{ scale: 0, rotate: -120 }}
+                              animate={{ scale: 1, rotate: 0 }}
+                              transition={{ type: 'spring', stiffness: 260, damping: 14, delay: 0.25 }}>
+                              <CheckCircle size={36} className="au-wiz-done-check" />
+                            </motion.div>
+                          </motion.div>
+
+                          <motion.div className="au-wiz-done-text"
+                            initial={{ opacity: 0, y: 12 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.35, duration: 0.3 }}>
+                            <h2 className="au-wiz-done-title">
+                              {scanMode === 'safe' ? 'Successfully Removed' : 'Deep Clean Complete'}
+                            </h2>
+                            {scanMode === 'safe' ? (
+                              <p className="au-wiz-done-detail">{targetApp?.name} has been removed from your system.</p>
+                            ) : deleteResult && deleteResult.deletedCount > 0 ? (
+                              <p className="au-wiz-done-detail">
+                                Cleaned {deleteResult.deletedCount} leftover{deleteResult.deletedCount !== 1 ? 's' : ''}
+                                {deleteResult.freedBytes > 0 ? ` — freed ${fmtSize(deleteResult.freedBytes)}` : ''}
+                              </p>
+                            ) : (
+                              <p className="au-wiz-done-detail">No leftovers found — clean removal.</p>
+                            )}
+                            <button className="au-btn au-btn--primary au-wiz-done-btn" onClick={backToList}>
+                              <CheckCircle size={13} /> Close
+                            </button>
+                          </motion.div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </motion.div>
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </motion.div>
   );
 };
