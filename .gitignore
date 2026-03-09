@@ -7,8 +7,18 @@ build/
 dist/
 out/
 release/
+
+# ── Source code (keep README only on main branch) ──
 src/
-main.js/
+public/
+components/
+pages/
+styles/
+utils/
+context/
+hooks/
+services/
+assets/
 
 # ── Internal scripts & binaries ──
 admin-check.js
