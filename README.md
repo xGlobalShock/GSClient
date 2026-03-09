@@ -1,9 +1,9 @@
-# GS Control Center ⚡
+# GS Control Center [ BETA ]
 
 An all-in-one Windows desktop utility for PC optimization, real-time hardware monitoring, game tuning, system cleanup, software management, and streaming setup — built with Electron, React, and TypeScript.
 
 ![Status](https://img.shields.io/badge/Status-Production%20Ready-brightgreen)
-![Version](https://img.shields.io/badge/Version-2.0.0-blue)
+![Version](https://img.shields.io/badge/Version-1.2.0-blue)
 ![Platform](https://img.shields.io/badge/Platform-Windows%2010%2F11%20x64-blue)
 ![Electron](https://img.shields.io/badge/Electron-27-blueviolet)
 ![React](https://img.shields.io/badge/React-18-61dafb)
@@ -15,9 +15,7 @@ An all-in-one Windows desktop utility for PC optimization, real-time hardware mo
 
 Get the latest installer from the most recent BETA release:
 
-[GS‑Control‑Center‑Setup‑1.1.0.exe](https://github.com/xGlobalShock/GS-Control-Center/releases/download/v1.1.0/GS-Control-Center-Setup-1.1.0.exe)
-
-(this link will change for each release, so you can also point to `latest`)
+[GS‑Control‑Center‑Setup‑1.2.0.exe](https://github.com/xGlobalShock/GS-Control-Center/releases/tag/v1.2.0)
 
 [Download latest release](https://github.com/xGlobalShock/GS-Control-Center/releases/latest)
 
