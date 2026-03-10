@@ -17,7 +17,7 @@ Whether you're spinning up a new gaming rig, chasing higher FPS, stabiliizing yo
 
 Get the latest installer from the most recent BETA release:
 
-[GS‑Control‑Center‑Setup‑1.2.0.exe](https://github.com/xGlobalShock/GS-Control-Center/releases/tag/v1.2.0)
+[GS‑Control‑Center‑Setup‑1.3.3.exe](https://github.com/xGlobalShock/GS-Control-Center/releases/tag/v1.3.3)
 
 [Download latest release](https://github.com/xGlobalShock/GS-Control-Center/releases/latest)
 
