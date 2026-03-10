@@ -34,8 +34,6 @@ Download the latest installer from the newest release:
 GS-Control-Center-Setup-x.x.x.exe
 ```
 
-3. The installer requires **Administrator privileges**.
-
 ---
 
 # Features
