@@ -26,28 +26,28 @@ Download the latest **GS-Control-Center-Setup-x.x.x.exe** from [GitHub Releases]
 
 ## What's Inside
 
-### Home
+### Dashboard
 Real-time monitoring of CPU, RAM, GPU, disk, network, and temperatures. View all the essential stats about your system at a glance.
 
-### Tweaks
+### PC Tweaks
 Performance optimizations with one-click setup. Apply tweaks instantly and roll back anytime they don't work for you.
 
-### Cleanup
+### CLeanup ToolKit
 Remove cached files, temporary files, game shader caches, and orphaned logs from your system. Free up space and keep your PC running clean.
 
-### Games
+### Games Manager
 Support for popular titles including Apex Legends, Valorant, Fortnite, CS2, League of Legends, Rocket League, Overwatch, and Call of Duty. View per-game settings, launch options, custom resolution support, and hardware compatibility.
 
-### Network
+### Network Diagnostics
 - Network diagnostics and connectivity testing. Monitor latency, packet loss, and connection quality across multiple endpoints.
 
-### Stream
-Gaming preset for OBS Studio. Deploy settings instantly and launch OBS with your profile ready to go.
+### OBS Preset
+Gaming preset for OBS Studio. Deploy settings, scenes, sources instantly and launch OBS with your profile ready to go.
 
-### Updates
+### Apps Software Update
 Scan and manage all installed applications and drivers. Update everything at once or select individual items.
 
-### Apps
+### Apps Installer / Apps Uninstaller
 Browse and install 47+ essential applications organized by category. Build your complete setup in one place.
 
 ### Settings
