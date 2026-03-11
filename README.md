@@ -28,11 +28,7 @@ Download the latest installer from the newest release:
 # Installation
 
 1. Download the latest installer from **[GitHub Releases](https://github.com/xGlobalShock/GS-Control-Center/releases)**
-2. Run:
-
-```
-GS-Control-Center-Setup-x.x.x.exe
-```
+2. Run: ```GS-Control-Center-Setup-x.x.x.exe```
 
 ---
 
