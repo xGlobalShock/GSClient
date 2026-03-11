@@ -3,19 +3,19 @@ const { execSync } = require('child_process');
 const path = require('path');
 
 // ── Modules ─────────────────────────────────────────────────────────────────
-const windowManager       = require('./main-process/windowManager');
-const autoUpdater         = require('./main-process/autoUpdater');
-const hardwareMonitor     = require('./main-process/hardwareMonitor');
-const hardwareInfo        = require('./main-process/hardwareInfo');
-const cleaners            = require('./main-process/cleaners');
-const tweaks              = require('./main-process/tweaks');
-const obsPresets          = require('./main-process/obsPresets');
-const softwareUpdates     = require('./main-process/softwareUpdates');
-const appInstaller        = require('./main-process/appInstaller');
-const appUninstaller      = require('./main-process/appUninstaller');
-const gameProfiles        = require('./main-process/gameProfiles');
-const network             = require('./main-process/network');
-const { execAsync }       = require('./main-process/utils');
+const windowManager       = require('../main-process/windowManager');
+const autoUpdater         = require('../main-process/autoUpdater');
+const hardwareMonitor     = require('../main-process/hardwareMonitor');
+const hardwareInfo        = require('../main-process/hardwareInfo');
+const cleaners            = require('../main-process/cleaners');
+const tweaks              = require('../main-process/tweaks');
+const obsPresets          = require('../main-process/obsPresets');
+const softwareUpdates     = require('../main-process/softwareUpdates');
+const appInstaller        = require('../main-process/appInstaller');
+const appUninstaller      = require('../main-process/appUninstaller');
+const gameProfiles        = require('../main-process/gameProfiles');
+const network             = require('../main-process/network');
+const { execAsync }       = require('../main-process/utils');
 
 // ── Rendering Pipeline ──────────────────────────────────────────────────────
 app.commandLine.appendSwitch('use-gl', 'swiftshader');
@@ -88,7 +88,7 @@ if (process.platform === 'win32') {
 }
 
 // ── Set root directory for modules ──────────────────────────────────────────
-windowManager.setRootDir(__dirname);
+windowManager.setRootDir(path.join(__dirname, '..'));
 
 // ── Initialize modules that need isElevated ─────────────────────────────────
 tweaks.init({ isElevated });

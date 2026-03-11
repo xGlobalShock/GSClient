@@ -6,13 +6,9 @@ import {
   DownloadSimple,
   GlobeHemisphereEast,
   FolderSimple,
-  HardDrives,
   Image,
   Scroll,
-  Bug,
-  Warning,
-  CloudArrowDown,
-  ClockCounterClockwise
+  Bug
 } from 'phosphor-react';
 
 // bring back game & nvidia asset logos
@@ -152,16 +148,6 @@ export const cleanerUtilities: CleanerUtility[] = [
     buttonColor: '#27ae60',
   },
   {
-    id: 'windows-temp',
-    title: 'Clear Windows Temp',
-    icon: HardDrives,
-    cacheType: 'System Temp Files',
-    description: 'Removes temporary files from the Windows system temp folder.',
-    buttonText: 'Clear Cache',
-    color: '#0074D9',
-    buttonColor: '#00B4D8',
-  },
-  {
     id: 'thumbnail-cache',
     title: 'Clear Thumbnail Cache',
     icon: Image,
@@ -190,36 +176,6 @@ export const cleanerUtilities: CleanerUtility[] = [
     buttonText: 'Clear Dumps',
     color: '#0074D9',
     buttonColor: '#FF6B6B',
-  },
-  {
-    id: 'error-reports',
-    title: 'Clear Error Reports',
-    icon: Warning,
-    cacheType: 'WER Archives',
-    description: 'Removes archived Windows Error Reporting files.',
-    buttonText: 'Clear Reports',
-    color: '#0074D9',
-    buttonColor: '#FFA07A',
-  },
-  {
-    id: 'delivery-optimization',
-    title: 'Clear Delivery Optimization',
-    icon: CloudArrowDown,
-    cacheType: 'Update Delivery Cache',
-    description: 'Clears Windows Update delivery optimization cache files.',
-    buttonText: 'Clear Cache',
-    color: '#0074D9',
-    buttonColor: '#64DFDF',
-  },
-  {
-    id: 'recent-files',
-    title: 'Clear Recent Files',
-    icon: ClockCounterClockwise,
-    cacheType: 'Recent Shortcuts',
-    description: 'Deletes recent file shortcut links from Windows history.',
-    buttonText: 'Clear History',
-    color: '#0074D9',
-    buttonColor: '#C77DFF',
   },
   {
     id: 'temp-files',

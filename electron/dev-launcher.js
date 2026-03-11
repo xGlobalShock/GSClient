@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 const { spawn } = require('child_process');
+const path = require('path');
 
 console.log(`[dev-launcher] Starting at ${new Date().toLocaleTimeString()}`);
 console.log('[dev-launcher] Launching React dev server and Electron...');
@@ -11,7 +12,7 @@ const cmd = 'cross-env NODE_OPTIONS=--no-deprecation NODE_MAX_OLD_SPACE_SIZE=409
 const proc = spawn(cmd, {
   stdio: 'inherit',
   shell: true,
-  cwd: __dirname,
+  cwd: path.join(__dirname, '..'),
   detached: false
 });
 
