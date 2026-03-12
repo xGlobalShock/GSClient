@@ -8,10 +8,12 @@ import '../styles/WhatsNew.css';
 import '../styles/DevUpdates.css';
 
 // GitHub Releases API Configuration
-const GITHUB_REPO = 'xSGCo/gs-control-center'; // Change to your repo: 'owner/repo'
+const GITHUB_REPO = 'xGlobalShock/GS-Control-Center'; // Change to your repo: 'owner/repo'
 const GITHUB_API_URL = `https://api.github.com/repos/${GITHUB_REPO}/releases`;
 const DEV_UPDATES_CACHE_KEY = 'devupdates-cache';
 const DEV_UPDATES_CACHE_TTL = 3600000; // 1 hour in milliseconds
+const SESSION_START_KEY = 'devupdates-session-start';
+const DEV_UPDATES_TAG = 'v2026.3.12'; // Set to specific tag, or leave empty for latest
 
 interface GitHubRelease {
   id: number;
@@ -139,7 +141,7 @@ const Header: React.FC = React.memo(() => {
   useEffect(() => {
     const fetchDevUpdates = async () => {
       try {
-        // Check cache first
+        // Check cache first (but will refresh every minute via interval below)
         const cached = localStorage.getItem(DEV_UPDATES_CACHE_KEY);
         if (cached) {
           const { data, timestamp } = JSON.parse(cached);
@@ -156,26 +158,34 @@ const Header: React.FC = React.memo(() => {
 
         const releases: GitHubRelease[] = await response.json();
 
-        const updates: DevUpdate[] = releases
-          .filter(r => !r.draft && !r.prerelease)
-          .slice(0, 10)
-          .map((release) => {
-            const lines = release.body.trim().split('\n').filter(l => l.trim());
-            const firstLine = lines[0] || release.name;
-            const rest = lines.slice(1).join('\n').trim();
+        let filtered = releases.filter(r => !r.draft && !r.prerelease);
+        
+        // If a specific tag is set, use only that release
+        if (DEV_UPDATES_TAG) {
+          filtered = filtered.filter(r => r.tag_name === DEV_UPDATES_TAG);
+        } else {
+          filtered = filtered.slice(0, 1); // Otherwise use latest
+        }
 
+        const updates: DevUpdate[] = filtered.map((release) => {
+            const lines = release.body.trim().split('\n').filter(l => l.trim());
+            const description = lines[0] || undefined;
+
+            // Determine type from release name (check for [tag] prefix) or body keywords
             let type: 'bug' | 'in-progress' | 'planned' | 'info' = 'info';
-            const bodyLower = release.body.toLowerCase();
-            if (bodyLower.includes('fixing') || bodyLower.includes('bug')) type = 'bug';
-            else if (bodyLower.includes('working on') || bodyLower.includes('in progress')) type = 'in-progress';
-            else if (bodyLower.includes('coming') || bodyLower.includes('planned')) type = 'planned';
+            const nameAndBody = (release.name + ' ' + release.body).toLowerCase();
+            
+            if (nameAndBody.includes('[bug]') || nameAndBody.includes('fixing') || nameAndBody.includes('bug')) type = 'bug';
+            else if (nameAndBody.includes('[in-progress]') || nameAndBody.includes('working on') || nameAndBody.includes('in progress')) type = 'in-progress';
+            else if (nameAndBody.includes('[planned]') || nameAndBody.includes('coming') || nameAndBody.includes('planned')) type = 'planned';
+            else if (nameAndBody.includes('[info]')) type = 'info';
 
             return {
               id: `du-gh-${release.id}`,
               date: release.published_at.split('T')[0],
               type,
-              title: firstLine,
-              description: rest || undefined,
+              title: release.name, // Use actual release title
+              description: description,
             };
           });
 
@@ -184,12 +194,27 @@ const Header: React.FC = React.memo(() => {
           data: updates.length > 0 ? updates : devUpdatesDefault,
           timestamp: Date.now(),
         }));
-      } catch {
+      } catch (error) {
         setDevUpdates(devUpdatesDefault);
       }
     };
 
+    // Fetch on mount and clear cache on new session
+    const sessionStart = sessionStorage.getItem(SESSION_START_KEY);
+    if (!sessionStart) {
+      localStorage.removeItem(DEV_UPDATES_CACHE_KEY);
+      sessionStorage.setItem(SESSION_START_KEY, Date.now().toString());
+    }
+
     fetchDevUpdates();
+
+    // Refresh every 10 seconds
+    const refreshInterval = setInterval(() => {
+      localStorage.removeItem(DEV_UPDATES_CACHE_KEY);
+      fetchDevUpdates();
+    }, 10000);
+
+    return () => clearInterval(refreshInterval);
   }, []);
 
   // Check for unseen dev updates
@@ -320,7 +345,54 @@ const Header: React.FC = React.memo(() => {
           )}
         </div>
 
-        {/* Dev Updates button — hidden (issue resolved) */}
+        {/* Dev Updates button */}
+        <div className="devupdates-wrapper" ref={devUpdatesRef}>
+          <button
+            className={`devupdates-btn ${showDevUpdates ? 'devupdates-btn--active' : ''}`}
+            onClick={handleOpenDevUpdates}
+            aria-label="Dev Updates"
+            title="Developer updates"
+          >
+            <Radio size={16} />
+            {hasUnseenDevUpdates && <span className="devupdates-dot" />}
+          </button>
+
+          {showDevUpdates && (
+            <div className="devupdates-panel">
+              <div className="devupdates-panel-header">
+                <h3 className="devupdates-panel-title">Announcements</h3>
+                <button className="devupdates-panel-close" onClick={() => setShowDevUpdates(false)}>
+                  <X size={14} />
+                </button>
+              </div>
+              <div className="devupdates-panel-body">
+                {devUpdates.length > 0 ? (
+                  devUpdates.map((update) => (
+                    <div key={update.id} className="devupdates-item">
+                      <div className={`devupdates-indicator devupdates-indicator--${update.type}`} />
+                      <div className="devupdates-content">
+                        <div className="devupdates-item-header">
+                          <span className={`devupdates-type-badge devupdates-type-badge--${update.type}`}>
+                            {update.type}
+                          </span>
+                          <span className="devupdates-item-date">{update.date}</span>
+                        </div>
+                        <h4 className="devupdates-item-title">{update.title}</h4>
+                        {update.description && (
+                          <p className="devupdates-item-description">
+                            {update.description.split('\n')[0]}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="devupdates-empty">No updates available</div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Update indicator — visible only when update is available / downloading / ready */}
         {showIndicator && (
