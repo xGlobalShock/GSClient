@@ -9,6 +9,15 @@ export interface ChangelogEntry {
 }
 
 const changelog: ChangelogEntry[] = [
+    {
+    version: '1.4.0',
+    date: '2026-03-12',
+    highlights: 'System Details & Updater Improvements',
+    changes: [
+      { type: 'fixed', text: 'Fixed an issue where realtime update tracking would briefly disappear when a new version was detected.' },
+      { type: 'improved', text: 'Added a progress bar to the memory statistics panel.' },
+    ],
+  },
   {
     version: '1.3.9',
     date: '2026-03-12',
