@@ -262,9 +262,83 @@
 }
 
 .devupdates-item-description {
-  font-size: 10px;
+  font-size: 10.5px;
   color: #ffffff;
-  font-weight: bold;
-  line-height: 1.3;
+  line-height: 1.4;
   margin-top: 3px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.devupdates-item-description p {
+  margin: 0 0 8px;
+}
+
+.devupdates-item-description h2,
+.devupdates-item-description h3,
+.devupdates-item-description h4 {
+  margin: 10px 0 6px;
+  color: #e2e8f0;
+  font-weight: 700;
+}
+
+.devupdates-item-description h2 {
+  font-size: 12px;
+}
+
+.devupdates-item-description h3 {
+  font-size: 11px;
+}
+
+.devupdates-item-description h4 {
+  font-size: 10px;
+}
+
+.devupdates-item-description ul {
+  padding-left: 18px;
+  margin: 6px 0;
+  list-style: none;
+}
+
+.devupdates-item-description li {
+  margin: 4px 0;
+  line-height: 1.4;
+  position: relative;
+  padding-left: 12px;
+}
+
+.devupdates-item-description li::before {
+  content: '•';
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 12px;
+  line-height: 1;
+}
+
+.devupdates-item-description strong {
+  font-weight: 700;
+}
+
+.devupdates-item-description em {
+  font-style: italic;
+}
+
+.devupdates-item-description code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.devupdates-item-description hr {
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  margin: 10px 0;
+}
+
+.devupdates-item-description a {
+  color: #68d9ff;
+  text-decoration: underline;
 }

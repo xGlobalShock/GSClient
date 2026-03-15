@@ -7,6 +7,95 @@ import '../styles/Header.css';
 import '../styles/WhatsNew.css';
 import '../styles/DevUpdates.css';
 
+// Minimal markdown renderer for Dev Updates (supports GitHub-style formatting)
+const escapeHtml = (str: string) =>
+  str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+const renderMarkdownToHtml = (markdown: string) => {
+  if (!markdown) return '';
+
+  // Basic escaping
+  let html = escapeHtml(markdown);
+
+  // Headers
+  html = html.replace(/^###\s*(.+)$/gm, '<h4>$1</h4>');
+  html = html.replace(/^##\s*(.+)$/gm, '<h3>$1</h3>');
+  html = html.replace(/^#\s*(.+)$/gm, '<h2>$1</h2>');
+
+  // Horizontal rule
+  html = html.replace(/^---$/gm, '<hr />');
+
+  // Lists (unordered list support using *, -, +, including nesting)
+  const lines = html.split('\n');
+  const formatted: string[] = [];
+  const listStack: number[] = []; // stores indentation levels for active <ul>
+
+  const closeLists = (targetLevel = 0) => {
+    while (listStack.length > targetLevel) {
+      listStack.pop();
+      formatted.push('</ul>');
+    }
+  };
+
+  for (const line of lines) {
+    const listMatch = line.match(/^(\s*)([*+-])\s+(.+)/);
+
+    if (listMatch) {
+      const indent = listMatch[1].length;
+      const level = Math.floor(indent / 2);
+      const content = listMatch[3];
+
+      if (level > listStack.length) {
+        // open nested lists
+        for (let i = listStack.length; i < level; i += 1) {
+          listStack.push(level);
+          formatted.push('<ul>');
+        }
+      } else if (level < listStack.length) {
+        closeLists(level);
+      } else if (!listStack.length) {
+        // start root list
+        listStack.push(level);
+        formatted.push('<ul>');
+      }
+
+      formatted.push(`<li>${content}</li>`);
+      continue;
+    }
+
+    if (listStack.length) {
+      closeLists(0);
+    }
+
+    formatted.push(line.trim());
+  }
+
+  if (listStack.length) {
+    closeLists(0);
+  }
+
+  // Wrap any remaining lines in paragraphs
+  let wrapped = formatted
+    .map((line) => {
+      if (!line) return '';
+      const tagMatch = line.match(/^<\/?(h2|h3|h4|ul|li|p|blockquote|hr|code|pre|strong|em|a)/);
+      if (tagMatch) return line;
+      return `<p>${line}</p>`;
+    })
+    .join('');
+
+  // Inline formatting (run last so list markers are not converted)
+  wrapped = wrapped.replace(/\`([^`]+)\`/g, '<code>$1</code>');
+  wrapped = wrapped.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  wrapped = wrapped.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+  wrapped = wrapped.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer">$1</a>');
+
+  return wrapped;
+};
+
 // GitHub Releases API Configuration
 const GITHUB_REPO = 'xGlobalShock/GS-Control-Center'; // Change to your repo: 'owner/repo'
 const GITHUB_API_URL = `https://api.github.com/repos/${GITHUB_REPO}/releases`;
@@ -179,8 +268,7 @@ const Header: React.FC = React.memo(() => {
         }
 
         const updates: DevUpdate[] = filtered.map((release) => {
-            const lines = release.body.trim().split('\n').filter(l => l.trim());
-            const description = lines[0] || undefined;
+const description = release.body?.trim() || undefined;
 
             // Determine type from release name (check for [tag] prefix) or body keywords
             let type: 'bug' | 'in-progress' | 'planned' | 'info' = 'info';
@@ -393,9 +481,10 @@ const Header: React.FC = React.memo(() => {
                           </div>
                           <h4 className="devupdates-item-title">{update.title}</h4>
                           {update.description && (
-                            <p className="devupdates-item-description">
-                              {update.description.split('\n')[0]}
-                            </p>
+                            <div
+                              className="devupdates-item-description"
+                              dangerouslySetInnerHTML={{ __html: renderMarkdownToHtml(update.description) }}
+                            />
                           )}
                         </div>
                       </div>
