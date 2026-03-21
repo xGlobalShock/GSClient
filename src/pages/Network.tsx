@@ -73,14 +73,30 @@ const Network: React.FC = () => {
     }
   }, []);
 
-  const pingAll = useCallback(() => { PING_TARGETS.forEach(t => pingOne(t)); }, [pingOne]);
+  const pingAll = useCallback(() => {
+    // Stagger full scan, avoids a flood of calls at once
+    PING_TARGETS.forEach((t, idx) => {
+      setTimeout(() => pingOne(t), idx * 250);
+    });
+  }, [pingOne]);
 
   useEffect(() => {
     mountedRef.current = true;
+    let nextIndex = 0;
+
     pingAll();
-    const iv = setInterval(pingAll, 1000);
-    return () => { mountedRef.current = false; clearInterval(iv); };
-  }, [pingAll]);
+
+    const intervalId = setInterval(() => {
+      const target = PING_TARGETS[nextIndex];
+      nextIndex = (nextIndex + 1) % PING_TARGETS.length;
+      pingOne(target);
+    }, 1000);
+
+    return () => {
+      mountedRef.current = false;
+      clearInterval(intervalId);
+    };
+  }, [pingAll, pingOne]);
 
   /* ── Stats ── */
   const allTimes = PING_TARGETS.map(t => results[t.id]?.time).filter((t): t is number => t != null);

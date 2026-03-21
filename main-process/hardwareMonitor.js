@@ -555,37 +555,68 @@ function _formatUptimeSeconds(seconds) {
   return `${d}d ${h}h ${m}m`;
 }
 
+const isWinPing = process.platform === 'win32';
+// Low-end friendly behavior: single ping with low timeout, longer interval
+const pingArgs1 = isWinPing ? ['-n', '1', '-w', '2000'] : ['-c', '1', '-W', '2'];
+const pingArgsFast = pingArgs1; // keep single packet for smaller overhead
+const LATENCY_POLL_INTERVAL_MS = 30000;
+
+function _parsePingOutput(stdout) {
+  const text = String(stdout);
+  let time = null;
+  let packetLoss = null;
+
+  if (isWinPing) {
+    const avgMatch = text.match(/Average\s*=\s*(\d+)\s*ms/i);
+    if (avgMatch) time = parseInt(avgMatch[1], 10);
+    const lossMatch = text.match(/Lost\s*=\s*\d+\s*\((\d+)%/i);
+    if (lossMatch) packetLoss = parseInt(lossMatch[1], 10);
+  } else {
+    const avgMatch = text.match(/rtt\s+min\/avg\/max\/mdev\s*=\s*[\d.]+\/([\d.]+)\//i)
+      || text.match(/round-trip\s+min\/avg\/max\/stddev\s*=\s*[\d.]+\/([\d.]+)\//i);
+    if (avgMatch) time = Math.round(parseFloat(avgMatch[1]));
+    const lossMatch = text.match(/,\s*([\d.]+)%\s*packet loss/i);
+    if (lossMatch) packetLoss = Math.round(parseFloat(lossMatch[1]));
+  }
+
+  return { time, packetLoss };
+}
+
+async function _pingHost(host, args) {
+  try {
+    const { stdout } = await execFileAsync('ping', [...args, host], { timeout: 20000, windowsHide: true });
+    return { success: true, ..._parsePingOutput(stdout) };
+  } catch (err) {
+    // no crash; just mark unreachable
+    const parsed = err.stdout ? _parsePingOutput(err.stdout) : { time: null, packetLoss: null };
+    return { success: false, time: parsed.time, packetLoss: parsed.packetLoss, error: err.message || 'ping failed' };
+  }
+}
+
 function _startLatencyPoll() {
   if (_realtimeLatencyTimer) return;
 
   (async () => {
-    try {
-      const { stdout } = await execAsync('ping -n 1 -w 2000 8.8.8.8', { shell: true, timeout: 5000 });
-      const m = stdout.match(/time[=<]\s*(\d+)\s*ms/i);
-      if (m) _rtLastLatency = parseInt(m[1], 10);
-      _rtLastPacketLoss = 0;
-    } catch { }
+    const res = await _pingHost('8.8.8.8', pingArgs1);
+    if (res.success && typeof res.time === 'number') {
+      _rtLastLatency = res.time;
+      _rtLastPacketLoss = typeof res.packetLoss === 'number' ? res.packetLoss : 0;
+    }
   })();
 
   const doPing = async () => {
-    try {
-      const { stdout } = await execAsync('ping -n 5 -w 2000 8.8.8.8', { shell: true, timeout: 20000 });
-      const avgMatch = stdout.match(/Average\s*=\s*(\d+)\s*ms/i)
-        || stdout.match(/Moyenne\s*=\s*(\d+)\s*ms/i)
-        || stdout.match(/Media\s*=\s*(\d+)\s*ms/i);
-      _rtLastLatency = avgMatch ? parseInt(avgMatch[1], 10) : 0;
-      const lossMatch = stdout.match(/Lost\s*=\s*\d+\s*\((\d+)%/i)
-        || stdout.match(/Perdus\s*=\s*\d+\s*\((\d+)%/i)
-        || stdout.match(/Perdidos\s*=\s*\d+\s*\((\d+)%/i)
-        || stdout.match(/=\s*\d+.*=\s*\d+.*=\s*\d+\s*\((\d+)%/);
-      _rtLastPacketLoss = lossMatch ? parseInt(lossMatch[1], 10) : 0;
-    } catch {
-      _rtLastLatency = 0;
-      _rtLastPacketLoss = -1;
+    const res = await _pingHost('8.8.8.8', pingArgsFast);
+    if (res.success) {
+      _rtLastLatency = res.time ?? 0;
+      _rtLastPacketLoss = typeof res.packetLoss === 'number' ? res.packetLoss : 0;
+    } else {
+      _rtLastLatency = res.time ?? 0;
+      _rtLastPacketLoss = typeof res.packetLoss === 'number' ? res.packetLoss : -1;
     }
   };
+
   doPing();
-  _realtimeLatencyTimer = setInterval(doPing, 10000);
+  _realtimeLatencyTimer = setInterval(doPing, LATENCY_POLL_INTERVAL_MS);
 }
 
 function _startWifiPoll() {
