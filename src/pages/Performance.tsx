@@ -139,22 +139,16 @@ const Performance: React.FC = () => {
     'win32-priority': 'tweak:check-win32-priority',
   };
 
-  // Check tweak status on mount and when window gains focus
+  // Check tweak status on mount only. Manual refresh via Scan Status button.
   useEffect(() => {
     let mounted = true;
 
-    const setChecking = (id: string, loading: boolean) => {
-      setTweakChecks(prev => ({ ...prev, [id]: { ...(prev[id] || {}), loading } }));
-    };
-
     const runChecks = async () => {
       const entries = Object.entries(checkMap);
-      // mark all as loading
       const initial: any = {};
       for (const [tweakId] of entries) initial[tweakId] = { loading: true };
       setTweakChecks(prev => ({ ...prev, ...initial }));
 
-      // run checks in parallel
       const promises = entries.map(async ([tweakId, channel]) => {
         try {
           const result = await window.electron!.ipcRenderer.invoke(channel);
@@ -171,15 +165,10 @@ const Performance: React.FC = () => {
       await Promise.all(promises);
     };
 
-    // initial run
     runChecks();
-
-    const onFocus = () => runChecks();
-    window.addEventListener('focus', onFocus);
 
     return () => {
       mounted = false;
-      window.removeEventListener('focus', onFocus);
     };
   }, []);
 
@@ -289,13 +278,6 @@ const Performance: React.FC = () => {
               <ArrowCounterClockwise size={14} weight="bold" />
               <span>{creatingRestore ? 'Creating...' : 'Restore Point'}</span>
             </button>
-            <button
-              className="perf-action-btn perf-action-refresh"
-              onClick={() => { addToast('Scanning tweak status...', 'info'); runChecksOnDemand(); }}
-            >
-              <ArrowCounterClockwise size={14} weight="bold" />
-              <span>Scan Status</span>
-            </button>
           </div>
         }
       />
@@ -321,7 +303,6 @@ const Performance: React.FC = () => {
               onReset={handleResetTweak}
               isLoading={applyingId === tweak.id}
               isEnabled={enabledTweaks[tweak.id] || false}
-              isChecking={!!tweakChecks[tweak.id]?.loading}
             />
           </motion.div>
         ))}

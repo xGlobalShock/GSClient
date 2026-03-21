@@ -73,7 +73,6 @@ const PerformanceTweakCard: React.FC<PerformanceTweakCardProps> = ({
             <Power size={10} weight="bold" />
           </div>
           <span className="tc-category">{category}</span>
-          {isChecking && <div className="tc-scan-badge">SCANNING</div>}
         </div>
 
         {/* Title + Icon row */}

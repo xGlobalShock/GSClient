@@ -472,6 +472,9 @@
   padding: 4px 10px;
   border-radius: 5px;
   transition: all 0.35s ease;
+  white-space: nowrap;
+  min-width: 90px;
+  justify-content: center;
 }
 
 .tc-status--on {
