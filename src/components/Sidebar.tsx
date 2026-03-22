@@ -10,6 +10,7 @@ import {
   Wifi,
   RefreshCw,
   Layers,
+  PackageX,
 } from 'lucide-react';
 import { LucideIcon } from 'lucide-react';
 import '../styles/Sidebar.css';
@@ -37,6 +38,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage }) => {
     { id: 'obsPresets', label: 'Stream', icon: Video },
     { id: 'softwareUpdates', label: 'Updates', icon: RefreshCw },
     { id: 'apps', label: 'Apps', icon: Layers },
+    { id: 'windowsDebloat', label: 'Debloat', icon: PackageX },
     { id: 'cleaner', label: 'Cleanup', icon: Trash2 },
     { id: 'settings', label: 'Settings', icon: Settings },
   ], []);

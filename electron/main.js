@@ -1,4 +1,4 @@
-﻿const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain } = require('electron');
 const { execSync } = require('child_process');
 const path = require('path');
 
@@ -15,6 +15,7 @@ const appInstaller        = require('../main-process/appInstaller');
 const appUninstaller      = require('../main-process/appUninstaller');
 const gameProfiles        = require('../main-process/gameProfiles');
 const network             = require('../main-process/network');
+const windowsDebloat      = require('../main-process/windowsDebloat');
 const { execAsync }       = require('../main-process/utils');
 
 // ── Rendering Pipeline ──────────────────────────────────────────────────────
@@ -95,6 +96,7 @@ tweaks.init({ isElevated });
 appInstaller.init({ isElevated });
 appUninstaller.init({ isElevated });
 softwareUpdates.init({ isElevated, invalidateInstallerCaches: appInstaller.invalidateCaches });
+windowsDebloat.init({ isElevated });
 
 // ── Register all IPC handlers ───────────────────────────────────────────────
 hardwareMonitor.registerIPC();
@@ -108,6 +110,7 @@ appUninstaller.registerIPC();
 gameProfiles.registerIPC();
 network.registerIPC();
 autoUpdater.registerIPC();
+windowsDebloat.registerIPC();
 
 // ── Pre-warm scan caches (orchestrator) ─────────────────────────────────────
 async function _prewarmScanCaches() {

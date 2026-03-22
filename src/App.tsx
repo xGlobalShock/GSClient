@@ -11,6 +11,7 @@ import OBSPresets from './pages/OBSPresets';
 import Network from './pages/Network';
 import SoftwareUpdates from './pages/SoftwareUpdates';
 import AppsPage from './pages/AppsPage';
+import WindowsDebloat from './pages/WindowsDebloat';
 import { ToastProvider } from './contexts/ToastContext';
 import { ToastContainer } from './components/ToastContainer';
 import { useRealtimeHardware } from './hooks/useRealtimeHardware';
@@ -184,6 +185,9 @@ function App() {
         </div>
         <div style={pageStyle('apps')}>
           <AppsPage isActive={currentPage === 'apps'} />
+        </div>
+        <div style={pageStyle('windowsDebloat')}>
+          <WindowsDebloat isActive={currentPage === 'windowsDebloat'} />
         </div>
       </>
     );
