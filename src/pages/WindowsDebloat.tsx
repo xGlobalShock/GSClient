@@ -41,7 +41,7 @@ const WindowsDebloat: React.FC<WindowsDebloatProps> = ({ isActive = false }) => 
 
   const IS_COMING_SOON = true; // LOCK / UNLOCK PAGE
 
-  /* ── State ── */
+  /* ── State ────────────────────────────────────────────────────────────── */
   const [tab, setTab] = useState<DebloatTab>('apps');
   const [items, setItems] = useState<DebloatItem[]>([]);
   const [loading, setLoading] = useState(false);
