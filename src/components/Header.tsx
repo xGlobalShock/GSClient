@@ -392,7 +392,7 @@ const description = release.body?.trim() || undefined;
   return (
     <header className="header">
       <div className="header-left header-drag-region">
-        <h1 className="header-title">GS Control Center</h1>
+        <h1 className="header-title">GS Center</h1>
         <p className="header-subtitle">System Performance Control Center</p>
       </div>
 

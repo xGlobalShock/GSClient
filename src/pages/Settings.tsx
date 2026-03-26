@@ -191,7 +191,7 @@ const Settings: React.FC = () => {
         <div className="settings-section">
           <h3 className="section-header">About</h3>
           <div className="about-info">
-            <p><strong>GS Control Center</strong></p>
+            <p><strong>GS Center</strong></p>
             <p>Version {appVersion}</p>
             <p>Advanced system optimization tool with gaming focus</p>
           </div>

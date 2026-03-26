@@ -1,8 +1,8 @@
 {
-  "name": "gs-control-center",
-  "version": "1.4.5",
-  "description": "GS Control Center - Advanced System Optimization Tool",
-  "author": "GS Control Center Team",
+  "name": "gs-center",
+  "version": "1.4.4",
+  "description": "GS Center - Advanced System Optimization Tool",
+  "author": "GS Center Team",
   "main": "electron/main.js",
   "homepage": "./",
   "private": true,
@@ -47,7 +47,7 @@
   },
   "build": {
     "appId": "com.gscontrolcenter.app",
-    "productName": "GS Control Center",
+    "productName": "GS Center",
     "asar": true,
     "files": [
       "build/**/*",
@@ -109,18 +109,18 @@
       "target": [
         "nsis"
       ],
-      "executableName": "GS Control Center",
-      "requestedExecutionLevel": "asInvoker"
+      "executableName": "GS Center",
+      "requestedExecutionLevel": "requireAdministrator"
     },
     "nsis": {
       "oneClick": true,
-      "perMachine": false,
+      "perMachine": true,
       "allowToChangeInstallationDirectory": false,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "runAfterFinish": true,
-      "shortcutName": "GS Control Center",
-      "artifactName": "GS-Control-Center-Setup-${version}.${ext}"
+      "shortcutName": "GS Center",
+      "artifactName": "GS-Center-Setup-${version}.${ext}"
     }
   },
   "browserslist": {

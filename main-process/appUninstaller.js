@@ -581,6 +581,7 @@ public class DeElev2 {
           if (matchesApp(entry.name)) {
             const fullPath = path.join(base, entry.name);
             if (fullPath.toLowerCase().includes('gs control center')) continue;
+            if (fullPath.toLowerCase().includes('gs center')) continue;
             if (fullPath.toLowerCase().includes('windows\\system32')) continue;
 
             let sizeBytes = 0;
