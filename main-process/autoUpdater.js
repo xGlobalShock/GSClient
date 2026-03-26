@@ -18,11 +18,12 @@ function initAutoUpdater() {
   }
 
   autoUpdater.autoDownload = false;
-  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.autoInstallOnAppQuit = false; // Manual install step (user clicks Install button)
   autoUpdater.allowDowngrade = false;
 
   autoUpdater.on('checking-for-update', () => {
     sendUpdateStatus({ event: 'checking' });
+    windowManager.sendSplashStatus('Checking for updates...');
   });
 
   autoUpdater.on('update-available', (info) => {
@@ -43,13 +44,16 @@ function initAutoUpdater() {
   });
 
   autoUpdater.on('download-progress', (progress) => {
+    const percent = Math.round(progress.percent);
     sendUpdateStatus({
       event: 'download-progress',
-      percent: Math.round(progress.percent),
+      percent,
       bytesPerSecond: progress.bytesPerSecond,
       transferred: progress.transferred,
       total: progress.total,
     });
+    windowManager.sendSplashStatus(`Downloading update... ${percent}%`);
+    windowManager.sendSplashProgress(percent);
   });
 
   autoUpdater.on('update-downloaded', (info) => {
@@ -57,6 +61,21 @@ function initAutoUpdater() {
       event: 'downloaded',
       version: info.version,
     });
+    windowManager.sendSplashStatus('Update downloaded. Ready to install.');
+    windowManager.sendSplashProgress(100);
+
+    // Auto-install shortly after download to avoid stale "ready" stall.
+    setTimeout(() => {
+      if (windowManager.getSplashWindow() && !windowManager.getSplashWindow().isDestroyed()) {
+        windowManager.sendSplashStatus('Installing update...');
+      }
+      autoUpdater.quitAndInstall(false, true);
+    }, 800);
+  });
+
+  autoUpdater.on('before-quit-for-update', () => {
+    windowManager.sendSplashStatus('Installing update...');
+    windowManager.sendSplashProgress(100);
   });
 
   autoUpdater.on('error', (err) => {
@@ -88,12 +107,29 @@ function registerIPC() {
 
   ipcMain.handle('updater:download', async () => {
     try {
+      const mainWindow = windowManager.getMainWindow();
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.hide();
+      }
+
+      if (!windowManager.getSplashWindow()) {
+        windowManager.createSplashWindow();
+      }
+
+      windowManager.sendSplashStatus('Downloading update...');
+      windowManager.sendSplashProgress(0);
+
       _downloadCancellationToken = new CancellationToken();
       await autoUpdater.downloadUpdate(_downloadCancellationToken);
       _downloadCancellationToken = null;
+
+      windowManager.sendSplashStatus('Update downloaded. Ready to install.');
+      windowManager.sendSplashProgress(100);
+
       return { success: true };
     } catch (err) {
       _downloadCancellationToken = null;
+      windowManager.sendSplashStatus('Download failed. Please retry.');
       if (err?.message === 'cancelled') return { success: false, cancelled: true };
       return { success: false, message: err?.message || 'Download failed' };
     }
@@ -110,7 +146,18 @@ function registerIPC() {
   });
 
   ipcMain.handle('updater:install', () => {
-    autoUpdater.quitAndInstall(false, true);
+    windowManager.sendSplashStatus('Installing update...');
+    windowManager.sendSplashProgress(100);
+
+    const mainWindow = windowManager.getMainWindow();
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.hide();
+    }
+
+    // Keep splash visible so user sees the transition, then quit and update.
+    setTimeout(() => {
+      autoUpdater.quitAndInstall(false, true);
+    }, 300);
   });
 
   ipcMain.handle('updater:get-version', () => {

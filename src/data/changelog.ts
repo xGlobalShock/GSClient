@@ -9,16 +9,23 @@ export interface ChangelogEntry {
 }
 
 const changelog: ChangelogEntry[] = [{
-  version: '1.4.3',
-  date: '2026-03-22',
-  highlights: 'New Debloat Tool & Game Library Optimization',
-  changes: [
-    { type: 'new', text: 'Added a new Debloat page to manage Windows Apps, Capabilities, and Optional Features in bulk' },
-    { type: 'new', text: 'Implemented a dedicated backend IPC module using DISM and PowerShell for safe system debloating.' },
-    { type: 'improved', text: 'Added a developer toggle for testing Video Settings in the Game Library.' },
-    { type: 'improved', text: 'Scrubbed and optimized unused variables from Game Library to ensure zero-warning TypeScript compilation.' },
-  ],
-},
+    version: '1.4.5',
+    date: '2026-03-26',
+    highlights: 'Minor updater fix',
+    changes: [
+      { type: 'fixed', text: 'Resolved a minor issue with the updater.' },
+    ],
+  },
+    {
+      version: '1.4.4',
+      date: '2026-03-26',
+      highlights: 'Improved updater UX with splash progress',
+      changes: [
+      { type: 'new', text: 'Enabled manual download + install flow via electron-updater.' },
+      { type: 'improved', text: 'Show downloader status/percentage on splash screen.' },
+      { type: 'fixed', text: 'Prevented main window stays open during update install step.' },
+    ],
+  },
 ];
 
 export default changelog;
