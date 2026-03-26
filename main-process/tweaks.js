@@ -38,8 +38,12 @@ ChkReg 'gpu' 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\GraphicsDrivers' 'HwSch
 ChkReg 'fse' 'HKCU:\\System\\GameConfigStore' 'GameDVR_FSEBehaviorMonitorEnabled'
 ChkReg 'usb' 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\USB' 'DisableSelectiveSuspend'
 ChkReg 'dvr' 'HKCU:\\System\\GameConfigStore' 'GameDVR_Enabled'
-ChkReg 'w32' 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\PriorityControl' 'Win32PrioritySeparation'
-$r | ConvertTo-Json -Compress
+ChkReg 'w32' 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\PriorityControl' 'Win32PrioritySeparation'try {
+  $mc = (Get-MMAgent -ErrorAction SilentlyContinue).MemoryCompression
+  if ($null -ne $mc) { $r['mc'] = @{ exists = $true; value = [int]$mc } } else { $r['mc'] = @{ exists = $false; value = $null } }
+} catch {
+  $r['mc'] = @{ exists = $false; value = $null }
+}$r | ConvertTo-Json -Compress
     `, 6000);
 
     if (raw) {
@@ -296,7 +300,32 @@ function registerIPC() {
       return { success: true, message: 'Win32 Priority reset to default' };
     } catch (error) { return { success: false, message: 'Failed to reset Win32 Priority - Admin privileges required' }; }
   });
+  ipcMain.handle('tweak:apply-memory-compression', async () => {
+    try {
+      const cmd = `Disable-MMAgent -mc`;
+      await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${cmd}"`, { shell: true });
+      _tweakCheckCache = null;
+      return { success: true, message: 'Memory compression disabled successfully' };
+    } catch (error) {
+      return { success: false, message: `Error: ${error.message}` };
+    }
+  });
 
+  ipcMain.handle('tweak:check-memory-compression', async () => {
+    try { return _tweakResult(await _runAllTweakChecks(), 'mc', 0); }
+    catch (error) { return { applied: false, exists: false, value: null, error: error.message || String(error) }; }
+  });
+
+  ipcMain.handle('tweak:reset-memory-compression', async () => {
+    try {
+      const cmd = `Enable-MMAgent -mc`;
+      await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${cmd}"`, { shell: true });
+      _tweakCheckCache = null;
+      return { success: true, message: 'Memory compression enabled successfully' };
+    } catch (error) {
+      return { success: false, message: `Error: ${error.message}` };
+    }
+  });
 } // end registerIPC
 
 module.exports = { init, registerIPC };

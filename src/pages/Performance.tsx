@@ -117,6 +117,7 @@ const Performance: React.FC = () => {
     'usb-suspend': 'tweak:apply-usb-suspend',
     'game-dvr': 'tweak:apply-game-dvr',
     'win32-priority': 'tweak:apply-win32-priority',
+    'memory-compression': 'tweak:apply-memory-compression',
   };
 
   const resetMap: { [key: string]: string } = {
@@ -127,6 +128,7 @@ const Performance: React.FC = () => {
     'usb-suspend': 'tweak:reset-usb-suspend',
     'game-dvr': 'tweak:reset-game-dvr',
     'win32-priority': 'tweak:reset-win32-priority',
+    'memory-compression': 'tweak:reset-memory-compression',
   };
 
   const checkMap: { [key: string]: string } = {
@@ -137,6 +139,7 @@ const Performance: React.FC = () => {
     'usb-suspend': 'tweak:check-usb-suspend',
     'game-dvr': 'tweak:check-game-dvr',
     'win32-priority': 'tweak:check-win32-priority',
+    'memory-compression': 'tweak:check-memory-compression',
   };
 
   // Check tweak status on mount only. Manual refresh via Scan Status button.
