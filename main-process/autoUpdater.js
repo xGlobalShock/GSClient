@@ -69,7 +69,7 @@ function initAutoUpdater() {
       if (windowManager.getSplashWindow() && !windowManager.getSplashWindow().isDestroyed()) {
         windowManager.sendSplashStatus('Installing update...');
       }
-      autoUpdater.quitAndInstall(false, true);
+      autoUpdater.quitAndInstall(true, true);
     }, 800);
   });
 
@@ -156,7 +156,7 @@ function registerIPC() {
 
     // Keep splash visible so user sees the transition, then quit and update.
     setTimeout(() => {
-      autoUpdater.quitAndInstall(false, true);
+      autoUpdater.quitAndInstall(true, true);
     }, 300);
   });
 

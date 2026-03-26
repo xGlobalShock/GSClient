@@ -110,13 +110,15 @@
         "nsis"
       ],
       "executableName": "GS Control Center",
-      "requestedExecutionLevel": "requireAdministrator"
+      "requestedExecutionLevel": "asInvoker"
     },
     "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
+      "oneClick": true,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
+      "runAfterFinish": true,
       "shortcutName": "GS Control Center",
       "artifactName": "GS-Control-Center-Setup-${version}.${ext}"
     }
