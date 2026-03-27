@@ -9,7 +9,7 @@ Whether you're setting up a **new gaming rig**, optimizing your **streaming setu
 **Real-time monitoring • Smart optimizations • One-click setup • No bloat**
 
 ![Status](https://img.shields.io/badge/Status-BETA-orange)
-![Version](https://img.shields.io/badge/Version-1.4.4-blue)
+![Version](https://img.shields.io/badge/Version-1.4.6-blue)
 ![Platform](https://img.shields.io/badge/Platform-Windows%2010%2F11%20x64-blue)
 ![Electron](https://img.shields.io/badge/Electron-27-blueviolet)
 ![React](https://img.shields.io/badge/React-18-61dafb)
@@ -22,6 +22,8 @@ Whether you're setting up a **new gaming rig**, optimizing your **streaming setu
 Download the latest installer from the newest release:
 
 ➡️ **[Download Latest Release](https://github.com/xGlobalShock/GS-Control-Center/releases/latest)**
+
+<img width="1919" height="1031" alt="image" src="https://github.com/user-attachments/assets/2b76ef15-08a5-4390-94a6-7a2ed321199e" />
 
 ---
 
