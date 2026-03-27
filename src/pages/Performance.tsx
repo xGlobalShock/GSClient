@@ -118,6 +118,7 @@ const Performance: React.FC = () => {
     'game-dvr': 'tweak:apply-game-dvr',
     'win32-priority': 'tweak:apply-win32-priority',
     'memory-compression': 'tweak:apply-memory-compression',
+    'games-priority': 'tweak:apply-games-priority',
   };
 
   const resetMap: { [key: string]: string } = {
@@ -129,6 +130,7 @@ const Performance: React.FC = () => {
     'game-dvr': 'tweak:reset-game-dvr',
     'win32-priority': 'tweak:reset-win32-priority',
     'memory-compression': 'tweak:reset-memory-compression',
+    'games-priority': 'tweak:reset-games-priority',
   };
 
   const checkMap: { [key: string]: string } = {
@@ -140,6 +142,7 @@ const Performance: React.FC = () => {
     'game-dvr': 'tweak:check-game-dvr',
     'win32-priority': 'tweak:check-win32-priority',
     'memory-compression': 'tweak:check-memory-compression',
+    'games-priority': 'tweak:check-games-priority',
   };
 
   // Check tweak status on mount only. Manual refresh via Scan Status button.
@@ -248,7 +251,8 @@ const Performance: React.FC = () => {
     'Stabilize Ping',
     'Disable Fullscreen Optimization',
     'Disable USB Suspend',
-    'Disable Game DVR'
+    'Disable Game DVR',
+    'Games Priority'
   ].includes(item.category));
   const appliedCount = Object.values(enabledTweaks).filter(Boolean).length;
   const totalCount = activeTweaks.length;

@@ -39,6 +39,7 @@ ChkReg 'fse' 'HKCU:\\System\\GameConfigStore' 'GameDVR_FSEBehaviorMonitorEnabled
 ChkReg 'usb' 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\USB' 'DisableSelectiveSuspend'
 ChkReg 'dvr' 'HKCU:\\System\\GameConfigStore' 'GameDVR_Enabled'
 ChkReg 'w32' 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\PriorityControl' 'Win32PrioritySeparation'
+ChkReg 'gprio' 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile\\Tasks\\Games' 'Priority'
 try {
   $mc = (Get-MMAgent -ErrorAction SilentlyContinue).MemoryCompression
   if ($null -ne $mc) { $r['mc'] = @{ exists = $true; value = [int]$mc } } else { $r['mc'] = @{ exists = $false; value = $null } }
@@ -203,6 +204,17 @@ function registerIPC() {
     }
   });
 
+  ipcMain.handle('tweak:apply-games-priority', async () => {
+    try {
+      const cmd = `If (-not (Test-Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile\\Tasks\\Games')) { New-Item -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile\\Tasks\\Games' -Force | Out-Null }; Set-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile\\Tasks\\Games' -Name 'Priority' -Value 6 -Type DWord -Force; Write-Host 'Games Priority applied'`;
+      await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${cmd}"`, { shell: true });
+      _tweakCheckCache = null;
+      return { success: true, message: 'Games Priority tweak applied successfully' };
+    } catch (error) {
+      return { success: false, message: `Error: ${error.message}` };
+    }
+  });
+
   // Check tweaks
   ipcMain.handle('tweak:check-irq-priority', async () => {
     try { return _tweakResult(await _runAllTweakChecks(), 'irq', 1); }
@@ -239,7 +251,21 @@ function registerIPC() {
     catch (error) { return { applied: false, exists: false, value: null, error: error.message || String(error) }; }
   });
 
+  ipcMain.handle('tweak:check-games-priority', async () => {
+    try { return _tweakResult(await _runAllTweakChecks(), 'gprio', 6); }
+    catch (error) { return { applied: false, exists: false, value: null, error: error.message || String(error) }; }
+  });
+
   // Reset tweaks
+  ipcMain.handle('tweak:reset-games-priority', async () => {
+    try {
+      const cmd = `Set-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile\\Tasks\\Games' -Name 'Priority' -Value 2 -Type DWord -Force`;
+      await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${cmd}"`, { shell: true });
+      _tweakCheckCache = null;
+      return { success: true, message: 'Games Priority reset to default' };
+    } catch (error) { return { success: false, message: 'Failed to reset Games Priority - Admin privileges required' }; }
+  });
+
   ipcMain.handle('tweak:reset-irq-priority', async () => {
     try {
       const cmd = `Remove-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\PriorityControl' -Name 'IRQ8Priority' -Force -ErrorAction Stop`;

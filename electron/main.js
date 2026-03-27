@@ -114,73 +114,73 @@ windowsDebloat.registerIPC();
 
 // ── Pre-warm scan caches (orchestrator) ─────────────────────────────────────
 async function _prewarmScanCaches() {
-  const tasks = [];
-
-  // 1. Pre-warm software updates (winget upgrade scan)
-  tasks.push(
-    (async () => {
-      try {
-        const result = await softwareUpdates.checkSoftwareUpdatesImpl();
-        softwareUpdates.setSoftwareUpdatesCache(result);
-      } catch {}
-    })()
-  );
-
-  // 2. Pre-warm registry display names
-  tasks.push(appInstaller.getRegistryDisplayNames().catch(() => new Set()));
+  // 1. Pre-warm registry display names
+  // Fire and forget since it's very fast
+  appInstaller.getRegistryDisplayNames().catch(() => new Set());
 
   // 3. Pre-warm winget list cache
-  tasks.push(
-    (async () => {
-      try {
-        const { stdout } = await execAsync(
-          'chcp 65001 >nul && winget list --accept-source-agreements 2>nul',
-          { timeout: 30000, windowsHide: true, encoding: 'utf8', shell: 'cmd.exe', maxBuffer: 1024 * 1024 * 5, env: process.env, cwd: process.env.SYSTEMROOT || 'C:\\Windows' }
-        );
-        const rawLines = stdout.split('\n').map(l => {
-          const parts = l.split('\r').map(p => p.trimEnd()).filter(p => p.length > 0);
-          return parts.length > 0 ? parts[parts.length - 1] : '';
-        }).filter(l => l.length > 0);
-        const lines = [];
-        for (const l of rawLines) {
-          if (/^\s+\S/.test(l) && lines.length > 0 && lines[lines.length - 1] !== '') {
-            lines[lines.length - 1] += l;
-          } else { lines.push(l); }
+  windowManager.sendSplashStatus('Loading applications library...');
+  windowManager.sendSplashProgress(60);
+  try {
+    const { stdout } = await execAsync(
+      'chcp 65001 >nul && winget list --accept-source-agreements 2>nul',
+      { timeout: 30000, windowsHide: true, encoding: 'utf8', shell: 'cmd.exe', maxBuffer: 1024 * 1024 * 5, env: process.env, cwd: process.env.SYSTEMROOT || 'C:\\Windows' }
+    );
+    const rawLines = stdout.split('\n').map(l => {
+      const parts = l.split('\r').map(p => p.trimEnd()).filter(p => p.length > 0);
+      return parts.length > 0 ? parts[parts.length - 1] : '';
+    }).filter(l => l.length > 0);
+    const lines = [];
+    for (const l of rawLines) {
+      if (/^\s+\S/.test(l) && lines.length > 0 && lines[lines.length - 1] !== '') {
+        lines[lines.length - 1] += l;
+      } else { lines.push(l); }
+    }
+    const headerIdx = lines.findIndex(l => /Name\s+Id\s+Version/i.test(l));
+    const installedEntries = [];
+    if (headerIdx !== -1) {
+      const headerLine = lines[headerIdx];
+      const idStart = headerLine.search(/\bId\b/i);
+      const versionStart = headerLine.search(/\bVersion\b/i);
+      const dataStart = headerIdx + 2;
+      for (let i = dataStart; i < lines.length; i++) {
+        const line = lines[i];
+        if (line.length < idStart + 2) continue;
+        const rawName = line.substring(0, idStart).trim();
+        const rawId = line.substring(idStart, versionStart > idStart ? versionStart : line.length).trim();
+        if (rawId && rawId !== '---' && rawName) {
+          installedEntries.push({ name: rawName.toLowerCase(), id: rawId.toLowerCase() });
         }
-        const headerIdx = lines.findIndex(l => /Name\s+Id\s+Version/i.test(l));
-        const installedEntries = [];
-        if (headerIdx !== -1) {
-          const headerLine = lines[headerIdx];
-          const idStart = headerLine.search(/\bId\b/i);
-          const versionStart = headerLine.search(/\bVersion\b/i);
-          const dataStart = headerIdx + 2;
-          for (let i = dataStart; i < lines.length; i++) {
-            const line = lines[i];
-            if (line.length < idStart + 2) continue;
-            const rawName = line.substring(0, idStart).trim();
-            const rawId = line.substring(idStart, versionStart > idStart ? versionStart : line.length).trim();
-            if (rawId && rawId !== '---' && rawName) {
-              installedEntries.push({ name: rawName.toLowerCase(), id: rawId.toLowerCase() });
-            }
-          }
-        }
-        appInstaller.setWingetListCache({
-          installedEntries,
-          installedIdSet: new Set(installedEntries.map(e => e.id)),
-          installedNameSet: new Set(installedEntries.map(e => e.name)),
-        });
-      } catch {}
-    })()
-  );
+      }
+    }
+    appInstaller.setWingetListCache({
+      installedEntries,
+      installedIdSet: new Set(installedEntries.map(e => e.id)),
+      installedNameSet: new Set(installedEntries.map(e => e.name)),
+    });
+  } catch {}
 
-  await Promise.allSettled(tasks);
-
-  // 4. Run full check-installed matching and push results to renderer
+  // 4. Match local applications
+  windowManager.sendSplashStatus('Verifying application states...');
+  windowManager.sendSplashProgress(75);
   try {
     const result = await appInstaller.checkInstalledImpl(appInstaller.APP_CATALOG_APPS);
     const win = windowManager.getMainWindow();
     if (win && !win.isDestroyed()) {
       win.webContents.send('appinstall:preloaded', result);
+    }
+  } catch {}
+
+  // 5. Pre-load Windows Debloat components
+  windowManager.sendSplashStatus('Loading Windows features...');
+  windowManager.sendSplashProgress(80);
+  try {
+    const result = await windowsDebloat.handlePreloadAll();
+    if (result && result.success && result.data) {
+      const win = windowManager.getMainWindow();
+      if (win && !win.isDestroyed()) {
+        win.webContents.send('wdebloat:preloaded', result.data);
+      }
     }
   } catch {}
 }
@@ -196,27 +196,34 @@ app.on('ready', async () => {
     });
   }
 
-  windowManager.sendSplashStatus('Starting services...');
+  windowManager.sendSplashStatus('Checking for updates...');
   windowManager.sendSplashProgress(5);
+  try {
+    const result = await softwareUpdates.checkSoftwareUpdatesImpl();
+    softwareUpdates.setSoftwareUpdatesCache(result);
+  } catch {}
+
+  windowManager.sendSplashStatus('Initializing core services...');
+  windowManager.sendSplashProgress(10);
 
   // Enable winget InstallerHashOverride (requires admin)
   if (isElevated) {
     try { execSync('winget settings --enable InstallerHashOverride', { stdio: 'ignore', windowsHide: true, timeout: 10000 }); } catch {}
   }
 
-  windowManager.sendSplashStatus('Initializing hardware monitors...');
+  windowManager.sendSplashStatus('Loading hardware sensors...');
   windowManager.sendSplashProgress(15);
 
   hardwareMonitor.startLHMService();
 
-  windowManager.sendSplashStatus('Starting performance counters...');
+  windowManager.sendSplashStatus('Loading performance metrics...');
   windowManager.sendSplashProgress(25);
 
   hardwareMonitor._startPerfCounterService();
   hardwareMonitor._startDiskRefresh();
   hardwareMonitor._startRamCacheRefresh();
 
-  windowManager.sendSplashStatus('Scanning hardware...');
+  windowManager.sendSplashStatus('Discovering system hardware...');
   windowManager.sendSplashProgress(40);
 
   hardwareInfo.initHardwareInfo();
@@ -225,7 +232,7 @@ app.on('ready', async () => {
     if (hwPromise) await hwPromise;
   } catch {}
 
-  windowManager.sendSplashStatus('Loading interface...');
+  windowManager.sendSplashStatus('Preparing user interface...');
   windowManager.sendSplashProgress(55);
 
   windowManager.createWindow();
@@ -240,12 +247,9 @@ app.on('ready', async () => {
     setTimeout(resolve, 8000);
   });
 
-  windowManager.sendSplashStatus('Scanning installed apps...');
-  windowManager.sendSplashProgress(70);
-
   await prewarmPromise;
 
-  windowManager.sendSplashStatus('Preparing dashboard...');
+  windowManager.sendSplashStatus('Finalizing setup...');
   windowManager.sendSplashProgress(85);
 
   hardwareMonitor._startRealtimePush();

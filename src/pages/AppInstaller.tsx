@@ -19,6 +19,7 @@ import {
   Check,
   LayoutGrid,
   Sparkles,
+  PackageX,
 } from 'lucide-react';
 
 import { useToast } from '../contexts/ToastContext';
@@ -33,7 +34,7 @@ interface InstallProgress {
   percent: number;
 }
 
-type AppTab = 'install' | 'uninstall';
+type AppTab = 'install' | 'uninstall' | 'debloat';
 
 interface AppInstallerProps {
   isActive?: boolean;
@@ -295,6 +296,17 @@ const AppInstaller: React.FC<AppInstallerProps> = ({ isActive = false, activeTab
               <span className="apps-hdr-sw-btn-body">
                 <span className="apps-hdr-sw-btn-title">Uninstall Apps</span>
                 <span className="apps-hdr-sw-btn-sub">Remove &amp; clean up</span>
+              </span>
+            </button>
+            <div className="apps-hdr-sw-sep" />
+            <button
+              className={`apps-hdr-sw-btn apps-hdr-sw-btn--debloat${activeTab === 'debloat' ? ' apps-hdr-sw-btn--on' : ''}`}
+              onClick={() => onTabChange?.('debloat')}
+            >
+              <span className="apps-hdr-sw-btn-icon"><PackageX size={15} strokeWidth={2} /></span>
+              <span className="apps-hdr-sw-btn-body">
+                <span className="apps-hdr-sw-btn-title">Windows Debloat</span>
+                <span className="apps-hdr-sw-btn-sub">System cleanup</span>
               </span>
             </button>
           </div>

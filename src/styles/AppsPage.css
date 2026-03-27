@@ -113,6 +113,15 @@
 .apps-hdr-sw-btn--uninstall.apps-hdr-sw-btn--on .apps-hdr-sw-btn-sub { color: rgba(248, 113, 113, 0.5); }
 .apps-hdr-sw-btn--uninstall.apps-hdr-sw-btn--on::after { background: #ef4444; }
 
+/* Active: Debloat — sky */
+.apps-hdr-sw-btn--debloat.apps-hdr-sw-btn--on {
+  background: rgba(14, 165, 233, 0.08);
+}
+.apps-hdr-sw-btn--debloat.apps-hdr-sw-btn--on .apps-hdr-sw-btn-icon { opacity: 1; color: #38bdf8; }
+.apps-hdr-sw-btn--debloat.apps-hdr-sw-btn--on .apps-hdr-sw-btn-title { color: #38bdf8; }
+.apps-hdr-sw-btn--debloat.apps-hdr-sw-btn--on .apps-hdr-sw-btn-sub { color: rgba(56, 189, 248, 0.5); }
+.apps-hdr-sw-btn--debloat.apps-hdr-sw-btn--on::after { background: #0ea5e9; }
+
 /* ════════════════════════════════
    TAB CONTENT
 ════════════════════════════════ */

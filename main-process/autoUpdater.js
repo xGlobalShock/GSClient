@@ -23,7 +23,6 @@ function initAutoUpdater() {
 
   autoUpdater.on('checking-for-update', () => {
     sendUpdateStatus({ event: 'checking' });
-    windowManager.sendSplashStatus('Checking for updates...');
   });
 
   autoUpdater.on('update-available', (info) => {

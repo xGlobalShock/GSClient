@@ -10,7 +10,22 @@ export interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
   {
-    version: '1.4.5',
+    version: '1.4.7',
+    date: '2026-03-27',
+    highlights: 'Windows Debloat System Overhaul & Startup Optimizations',
+    changes: [
+      { type: 'improved', text: 'Completely overhauled the Windows Debloat system with pre-warmed background loading to eliminate UI freezing and loading spinners.' },
+      { type: 'improved', text: 'Merged the Windows Debloat page into the Apps Manager to create a unified ecosystem (Install, Uninstall, Debloat) with seamless tab switching.' },
+      { type: 'improved', text: 'Consolidated PowerShell status checks into a single, highly optimized execution context to drastically reduce CPU overhead during application boot.' },
+      { type: 'new', text: 'Replaced reactive loading statuses with a professional, granular splash screen sequence detailing exact startup steps.' },
+      { type: 'new', text: 'Redesigned Windows Debloat badges with clean, color-coded neon indicators and added safety tooltips for non-reinstallable system apps.' },
+      { type: 'new', text: 'Introduced an interactive confirmation modal with strict warnings when attempting to remove non-reinstallable Windows capabilities.' },
+      { type: 'new', text: 'Added a new Games registry tweak to optimize the Multimedia/SystemProfile/Tasks/Games priority value for improved performance.' },
+      { type: 'improved', text: 'Refined Game Library functionality with a new toggle for the video settings page and resolved unhandled TypeScript errors.' },
+    ],
+  },
+  {
+    version: '1.4.6',
     date: '2026-03-27',
     highlights: 'Cleanup toolkit and PC tweak support improvements',
     changes: [

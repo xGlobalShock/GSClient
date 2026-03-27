@@ -10,6 +10,9 @@ import {
   Trash2,
   AlertTriangle,
   Lock,
+  Check,
+  AlertOctagon,
+  LayoutGrid,
 } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import { useToast } from '../contexts/ToastContext';
@@ -21,6 +24,7 @@ type DebloatSource = 'apps' | 'capabilities' | 'features';
 interface DebloatItem {
   id: string;
   name: string;
+  description?: string;
   source: DebloatSource;
   rawName?: string;
   packageFamilyName?: string;
@@ -28,30 +32,51 @@ interface DebloatItem {
   installed: boolean;
   nonRemovable?: boolean;
   isCatalog?: boolean;
+  canBeReinstalled?: boolean;
   state?: string;
 }
 
 // no longer using tabs replacement
 
 
+type AppTab = 'install' | 'uninstall' | 'debloat';
+
 interface WindowsDebloatProps {
   isActive?: boolean;
+  activeTab?: AppTab;
+  onTabChange?: (tab: AppTab) => void;
 }
 
 /* ─── Component ──────────────────────────────────────────────────────────── */
-const WindowsDebloat: React.FC<WindowsDebloatProps> = ({ isActive = false }) => {
+const WindowsDebloat: React.FC<WindowsDebloatProps> = ({ isActive = false, activeTab = 'debloat', onTabChange }) => {
   const { addToast } = useToast();
 
-  const IS_COMING_SOON = true; // LOCK / UNLOCK PAGE
+  const IS_COMING_SOON = false; // LOCK / UNLOCK PAGE
 
   /* ── State ────────────────────────────────────────────────────────────── */
   const [items, setItems] = useState<DebloatItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [progressMsg, setProgressMsg] = useState('');
+  const [progressCurrent, setProgressCurrent] = useState(0);
+  const [progressTotal, setProgressTotal] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [isElevated, setIsElevated] = useState(true); // assume elevated; update if IPC says otherwise
+
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    onCancel: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+    onCancel: () => {}
+  });
 
   const hasLoaded = React.useRef<Record<DebloatSource, boolean>>({ apps: false, capabilities: false, features: false });
 
@@ -110,23 +135,63 @@ const WindowsDebloat: React.FC<WindowsDebloatProps> = ({ isActive = false }) => 
     }
   }, []);
 
+  const hydrateFromPreloaded = useCallback((data: any) => {
+    if (!data) return;
+    const { apps, caps, feats } = data;
+    const merged: DebloatItem[] = [];
+
+    if (apps?.success) {
+      merged.push(...(apps.items || []).map((i: any) => ({ ...i, source: 'apps' as DebloatSource })));
+    } else if (apps?.error && (apps.error.includes('privilege') || apps.error.includes('elevation'))) {
+      setIsElevated(false);
+    }
+    if (caps?.success) {
+      merged.push(...(caps.items || []).map((i: any) => ({ ...i, source: 'capabilities' as DebloatSource })));
+    }
+    if (feats?.success) {
+      merged.push(...(feats.items || []).map((i: any) => ({ ...i, source: 'features' as DebloatSource })));
+    }
+
+    if (merged.length > 0) setItems(prev => merged);
+    
+    if (apps?.success) hasLoaded.current.apps = true;
+    if (caps?.success) hasLoaded.current.capabilities = true;
+    if (feats?.success) hasLoaded.current.features = true;
+  }, []);
+
   /* ── Load on activate only ── */
   useEffect(() => {
     if (!isActive) return;
     if (!hasLoaded.current.apps || !hasLoaded.current.capabilities || !hasLoaded.current.features) {
-      fetchItems();
+      const preloaded = (window as any).__WDEBLOAT_PRELOADED__;
+      if (preloaded) {
+        hydrateFromPreloaded(preloaded);
+        (window as any).__WDEBLOAT_PRELOADED__ = null; // Consume the global payload
+      } else {
+        fetchItems();
+      }
     }
-  }, [isActive]);
+  }, [isActive, fetchItems, hydrateFromPreloaded]);
 
-  /* ── Listen for progress events ── */
+  /* ── Listen for events ── */
   useEffect(() => {
     if (!window.electron?.ipcRenderer) return;
-    const unsub = window.electron.ipcRenderer.on('wdebloat:progress', (data: any) => {
+    
+    const unsubProgress = window.electron.ipcRenderer.on('wdebloat:progress', (data: any) => {
       setProgressMsg(data?.msg || '');
+      setProgressCurrent(data?.current || 0);
+      setProgressTotal(data?.total || 0);
     });
-    return () => { if (unsub) unsub(); };
-  }, []);
 
+    const unsubPreloaded = window.electron.ipcRenderer.on('wdebloat:preloaded', (data: any) => {
+      hydrateFromPreloaded(data);
+    });
+
+    return () => { 
+      if (unsubProgress) unsubProgress();
+      if (unsubPreloaded) unsubPreloaded();
+    };
+  }, [hydrateFromPreloaded]);
 
   /* ── Filtered items ── */
   const filtered = useMemo(() => {
@@ -166,10 +231,7 @@ const WindowsDebloat: React.FC<WindowsDebloatProps> = ({ isActive = false }) => 
     filtered.filter(i => !i.nonRemovable).length > 0 &&
     filtered.filter(i => !i.nonRemovable).every(i => selected.has(i.id));
 
-  /* ── Uninstall selected ── */
-  const handleRemoveSelected = async () => {
-    if (selected.size === 0) return;
-    const ids = Array.from(selected);
+  const executeRemoval = async (ids: string[]) => {
     const appIds: string[] = [];
     const capIds: string[] = [];
     const featIds: string[] = [];
@@ -183,6 +245,8 @@ const WindowsDebloat: React.FC<WindowsDebloatProps> = ({ isActive = false }) => 
 
     setBusy(true);
     setProgressMsg('Starting removal…');
+    setProgressCurrent(0);
+    setProgressTotal(ids.length);
     try {
       const allResults: any[] = [];
       if (appIds.length > 0) {
@@ -202,7 +266,8 @@ const WindowsDebloat: React.FC<WindowsDebloatProps> = ({ isActive = false }) => 
       if (failed.length === 0) {
         addToast(`Removed ${ids.length} item${ids.length !== 1 ? 's' : ''} successfully`, 'success');
       } else {
-        addToast(`Removed ${ids.length - failed.length}/${ids.length}. ${failed.length} failed.`, 'info');
+        const firstErr = failed[0]?.error ? `: ${failed[0].error}` : '';
+        addToast(`Removed ${ids.length - failed.length}/${ids.length}. ${failed.length} failed${firstErr}`, 'error');
       }
       await fetchItems();
     } catch (err: any) {
@@ -210,7 +275,38 @@ const WindowsDebloat: React.FC<WindowsDebloatProps> = ({ isActive = false }) => 
     } finally {
       setBusy(false);
       setProgressMsg('');
+      setProgressCurrent(0);
+      setProgressTotal(0);
     }
+  };
+
+  /* ── Uninstall selected ── */
+  const handleRemoveSelected = async () => {
+    if (selected.size === 0) return;
+    const ids = Array.from(selected);
+
+    const nonReinstallable = ids
+      .map(id => items.find(i => i.id === id))
+      .filter((i) => i && i.canBeReinstalled === false);
+    
+    if (nonReinstallable.length > 0) {
+      const names = nonReinstallable.map(i => i!.name).join(', ');
+      setConfirmModal({
+        isOpen: true,
+        title: 'Permanent Removal Warning',
+        message: `The following items cannot be reinstalled once removed:\n\n${names}\n\nAre you sure you want to permanently remove them?`,
+        onConfirm: () => {
+          setConfirmModal(prev => ({ ...prev, isOpen: false }));
+          executeRemoval(ids);
+        },
+        onCancel: () => {
+          setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        }
+      });
+      return;
+    }
+
+    executeRemoval(ids);
   };
 
   /* ── Install selected ── */
@@ -230,6 +326,8 @@ const WindowsDebloat: React.FC<WindowsDebloatProps> = ({ isActive = false }) => 
 
     setBusy(true);
     setProgressMsg('Starting installation…');
+    setProgressCurrent(0);
+    setProgressTotal(ids.length);
     try {
       const allResults: any[] = [];
       if (appIds.length > 0) {
@@ -249,7 +347,8 @@ const WindowsDebloat: React.FC<WindowsDebloatProps> = ({ isActive = false }) => 
       if (failed.length === 0) {
         addToast(`Installed ${ids.length} item${ids.length !== 1 ? 's' : ''} successfully`, 'success');
       } else {
-        addToast(`Installed ${ids.length - failed.length}/${ids.length}. ${failed.length} failed.`, 'info');
+        const firstErr = failed[0]?.error ? `: ${failed[0].error}` : '';
+        addToast(`Installed ${ids.length - failed.length}/${ids.length}. ${failed.length} failed${firstErr}`, 'error');
       }
       await fetchItems();
     } catch (err: any) {
@@ -257,6 +356,8 @@ const WindowsDebloat: React.FC<WindowsDebloatProps> = ({ isActive = false }) => 
     } finally {
       setBusy(false);
       setProgressMsg('');
+      setProgressCurrent(0);
+      setProgressTotal(0);
     }
   };
 
@@ -275,34 +376,45 @@ const WindowsDebloat: React.FC<WindowsDebloatProps> = ({ isActive = false }) => 
 
   const renderItemCard = (item: DebloatItem) => {
     const isSelected = selected.has(item.id);
-    const dotClass = item.installed ? 'wd-dot wd-dot--on' : 'wd-dot wd-dot--off';
+    const warnNoReinstall = item.installed && item.canBeReinstalled === false;
+    const dotClass = item.installed
+      ? (warnNoReinstall ? 'wd-dot wd-dot--warn' : 'wd-dot wd-dot--on')
+      : 'wd-dot wd-dot--off';
     const cardClass = ['wd-card', isSelected ? 'wd-card--selected' : '', item.nonRemovable ? 'wd-card--non-removable' : ''].filter(Boolean).join(' ');
 
-    const badgeClass = item.installed ? 'wd-card-badge wd-card-badge--enabled' : 'wd-card-badge wd-card-badge--disabled';
-    let badgeText = 'Unknown';
-    if (item.source === 'apps') {
-      badgeText = item.installed ? 'Installed' : item.isCatalog ? 'Reinstallable' : 'Not Installed';
-    } else if (item.source === 'features') {
-      badgeText = item.installed ? 'Enabled' : 'Disabled';
-    } else {
-      badgeText = item.installed ? 'Installed' : 'Not Installed';
-    }
+    const isNoReinstall = !item.installed && item.canBeReinstalled === false;
+    const badgeClass = item.installed ? 'wd-card-badge wd-card-badge--enabled' : isNoReinstall ? 'wd-card-badge wd-card-badge--danger' : 'wd-card-badge wd-card-badge--disabled';
+
+    const installedText = item.source === 'features' ? 'Enabled' : 'Installed';
+    const notInstalledText = item.source === 'features' ? 'Disabled' : 'Not Installed';
+    const removeWarnText = item.source === 'features' ? 'disabled' : 'removed';
+    const permText = item.source === 'features' ? 'Permanently Disabled (Cannot re-enable)' : 'Permanently Removed (Cannot reinstall)';
+
+    const badgeTooltip = item.installed
+      ? (warnNoReinstall ? `⚠ Cannot be reinstalled once ${removeWarnText}` : installedText)
+      : (isNoReinstall ? permText : notInstalledText);
+
+    const badgeIcon = item.installed
+      ? <Check size={10} strokeWidth={3} />
+      : isNoReinstall
+        ? <AlertOctagon size={10} />
+        : <Download size={10} strokeWidth={2.5} />;
 
     return (
       <div
         key={item.id}
         className={cardClass}
         onClick={() => toggleItem(item.id, item.nonRemovable)}
-        title={item.nonRemovable ? 'This component cannot be removed' : undefined}
+        title={item.nonRemovable ? 'This component cannot be removed' : warnNoReinstall ? `⚠ Cannot be reinstalled once ${item.source === 'features' ? 'disabled' : 'removed'}` : undefined}
       >
         <div className="wd-card-cb" />
         <span className={dotClass} />
         <div className="wd-card-info">
-          <span className="wd-card-name">{item.name}</span>
-          {item.source === 'apps' && item.version && <span className="wd-card-sub">v{item.version}</span>}
-          {item.source !== 'apps' && item.rawName && item.rawName !== item.name && <span className="wd-card-sub" title={item.rawName}>{item.rawName}</span>}
+          <span className="wd-card-name" title={item.name}>{item.name}</span>
         </div>
-        <span className={badgeClass}>{badgeText}</span>
+        <div className={badgeClass} title={badgeTooltip}>
+          {badgeIcon}
+        </div>
       </div>
     );
   };
@@ -329,18 +441,7 @@ const WindowsDebloat: React.FC<WindowsDebloatProps> = ({ isActive = false }) => 
       transition={{ duration: 0.18 }}
     >
       {/* ── Page Header ── */}
-      <PageHeader
-        icon={<PackageX size={16} />}
-        title="Windows Apps & Features"
-        stat={
-          !loading && items.length > 0 ? (
-            <span style={{ fontSize: 10, color: 'rgba(145,168,195,0.45)', display: 'flex', gap: 6 }}>
-              <span style={{ color: '#34d399' }}>{installedCount} installed</span>
-              {notInstalledCount > 0 && <span>· {notInstalledCount} removed</span>}
-            </span>
-          ) : undefined
-        }
-      />
+      <PageHeader icon={<LayoutGrid size={16} />} title="Apps Manager" />
 
       {IS_COMING_SOON && (
         <div className="wd-lock-overlay">
@@ -362,9 +463,7 @@ const WindowsDebloat: React.FC<WindowsDebloatProps> = ({ isActive = false }) => 
           </div>
         )}
 
-        <div className="wd-tabs">{/* tabs removed; integrated sections below */}</div>
-
-        {/* ── Toolbar ── */}
+        {/* ── Toolbar with tab switcher ── */}
         <div className="wd-toolbar">
           <div className="wd-toolbar-l">
             {/* Search */}
@@ -372,7 +471,7 @@ const WindowsDebloat: React.FC<WindowsDebloatProps> = ({ isActive = false }) => 
               <Search size={12} className="wd-search-icon" />
               <input
                 className="wd-search"
-                placeholder="Search Windows apps, capabilities, and features…"
+                placeholder="Search apps, capabilities, features…"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 disabled={loading || busy}
@@ -388,6 +487,43 @@ const WindowsDebloat: React.FC<WindowsDebloatProps> = ({ isActive = false }) => 
             {busy && progressMsg && (
               <span className="wd-progress-msg">{progressMsg}</span>
             )}
+          </div>
+
+          <div className="wd-toolbar-c">
+            <div className="apps-hdr-sw">
+              <button
+                className={`apps-hdr-sw-btn apps-hdr-sw-btn--install${activeTab === 'install' ? ' apps-hdr-sw-btn--on' : ''}`}
+                onClick={() => onTabChange?.('install')}
+              >
+                <span className="apps-hdr-sw-btn-icon"><Download size={15} strokeWidth={2} /></span>
+                <span className="apps-hdr-sw-btn-body">
+                  <span className="apps-hdr-sw-btn-title">Install Apps</span>
+                  <span className="apps-hdr-sw-btn-sub">Deploy software</span>
+                </span>
+              </button>
+              <div className="apps-hdr-sw-sep" />
+              <button
+                className={`apps-hdr-sw-btn apps-hdr-sw-btn--uninstall${activeTab === 'uninstall' ? ' apps-hdr-sw-btn--on' : ''}`}
+                onClick={() => onTabChange?.('uninstall')}
+              >
+                <span className="apps-hdr-sw-btn-icon"><Trash2 size={15} strokeWidth={2} /></span>
+                <span className="apps-hdr-sw-btn-body">
+                  <span className="apps-hdr-sw-btn-title">Uninstall Apps</span>
+                  <span className="apps-hdr-sw-btn-sub">Remove &amp; clean up</span>
+                </span>
+              </button>
+              <div className="apps-hdr-sw-sep" />
+              <button
+                className={`apps-hdr-sw-btn apps-hdr-sw-btn--debloat${activeTab === 'debloat' ? ' apps-hdr-sw-btn--on' : ''}`}
+                onClick={() => onTabChange?.('debloat')}
+              >
+                <span className="apps-hdr-sw-btn-icon"><PackageX size={15} strokeWidth={2} /></span>
+                <span className="apps-hdr-sw-btn-body">
+                  <span className="apps-hdr-sw-btn-title">Windows Debloat</span>
+                  <span className="apps-hdr-sw-btn-sub">System cleanup</span>
+                </span>
+              </button>
+            </div>
           </div>
 
           <div className="wd-toolbar-r">
@@ -432,6 +568,25 @@ const WindowsDebloat: React.FC<WindowsDebloatProps> = ({ isActive = false }) => 
             </button>
           </div>
         </div>
+
+        {/* ── Progress Overlay ── */}
+        {busy && (
+          <div className="wd-progress-overlay">
+            <div className="wd-progress-bar-track">
+              <div
+                className="wd-progress-bar-fill"
+                style={{ width: progressTotal > 0 ? `${(progressCurrent / progressTotal) * 100}%` : '0%' }}
+              />
+            </div>
+            <div className="wd-progress-detail">
+              <Loader2 size={12} className="wd-spin" />
+              <span className="wd-progress-text">{progressMsg}</span>
+              {progressTotal > 0 && (
+                <span className="wd-progress-count">{progressCurrent} / {progressTotal}</span>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* ── Selection Bar ── */}
         <div className="wd-sel-bar">
@@ -514,6 +669,42 @@ const WindowsDebloat: React.FC<WindowsDebloatProps> = ({ isActive = false }) => 
             )}
           </AnimatePresence>
         </div>
+
+        {/* ── Confirm Modal ── */}
+        <AnimatePresence>
+          {confirmModal.isOpen && (
+            <div className="wd-modal-overlay">
+              <motion.div
+                className="wd-modal"
+                initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                transition={{ duration: 0.2, ease: "easeOut" }}
+              >
+                <div className="wd-modal-header">
+                  <AlertTriangle size={18} className="wd-modal-icon" />
+                  <span>{confirmModal.title}</span>
+                </div>
+                <div className="wd-modal-body">
+                  {confirmModal.message.split('\n').map((line, i) => (
+                    <React.Fragment key={i}>
+                      {line}
+                      <br />
+                    </React.Fragment>
+                  ))}
+                </div>
+                <div className="wd-modal-footer">
+                  <button className="wd-btn wd-btn--cancel" onClick={confirmModal.onCancel}>
+                    Cancel
+                  </button>
+                  <button className="wd-btn wd-btn--danger" onClick={confirmModal.onConfirm}>
+                    Permanently Remove
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
       </div>
     </motion.div>
   );

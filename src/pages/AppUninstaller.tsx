@@ -20,6 +20,7 @@ import {
   ShieldCheck,
   Check,
   LayoutGrid,
+  PackageX,
 } from 'lucide-react';
 
 import { useToast } from '../contexts/ToastContext';
@@ -51,7 +52,7 @@ interface LeftoverItem {
 type Phase = 'list' | 'confirm' | 'uninstalling' | 'scanning' | 'leftovers' | 'deleting' | 'done';
 type ScanMode = 'safe' | 'moderate' | 'advanced';
 
-type AppTab = 'install' | 'uninstall';
+type AppTab = 'install' | 'uninstall' | 'debloat';
 
 interface AppUninstallerProps {
   isActive?: boolean;
@@ -514,6 +515,17 @@ const AppUninstaller: React.FC<AppUninstallerProps> = ({ isActive = false, activ
               <span className="apps-hdr-sw-btn-body">
                 <span className="apps-hdr-sw-btn-title">Uninstall Apps</span>
                 <span className="apps-hdr-sw-btn-sub">Remove &amp; clean up</span>
+              </span>
+            </button>
+            <div className="apps-hdr-sw-sep" />
+            <button
+              className={`apps-hdr-sw-btn apps-hdr-sw-btn--debloat${activeTab === 'debloat' ? ' apps-hdr-sw-btn--on' : ''}`}
+              onClick={() => onTabChange?.('debloat')}
+            >
+              <span className="apps-hdr-sw-btn-icon"><PackageX size={15} strokeWidth={2} /></span>
+              <span className="apps-hdr-sw-btn-body">
+                <span className="apps-hdr-sw-btn-title">Windows Debloat</span>
+                <span className="apps-hdr-sw-btn-sub">System cleanup</span>
               </span>
             </button>
           </div>

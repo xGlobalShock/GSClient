@@ -112,4 +112,16 @@ export const performanceTweaks: PerformanceTweak[] = [
     registryKey: 'GameDVR_Enabled',
     registryValue: 0,
   },
+  {
+    id: 'games-priority',
+    title: 'Games Priority',
+    icon: regeditIcon,
+    category: 'Games Priority',
+    description: 'Increases the multimedia class scheduler priority for games to 6, giving games more CPU priority for smoother gameplay.',
+    buttonText: 'Apply Tweak',
+    color: '#0074D9',
+    registryPath: 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile\\Tasks\\Games',
+    registryKey: 'Priority',
+    registryValue: 6,
+  },
 ];

@@ -11,7 +11,6 @@ import OBSPresets from './pages/OBSPresets';
 import Network from './pages/Network';
 import SoftwareUpdates from './pages/SoftwareUpdates';
 import AppsPage from './pages/AppsPage';
-import WindowsDebloat from './pages/WindowsDebloat';
 import { ToastProvider } from './contexts/ToastContext';
 import { ToastContainer } from './components/ToastContainer';
 import { useRealtimeHardware } from './hooks/useRealtimeHardware';
@@ -146,6 +145,11 @@ function App() {
       unsub = window.electron.ipcRenderer.on('hw-info-update', (partial: Partial<HardwareInfo>) => {
         setHardwareInfo(prev => prev ? { ...prev, ...partial } : prev);
       });
+      
+      // Catch pre-loaded Windows Debloat data dispatched during splash screen
+      window.electron.ipcRenderer.on('wdebloat:preloaded', (data: any) => {
+        (window as any).__WDEBLOAT_PRELOADED__ = data;
+      });
     }
     return () => { unsub?.(); };
   }, []);
@@ -185,9 +189,6 @@ function App() {
         </div>
         <div style={pageStyle('apps')}>
           <AppsPage isActive={currentPage === 'apps'} />
-        </div>
-        <div style={pageStyle('windowsDebloat')}>
-          <WindowsDebloat isActive={currentPage === 'windowsDebloat'} />
         </div>
       </>
     );
