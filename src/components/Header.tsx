@@ -157,6 +157,7 @@ const Header: React.FC = React.memo(() => {
   const [hasUnseenDevUpdates, setHasUnseenDevUpdates] = useState(false);
   const [devUpdates, setDevUpdates] = useState<DevUpdate[]>(devUpdatesDefault);
   const [hasGitHubUpdates, setHasGitHubUpdates] = useState(false);
+  const [appVersion, setAppVersion] = useState<string>('');
   const popupRef = useRef<HTMLDivElement>(null);
   const whatsNewRef = useRef<HTMLDivElement>(null);
   const devUpdatesRef = useRef<HTMLDivElement>(null);
@@ -213,6 +214,9 @@ const Header: React.FC = React.memo(() => {
 
     // Check once on mount
     updater.checkForUpdates().catch(() => {});
+    
+    // Fetch version
+    updater.getVersion().then(setAppVersion).catch(() => {});
   }, []);
 
   // Close popup on outside click
@@ -392,7 +396,10 @@ const description = release.body?.trim() || undefined;
   return (
     <header className="header">
       <div className="header-left header-drag-region">
-        <h1 className="header-title">GS Center</h1>
+        <div className="header-title-row">
+          <h1 className="header-title">GS Center</h1>
+          {appVersion && <span className="header-version">v{appVersion}</span>}
+        </div>
         <p className="header-subtitle">System Performance Control Center</p>
       </div>
 

@@ -10,6 +10,17 @@ export interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
   {
+    version: '1.4.9',
+    date: '2026-03-28',
+    highlights: 'Global UI Standardization & Layout Refinement',
+    changes: [
+      { type: 'improved', text: 'Standardized vertical header alignment across all application modules.' },
+      { type: 'improved', text: 'Compacted Performance Tweak cards for high-density information display.' },
+      { type: 'fixed', text: 'Normalized Windows Debloat UI and search bar to match the Apps Manager ecosystem.' },
+      { type: 'new', text: 'Added dynamic application version display to the main header.' },
+    ],
+  },
+  {
     version: '1.4.8',
     date: '2026-03-27',
     highlights: 'New Splash Screen and Minor Bug Fixes',

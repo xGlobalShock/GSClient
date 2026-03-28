@@ -25,6 +25,12 @@
   z-index: 1;
 }
 
+.header-title-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
 .header-title {
   font-size: 18px;
   font-weight: 900;
@@ -35,6 +41,20 @@
   background-clip: text;
   margin: 0;
 }
+
+.header-version {
+  font-size: 8.5px;
+  font-weight: 700;
+  color: rgba(0, 242, 255, 0.45);
+  background-color: rgba(0, 242, 255, 0.04);
+  padding: 1px 5px;
+  margin-left: -5px;
+  border: 1px solid rgba(0, 242, 255, 0.1);
+  border-radius: 4px;
+  letter-spacing: 1px;
+  margin-top: -2px;
+}
+
 
 .header-subtitle {
   font-size: 10px;
@@ -92,9 +112,12 @@
 }
 
 @keyframes badge-pulse {
-  0%, 100% {
+
+  0%,
+  100% {
     box-shadow: 0 0 5px rgba(255, 68, 68, 0.5);
   }
+
   50% {
     box-shadow: 0 0 10px rgba(255, 68, 68, 0.8);
   }
@@ -188,13 +211,27 @@
 }
 
 @keyframes update-dot-pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.5; transform: scale(0.8); }
+
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.5;
+    transform: scale(0.8);
+  }
 }
 
 @keyframes update-icon-spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .update-spin {
@@ -220,8 +257,15 @@
 }
 
 @keyframes update-popup-in {
-  from { opacity: 0; transform: translateY(-6px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .update-popup-header {
