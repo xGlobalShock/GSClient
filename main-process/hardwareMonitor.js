@@ -566,18 +566,13 @@ function _parsePingOutput(stdout) {
   let time = null;
   let packetLoss = null;
 
-  if (isWinPing) {
-    const avgMatch = text.match(/Average\s*=\s*(\d+)\s*ms/i);
-    if (avgMatch) time = parseInt(avgMatch[1], 10);
-    const lossMatch = text.match(/Lost\s*=\s*\d+\s*\((\d+)%/i);
-    if (lossMatch) packetLoss = parseInt(lossMatch[1], 10);
-  } else {
-    const avgMatch = text.match(/rtt\s+min\/avg\/max\/mdev\s*=\s*[\d.]+\/([\d.]+)\//i)
-      || text.match(/round-trip\s+min\/avg\/max\/stddev\s*=\s*[\d.]+\/([\d.]+)\//i);
-    if (avgMatch) time = Math.round(parseFloat(avgMatch[1]));
-    const lossMatch = text.match(/,\s*([\d.]+)%\s*packet loss/i);
-    if (lossMatch) packetLoss = Math.round(parseFloat(lossMatch[1]));
-  }
+  // Language/OS agnostic latency parsing (ms or Cyrillic мс)
+  const timeMatch = text.match(/[=<]\s*([\d.]+)\s*(?:ms|мс)/i);
+  if (timeMatch) time = Math.round(parseFloat(timeMatch[1]));
+
+  // Packet loss parsing (e.g. 0% loss, 0% perte, 0.0% packet loss)
+  const lossMatch = text.match(/([\d.]+)\s*%/);
+  if (lossMatch) packetLoss = Math.round(parseFloat(lossMatch[1]));
 
   return { time, packetLoss };
 }

@@ -24,10 +24,9 @@ async function execPing(host) {
       }
 
       const output = stdout.toString();
-      let match = output.match(/time[=<]\s*([\d.]+)\s*ms/i);
-      if (!match && !isWin) {
-        match = output.match(/time=([\d.]+)\s*ms/i);
-      }
+      // Use language-agnostic regex for ping response time (ms or Cyrillic мс)
+      // Matches: "=14ms", "<1 ms", "=14 мс", etc.
+      let match = output.match(/[=<]\s*([\d.]+)\s*(?:ms|мс)/i);
 
       if (match) {
         const ms = Math.round(parseFloat(match[1]));
