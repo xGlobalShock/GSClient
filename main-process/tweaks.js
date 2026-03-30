@@ -35,7 +35,12 @@ function ChkReg($id, $path, $name) {
 ChkReg 'irq' 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\PriorityControl' 'IRQ8Priority'
 ChkReg 'net' 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\NDIS\\Parameters' 'ProcessorThrottleMode'
 ChkReg 'gpu' 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\GraphicsDrivers' 'HwSchMode'
+ChkReg 'tdr' 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\GraphicsDrivers' 'TdrLevel'
+ChkReg 'gdrvpolicy' 'HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\GameDVR' 'AllowGameDVR'
+ChkReg 'appcap' 'HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\GameDVR' 'AppCaptureEnabled'
+ChkReg 'dwm-overlay-test' 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\Dwm' 'OverlayTestMode'
 ChkReg 'fse' 'HKCU:\\System\\GameConfigStore' 'GameDVR_FSEBehaviorMonitorEnabled'
+ChkReg 'fse-mode' 'HKCU:\\System\\GameConfigStore' 'GameDVR_FSEBehaviorMode'
 ChkReg 'usb' 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\USB' 'DisableSelectiveSuspend'
 ChkReg 'dvr' 'HKCU:\\System\\GameConfigStore' 'GameDVR_Enabled'
 ChkReg 'w32' 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\PriorityControl' 'Win32PrioritySeparation'
@@ -160,6 +165,57 @@ function registerIPC() {
     }
   });
 
+  ipcMain.handle('tweak:apply-tdr-level', async () => {
+    try {
+      const cmd = `If (-not (Test-Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\GraphicsDrivers')) { New-Item -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\GraphicsDrivers' -Force | Out-Null }; Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\GraphicsDrivers' -Name 'TdrLevel' -Value 0 -Type DWord -Force; Write-Host 'TdrLevel applied'`;
+      await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${cmd}"`, { shell: true });
+      _tweakCheckCache = null;
+      return { success: true, message: 'TdrLevel tweak applied successfully' };
+    } catch (error) {
+      return { success: false, message: `Error: ${error.message}` };
+    }
+  });
+  ipcMain.handle('tweak:apply-gdrv-policy', async () => {
+    try {
+      const cmd = `If (-not (Test-Path 'HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\GameDVR')) { New-Item -Path 'HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\GameDVR' -Force | Out-Null }; Set-ItemProperty -Path 'HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\GameDVR' -Name 'AllowGameDVR' -Value 0 -Type DWord -Force; $val = (Get-ItemProperty -Path 'HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\GameDVR' -Name 'AllowGameDVR' -ErrorAction Stop).AllowGameDVR; if ($val -ne 0) { throw 'AllowGameDVR value verification failed'; }`;      await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${cmd}"`, { shell: true });
+      _tweakCheckCache = null;
+      return { success: true, message: 'AllowGameDVR policy tweak applied successfully' };
+    } catch (error) {
+      return { success: false, message: `Error applying AllowGameDVR policy: ${error.message}` };
+    }
+  });
+
+  ipcMain.handle('tweak:apply-appcapture-disabled', async () => {
+    try {
+      const cmd = `If (-not (Test-Path 'HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\GameDVR')) { New-Item -Path 'HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\GameDVR' -Force | Out-Null }; Set-ItemProperty -Path 'HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\GameDVR' -Name 'AppCaptureEnabled' -Value 0 -Type DWord -Force; $val = (Get-ItemProperty -Path 'HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\GameDVR' -Name 'AppCaptureEnabled' -ErrorAction Stop).AppCaptureEnabled; if ($val -ne 0) { throw 'AppCaptureEnabled value verification failed'; }`;
+      await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${cmd}"`, { shell: true });
+      _tweakCheckCache = null;
+      return { success: true, message: 'AppCaptureEnabled tweak applied successfully' };
+    } catch (error) {
+      return { success: false, message: `Error applying AppCaptureEnabled tweak: ${error.message}` };
+    }
+  });
+  ipcMain.handle('tweak:apply-fse-behavior-mode', async () => {
+    try {
+      const cmd = `If (-not (Test-Path 'HKCU:\\System\\GameConfigStore')) { New-Item -Path 'HKCU:\\System\\GameConfigStore' -Force | Out-Null }; Set-ItemProperty -Path 'HKCU:\\System\\GameConfigStore' -Name 'GameDVR_FSEBehaviorMode' -Value 2 -Type DWord -Force; $val = (Get-ItemProperty -Path 'HKCU:\\System\\GameConfigStore' -Name 'GameDVR_FSEBehaviorMode' -ErrorAction Stop).GameDVR_FSEBehaviorMode; if ($val -ne 2) { throw 'GameDVR_FSEBehaviorMode value verification failed'; }`;
+      await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${cmd}"`, { shell: true });
+      _tweakCheckCache = null;
+      return { success: true, message: 'Fullscreen Optimization system tweak applied successfully' };
+    } catch (error) {
+      return { success: false, message: `Error applying fullscreen optimization system tweak: ${error.message}` };
+    }
+  });
+
+  ipcMain.handle('tweak:apply-overlay-test-mode', async () => {
+    try {
+      const cmd = `If (-not (Test-Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\Dwm')) { New-Item -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\Dwm' -Force | Out-Null }; Set-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\Dwm' -Name 'OverlayTestMode' -Value 5 -Type DWord -Force; $val = (Get-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\Dwm' -Name 'OverlayTestMode' -ErrorAction Stop).OverlayTestMode; if ($val -ne 5) { throw 'OverlayTestMode value verification failed'; }`;
+      await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${cmd}"`, { shell: true });
+      _tweakCheckCache = null;
+      return { success: true, message: 'OverlayTestMode tweak applied successfully' };
+    } catch (error) {
+      return { success: false, message: `Error applying OverlayTestMode tweak: ${error.message}` };
+    }
+  });
   ipcMain.handle('tweak:apply-fullscreen-optimization', async () => {
     try {
       const cmd = `If (-not (Test-Path 'HKCU:\\System\\GameConfigStore')) { New-Item -Path 'HKCU:\\System\\GameConfigStore' -Force | Out-Null }; Set-ItemProperty -Path 'HKCU:\\System\\GameConfigStore' -Name 'GameDVR_FSEBehaviorMonitorEnabled' -Value 0 -Type DWord -Force; Write-Host 'Fullscreen Optimization applied'`;
@@ -231,6 +287,30 @@ function registerIPC() {
     catch (error) { return { applied: false, exists: false, value: null, error: error.message || String(error) }; }
   });
 
+  ipcMain.handle('tweak:check-tdr-level', async () => {
+    try { return _tweakResult(await _runAllTweakChecks(), 'tdr', 0); }
+    catch (error) { return { applied: false, exists: false, value: null, error: error.message || String(error) }; }
+  });
+
+  ipcMain.handle('tweak:check-gdrv-policy', async () => {
+    try { return _tweakResult(await _runAllTweakChecks(), 'gdrvpolicy', 0); }
+    catch (error) { return { applied: false, exists: false, value: null, error: error.message || String(error) }; }
+  });
+
+  ipcMain.handle('tweak:check-appcapture-disabled', async () => {
+    try { return _tweakResult(await _runAllTweakChecks(), 'appcap', 0); }
+    catch (error) { return { applied: false, exists: false, value: null, error: error.message || String(error) }; }
+  });
+  ipcMain.handle('tweak:check-fse-behavior-mode', async () => {
+    try { return _tweakResult(await _runAllTweakChecks(), 'fse-mode', 2); }
+    catch (error) { return { applied: false, exists: false, value: null, error: error.message || String(error) }; }
+  });
+
+  ipcMain.handle('tweak:check-overlay-test-mode', async () => {
+    try { return _tweakResult(await _runAllTweakChecks(), 'dwm-overlay-test', 5); }
+    catch (error) { return { applied: false, exists: false, value: null, error: error.message || String(error) }; }
+  });
+
   ipcMain.handle('tweak:check-fullscreen-optimization', async () => {
     try { return _tweakResult(await _runAllTweakChecks(), 'fse', 0); }
     catch (error) { return { applied: false, exists: false, value: null, error: error.message || String(error) }; }
@@ -291,6 +371,49 @@ function registerIPC() {
       _tweakCheckCache = null;
       return { success: true, message: 'GPU Scheduling reset to default' };
     } catch (error) { return { success: false, message: 'Failed to reset GPU Scheduling - Admin privileges required' }; }
+  });
+
+  ipcMain.handle('tweak:reset-tdr-level', async () => {
+    try {
+      const cmd = `Remove-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\GraphicsDrivers' -Name 'TdrLevel' -Force -ErrorAction Stop`;
+      await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${cmd}"`, { shell: true });
+      _tweakCheckCache = null;
+      return { success: true, message: 'TdrLevel reset to default' };
+    } catch (error) { return { success: false, message: 'Failed to reset TdrLevel - Admin privileges required' }; }
+  });
+  ipcMain.handle('tweak:reset-gdrv-policy', async () => {
+    try {
+      const cmd = `Remove-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\GameDVR' -Name 'AllowGameDVR' -Force -ErrorAction Stop; if (Test-Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\GameDVR') { if (Get-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\GameDVR' -Name 'AllowGameDVR' -ErrorAction SilentlyContinue) { throw 'AllowGameDVR clearing failed'; } }`;
+      await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${cmd}"`, { shell: true });
+      _tweakCheckCache = null;
+      return { success: true, message: 'AllowGameDVR policy reset to default' };
+    } catch (error) { return { success: false, message: `Failed to reset AllowGameDVR policy: ${error.message}` }; }
+  });
+
+  ipcMain.handle('tweak:reset-appcapture-disabled', async () => {
+    try {
+      const cmd = `Remove-ItemProperty -Path 'HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\GameDVR' -Name 'AppCaptureEnabled' -Force -ErrorAction SilentlyContinue; if (Test-Path 'HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\GameDVR') { $prop = (Get-ItemProperty -Path 'HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\GameDVR' -Name 'AppCaptureEnabled' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty AppCaptureEnabled -ErrorAction SilentlyContinue); if ($null -ne $prop) { throw 'AppCaptureEnabled clearing failed'; } }`;
+      await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${cmd}"`, { shell: true });
+      _tweakCheckCache = null;
+      return { success: true, message: 'AppCaptureEnabled reset to default' };
+    } catch (error) { return { success: false, message: `Failed to reset AppCaptureEnabled: ${error.message}` }; }
+  });
+  ipcMain.handle('tweak:reset-fse-behavior-mode', async () => {
+    try {
+      const cmd = `Remove-ItemProperty -Path 'HKCU:\\System\\GameConfigStore' -Name 'GameDVR_FSEBehaviorMode' -Force -ErrorAction SilentlyContinue; $prop = (Get-ItemProperty -Path 'HKCU:\\System\\GameConfigStore' -Name 'GameDVR_FSEBehaviorMode' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty GameDVR_FSEBehaviorMode -ErrorAction SilentlyContinue); if ($null -ne $prop) { throw 'GameDVR_FSEBehaviorMode clearing failed'; }`;
+      await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${cmd}"`, { shell: true });
+      _tweakCheckCache = null;
+      return { success: true, message: 'Fullscreen Optimization system tweak reset to default' };
+    } catch (error) { return { success: false, message: `Failed to reset fullscreen optimization system tweak: ${error.message}` }; }
+  });
+
+  ipcMain.handle('tweak:reset-overlay-test-mode', async () => {
+    try {
+      const cmd = `Remove-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\Dwm' -Name 'OverlayTestMode' -Force -ErrorAction SilentlyContinue; $prop = (Get-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\Dwm' -Name 'OverlayTestMode' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OverlayTestMode -ErrorAction SilentlyContinue); if ($null -ne $prop) { throw 'OverlayTestMode clearing failed'; }`;
+      await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${cmd}"`, { shell: true });
+      _tweakCheckCache = null;
+      return { success: true, message: 'OverlayTestMode reset to default' };
+    } catch (error) { return { success: false, message: `Failed to reset OverlayTestMode: ${error.message}` }; }
   });
 
   ipcMain.handle('tweak:reset-fullscreen-optimization', async () => {
