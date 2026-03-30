@@ -9,7 +9,20 @@ export interface ChangelogEntry {
 }
 
 const changelog: ChangelogEntry[] = [
-    {
+  {
+    version: '1.5.4',
+    date: '2026-03-30',
+    highlights: 'Expanded PC Tweaks with GPU, DWM, and GameDVR Policy controls',
+    changes: [
+      { type: 'new', text: 'Added new tweak: Disable TDR timeout with TdrLevel control.' },
+      { type: 'new', text: 'Added new tweak: GameDVR policy override through AllowGameDVR flag.' },
+      { type: 'new', text: 'Added new tweak: Disable AppCapture in GameDVR settings.' },
+      { type: 'new', text: 'Added new tweak: Fullscreen optimization system mode via GameDVR_FSEBehaviorMode.' },
+      { type: 'new', text: 'Added new tweak: DWM overlay test mode with OverlayTestMode setting.' },
+      { type: 'fixed', text: 'Resolved registry path escape issues for tweak status detection and reverted handling for GameDVR and DWM settings.' },
+    ],
+  },
+  {
     version: '1.5.3',
     date: '2026-03-29',
     highlights: 'Disk Analyzer & App Performance Improvement',
