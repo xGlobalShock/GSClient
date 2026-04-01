@@ -1,8 +1,22 @@
 const { app, ipcMain } = require('electron');
 const { autoUpdater, CancellationToken } = require('electron-updater');
 const windowManager = require('./windowManager');
+const fs = require('fs');
+const path = require('path');
 
 let _downloadCancellationToken = null;
+let _updateDownloadedAt = null;
+let _updateLogPath = null;
+
+function logUpdateEvent(line) {
+  try {
+    if (!_updateLogPath) return;
+    const entry = `${new Date().toISOString()} ${line}\n`;
+    fs.appendFile(_updateLogPath, entry, () => {});
+  } catch (e) {
+    // Best-effort logging only
+  }
+}
 
 function sendUpdateStatus(data) {
   const mainWindow = windowManager.getMainWindow();
@@ -17,8 +31,15 @@ function initAutoUpdater() {
     return;
   }
 
+  // Ensure we have a path to write lightweight update telemetry/logs
+  try {
+    _updateLogPath = path.join(app.getPath('userData'), 'update-finalization.log');
+  } catch (e) {
+    _updateLogPath = null;
+  }
+
   autoUpdater.autoDownload = false;
-  autoUpdater.autoInstallOnAppQuit = false; // Manual install step (user clicks Install button)
+  autoUpdater.autoInstallOnAppQuit = true; // Safety net: if app quits after download, install runs
   autoUpdater.allowDowngrade = false;
 
   autoUpdater.on('checking-for-update', () => {
@@ -56,25 +77,34 @@ function initAutoUpdater() {
   });
 
   autoUpdater.on('update-downloaded', (info) => {
-    sendUpdateStatus({
-      event: 'downloaded',
-      version: info.version,
-    });
-    windowManager.sendSplashStatus('Update downloaded. Ready to install.');
+    sendUpdateStatus({ event: 'downloaded', version: info.version });
+
+    _updateDownloadedAt = Date.now();
+    logUpdateEvent(`update-downloaded version=${info.version}`);
+
+    windowManager.sendSplashStatus('Update downloaded. Installing...');
     windowManager.sendSplashProgress(100);
 
-    // Auto-install shortly after download to avoid stale "ready" stall.
+    // Auto-install immediately — app will quit, NSIS runs silently, then relaunches.
     setTimeout(() => {
-      if (windowManager.getSplashWindow() && !windowManager.getSplashWindow().isDestroyed()) {
-        windowManager.sendSplashStatus('Installing update...');
+      try {
+        autoUpdater.quitAndInstall(true, true);
+      } catch (e) {
+        console.error('[AutoUpdater] quitAndInstall failed:', e?.message || e);
       }
-      autoUpdater.quitAndInstall(true, true);
     }, 800);
   });
 
   autoUpdater.on('before-quit-for-update', () => {
     windowManager.sendSplashStatus('Installing update...');
     windowManager.sendSplashProgress(100);
+
+    // Log how long we waited between download and install kickoff
+    try {
+      const elapsedMs = _updateDownloadedAt ? Date.now() - _updateDownloadedAt : null;
+      logUpdateEvent(`before-quit-for-update elapsedMs=${elapsedMs ?? 'n/a'}`);
+      sendUpdateStatus({ event: 'finalizing', elapsedMs: elapsedMs ?? null });
+    } catch (e) {}
   });
 
   autoUpdater.on('error', (err) => {
@@ -88,7 +118,7 @@ function initAutoUpdater() {
 
   setInterval(() => {
     autoUpdater.checkForUpdates().catch(() => {});
-  }, 4 * 60 * 60 * 1000);
+  }, 30 * 1000); // Check every 30 seconds
 }
 
 function registerIPC() {
@@ -122,9 +152,8 @@ function registerIPC() {
       await autoUpdater.downloadUpdate(_downloadCancellationToken);
       _downloadCancellationToken = null;
 
-      windowManager.sendSplashStatus('Update downloaded. Ready to install.');
-      windowManager.sendSplashProgress(100);
-
+      // update-downloaded event already fired and queued quitAndInstall.
+      // Just return success — do not overwrite the splash status set by the event handler.
       return { success: true };
     } catch (err) {
       _downloadCancellationToken = null;
@@ -145,18 +174,10 @@ function registerIPC() {
   });
 
   ipcMain.handle('updater:install', () => {
-    windowManager.sendSplashStatus('Installing update...');
-    windowManager.sendSplashProgress(100);
-
-    const mainWindow = windowManager.getMainWindow();
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.close();
-    }
-
-    // Keep splash visible so user sees the transition, then quit and update.
-    setTimeout(() => {
-      autoUpdater.quitAndInstall(true, true);
-    }, 300);
+    // This is a no-op in the auto-install flow — quitAndInstall is already
+    // triggered automatically from the update-downloaded event handler.
+    // Kept for API compatibility with the renderer.
+    return { success: true };
   });
 
   ipcMain.handle('updater:get-version', () => {
