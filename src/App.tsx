@@ -17,7 +17,6 @@ import { ToastProvider } from './contexts/ToastContext';
 import { ToastContainer } from './components/ToastContainer';
 import AutoCleanupRunner from './components/AutoCleanupRunner';
 import { useRealtimeHardware } from './hooks/useRealtimeHardware';
-import './App.css';
 
 export interface HardwareInfo {
   cpuName: string;
