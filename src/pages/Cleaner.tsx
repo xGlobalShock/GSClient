@@ -27,7 +27,7 @@ const Cleaner: React.FC = () => {
 
   const handleShowClearAllToast = () => {
     const k = Math.random().toString(36).substring(2, 11);
-    const windowsIds = utilityTabs.windows.map((u) => u.id);
+    const windowsIds = utilityTabs.windows.map((u) => u.id).filter(id => id !== 'recent-files');
     addToast(<CacheCleanupToast toastKey={k} windowsIds={windowsIds} />, 'info', 0);
   };
 

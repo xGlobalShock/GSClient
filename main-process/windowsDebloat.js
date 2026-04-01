@@ -204,13 +204,25 @@ $pkgs | ConvertTo-Json -Compress -Depth 2
         packageFamilyName: pkg.PackageFamilyName || '',
         version: pkg.Version || '',
         installed: true,
-        nonRemovable: !!pkg.NonRemovable,
+        nonRemovable: (catalogEntry && catalogEntry.isEdge) ? false : !!pkg.NonRemovable,
         isCatalog: !!catalogEntry,
         canBeReinstalled: catalogEntry ? catalogEntry.canBeReinstalled : true,
         isEdge: catalogEntry ? !!catalogEntry.isEdge : false,
         isOneDrive: catalogEntry ? !!catalogEntry.isOneDrive : false,
       };
     });
+
+    // Deduplicate installed packages that map to the same catalog entry (e.g. Edge reports two packages)
+    const seenCatalogNames = new Set();
+    for (let i = items.length - 1; i >= 0; i--) {
+      if (items[i].isCatalog) {
+        if (seenCatalogNames.has(items[i].name)) {
+          items.splice(i, 1);
+        } else {
+          seenCatalogNames.add(items[i].name);
+        }
+      }
+    }
 
     // Add catalog entries that are NOT installed (so user can reinstall them)
     for (const entry of GS_APPS_CATALOG) {
@@ -688,13 +700,25 @@ $feats = Get-WindowsOptionalFeature -Online | Select-Object FeatureName, @{Name=
         packageFamilyName: pkg.PackageFamilyName || '',
         version: pkg.Version || '',
         installed: true,
-        nonRemovable: !!pkg.NonRemovable,
+        nonRemovable: (catalogEntry && catalogEntry.isEdge) ? false : !!pkg.NonRemovable,
         isCatalog: !!catalogEntry,
         canBeReinstalled: catalogEntry ? catalogEntry.canBeReinstalled : true,
         isEdge: catalogEntry ? !!catalogEntry.isEdge : false,
         isOneDrive: catalogEntry ? !!catalogEntry.isOneDrive : false,
       };
     });
+
+    // Deduplicate installed packages that map to the same catalog entry (e.g. Edge reports two packages)
+    const seenCatalogNamesPA = new Set();
+    for (let i = appsItems.length - 1; i >= 0; i--) {
+      if (appsItems[i].isCatalog) {
+        if (seenCatalogNamesPA.has(appsItems[i].name)) {
+          appsItems.splice(i, 1);
+        } else {
+          seenCatalogNamesPA.add(appsItems[i].name);
+        }
+      }
+    }
 
     for (const entry of GS_APPS_CATALOG) {
       const alreadyListed = appsItems.some(i => {

@@ -91,6 +91,8 @@ const CacheCleanupToast: React.FC<Props> = ({ toastKey, windowsIds }) => {
     'thumbnail-cache': 'cleaner:clear-thumbnail-cache',
     'windows-logs': 'cleaner:clear-windows-logs',
     'crash-dumps': 'cleaner:clear-crash-dumps',
+    'windows-temp': 'cleaner:clear-windows-temp',
+    'delivery-optimization': 'cleaner:clear-delivery-optimization',
     'font-cache': 'cleaner:clear-font-cache',
     'prefetch': 'cleaner:clear-prefetch',
     'memory-dumps': 'cleaner:clear-memory-dumps',
@@ -99,18 +101,16 @@ const CacheCleanupToast: React.FC<Props> = ({ toastKey, windowsIds }) => {
   const windowsUtilityIds = useMemo(() => {
     if (windowsIds && Array.isArray(windowsIds) && windowsIds.length) return windowsIds;
     return [
+      'thumbnail-cache',
+      'windows-logs',
+      'crash-dumps',
       'temp-files',
       'update-cache',
       'dns-cache',
       'ram-cache',
       'recycle-bin',
-      'thumbnail-cache',
-      'windows-logs',
-      'crash-dumps',
-      // additional safe cleaners implemented in main-process (fallback)
-      'prefetch',
-      'font-cache',
-      'memory-dumps',
+      'windows-temp',
+      'delivery-optimization',
     ];
   }, [windowsIds]);
 

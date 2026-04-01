@@ -5,13 +5,9 @@ import { loadSettings } from '../utils/settings';
 const SESSION_KEY = 'gc-auto-cleanup-ran';
 
 const WINDOWS_IDS = [
-  'windows-temp',
   'thumbnail-cache',
   'windows-logs',
   'crash-dumps',
-  'error-reports',
-  'delivery-optimization',
-  'recent-files',
   'temp-files',
   'update-cache',
   'dns-cache',
@@ -20,13 +16,9 @@ const WINDOWS_IDS = [
 ] as const;
 
 const CLEANER_MAP: Record<string, string> = {
-  'windows-temp': 'cleaner:clear-windows-temp',
   'thumbnail-cache': 'cleaner:clear-thumbnail-cache',
   'windows-logs': 'cleaner:clear-windows-logs',
   'crash-dumps': 'cleaner:clear-crash-dumps',
-  'error-reports': 'cleaner:clear-error-reports',
-  'delivery-optimization': 'cleaner:clear-delivery-optimization',
-  'recent-files': 'cleaner:clear-recent-files',
   'temp-files': 'cleaner:clear-temp-files',
   'update-cache': 'cleaner:clear-update-cache',
   'dns-cache': 'cleaner:clear-dns-cache',

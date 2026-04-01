@@ -8,7 +8,9 @@ import {
   FolderSimple,
   Image,
   Scroll,
-  Bug
+  Bug,
+  CloudArrowDown,
+  ClockCounterClockwise,
 } from 'phosphor-react';
 
 // bring back game & nvidia asset logos
@@ -220,11 +222,41 @@ export const cleanerUtilities: CleanerUtility[] = [
   {
     id: 'recycle-bin',
     title: 'Empty Recycle Bin',
-    icon: Trash, // Trash icon for recycle bin
+    icon: Trash,
     cacheType: 'Recycle Bin',
     description: 'Permanently deletes recycled files to recover disk space, make sure you no longer need deleted items before running.',
     buttonText: 'Empty Bin',
     color: '#0074D9',
     buttonColor: '#E74C3C',
+  },
+  {
+    id: 'windows-temp',
+    title: 'Clear System Temp',
+    icon: FolderSimple,
+    cacheType: 'System Temp Folder',
+    description: 'Clears the Windows system-wide temp folder (C:\\Windows\\Temp), which accumulates files from system processes and installers.',
+    buttonText: 'Clear Temp',
+    color: '#0074D9',
+    buttonColor: '#7B61FF',
+  },
+  {
+    id: 'delivery-optimization',
+    title: 'Clear Delivery Optimization',
+    icon: CloudArrowDown,
+    cacheType: 'Delivery Optimization',
+    description: 'Clears the Windows Update delivery optimization cache used for peer-to-peer update sharing, freeing up disk space without affecting future updates.',
+    buttonText: 'Clear Cache',
+    color: '#0074D9',
+    buttonColor: '#0094D4',
+  },
+  {
+    id: 'recent-files',
+    title: 'Clear Quick Access History',
+    icon: ClockCounterClockwise,
+    cacheType: 'Quick Access History',
+    description: 'Removes the Recent Files and Quick Access history from Windows Explorer, keeping your browsing activity private and the list clutter-free.',
+    buttonText: 'Clear History',
+    color: '#0074D9',
+    buttonColor: '#F39C12',
   },
 ];
