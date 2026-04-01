@@ -13,6 +13,7 @@ assets/
 scripts/
 V-Config/
 lib/
+public/
 
 # ── Environment ──
 .env
