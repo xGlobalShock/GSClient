@@ -13,6 +13,7 @@ const Settings: React.FC = () => {
     autoUpdate: false,
     theme: 'dark',
     startupLaunch: false,
+    autoCleanupOnStartup: false,
   }));
   const [appVersion, setAppVersion] = useState('1.0.0');
   const [gpuStatus, setGpuStatus] = useState<{ status: string; renderer: string; detail: string } | null>(null);
@@ -148,6 +149,25 @@ const Settings: React.FC = () => {
           </div>
 
 
+        </div>
+
+        <div className="settings-section">
+          <h3 className="section-header">Startup</h3>
+
+          <div className="setting-item">
+            <div className="setting-label">
+              <span className="label-title">Auto Cleanup Toolkit</span>
+              <span className="label-description">Automatically run Windows cache cleanup each time the app launches</span>
+            </div>
+            <label className="toggle-switch">
+              <input
+                type="checkbox"
+                checked={!!settings.autoCleanupOnStartup}
+                onChange={() => handleToggle('autoCleanupOnStartup')}
+              />
+              <span className="slider"></span>
+            </label>
+          </div>
         </div>
 
         <div className="settings-section">

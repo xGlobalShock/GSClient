@@ -1,6 +1,6 @@
 {
   "name": "gs-center",
-  "version": "1.6.1",
+  "version": "1.6.2",
   "description": "GS Center - Advanced System Optimization Tool",
   "author": "GS Center Team",
   "main": "electron/main.js",
@@ -26,6 +26,7 @@
     "framer-motion": "^10.16.4",
     "is-admin": "^4.0.0",
     "lucide-react": "^0.292.0",
+    "node-pty": "^1.1.0",
     "phosphor-react": "^1.4.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
@@ -34,6 +35,7 @@
     "systeminformation": "^5.31.1"
   },
   "devDependencies": {
+    "@electron/rebuild": "^4.0.3",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
     "autoprefixer": "^10.4.16",
@@ -60,7 +62,8 @@
     ],
     "asarUnpack": [
       "node_modules/**/*.node",
-      "node_modules/**/*.dll"
+      "node_modules/**/*.dll",
+      "node_modules/node-pty/**"
     ],
     "extraFiles": [
       {

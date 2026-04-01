@@ -600,35 +600,39 @@ const pingArgsFast = pingArgs1; // keep single packet for smaller overhead
 const LATENCY_POLL_INTERVAL_ACTIVE_MS = 1000; // 1s for active view
 const LATENCY_POLL_INTERVAL_IDLE_MS = 10000; // 10s for inactive/minimized
 
+// Rolling window for packet-loss calculation (20 samples ≈ 20 seconds of history)
+const PING_WINDOW_SIZE = 20;
+const MIN_SAMPLES_FOR_LOSS = 5; // show packet loss only once we have enough data
+let _pingWindow = []; // 1 = received, 0 = dropped
+
 let _rtWindowActive = true;
 let _rtLatencyPollingIntervalMs = LATENCY_POLL_INTERVAL_ACTIVE_MS;
 let _rtPingInFlight = false;
 
-function _parsePingOutput(stdout) {
+function _parsePingLatency(stdout) {
   const text = String(stdout);
-  let time = null;
-  let packetLoss = null;
-
-  // Language/OS agnostic latency parsing (ms or Cyrillic мс)
+  // Language/OS agnostic: matches "=14ms", "<1 ms", "=14 мс", etc.
   const timeMatch = text.match(/[=<]\s*([\d.]+)\s*(?:ms|мс)/i);
-  if (timeMatch) time = Math.round(parseFloat(timeMatch[1]));
-
-  // Packet loss parsing (e.g. 0% loss, 0% perte, 0.0% packet loss)
-  const lossMatch = text.match(/([\d.]+)\s*%/);
-  if (lossMatch) packetLoss = Math.round(parseFloat(lossMatch[1]));
-
-  return { time, packetLoss };
+  return timeMatch ? Math.round(parseFloat(timeMatch[1])) : null;
 }
 
 async function _pingHost(host, args) {
   try {
     const { stdout } = await execFileAsync('ping', [...args, host], { timeout: 20000, windowsHide: true });
-    return { success: true, ..._parsePingOutput(stdout) };
+    return { success: true, time: _parsePingLatency(stdout) };
   } catch (err) {
-    // no crash; just mark unreachable
-    const parsed = err.stdout ? _parsePingOutput(err.stdout) : { time: null, packetLoss: null };
-    return { success: false, time: parsed.time, packetLoss: parsed.packetLoss, error: err.message || 'ping failed' };
+    // Ping timed out or host unreachable — packet was dropped
+    const time = err.stdout ? _parsePingLatency(err.stdout) : null;
+    return { success: false, time, error: err.message || 'ping failed' };
   }
+}
+
+function _recordPingResult(success) {
+  _pingWindow.push(success ? 1 : 0);
+  if (_pingWindow.length > PING_WINDOW_SIZE) _pingWindow.shift();
+  if (_pingWindow.length < MIN_SAMPLES_FOR_LOSS) return -1; // not enough data yet
+  const dropped = _pingWindow.filter(v => v === 0).length;
+  return Math.round((dropped / _pingWindow.length) * 100);
 }
 
 function _updateLatencyPollInterval() {
@@ -644,11 +648,11 @@ async function _doPing() {
     const res = await _pingHost('8.8.8.8', pingArgsFast);
     if (res.success) {
       _rtLastLatency = res.time ?? 0;
-      _rtLastPacketLoss = typeof res.packetLoss === 'number' ? res.packetLoss : 0;
     } else {
-      _rtLastLatency = res.time ?? 0;
-      _rtLastPacketLoss = typeof res.packetLoss === 'number' ? res.packetLoss : -1;
+      // Keep last known latency on timeout instead of resetting to 0
+      if (res.time != null) _rtLastLatency = res.time;
     }
+    _rtLastPacketLoss = _recordPingResult(res.success);
   } finally {
     _rtPingInFlight = false;
   }
@@ -671,7 +675,9 @@ function _startLatencyPoll() {
     const res = await _pingHost('8.8.8.8', pingArgs1);
     if (res.success && typeof res.time === 'number') {
       _rtLastLatency = res.time;
-      _rtLastPacketLoss = typeof res.packetLoss === 'number' ? res.packetLoss : 0;
+      _rtLastPacketLoss = _recordPingResult(true);
+    } else {
+      _rtLastPacketLoss = _recordPingResult(false);
     }
   })();
 
@@ -885,7 +891,9 @@ async function _startRealtimePush() {
         ramUsedGB: mem ? Math.round(mem.active / (1024 * 1024 * 1024) * 10) / 10 : 0,
         ramTotalGB: mem ? Math.round(mem.total / (1024 * 1024 * 1024) * 10) / 10 : 0,
         ramAvailableGB: mem ? Math.round(mem.available / (1024 * 1024 * 1024) * 10) / 10 : 0,
-        ramCachedGB: _cachedRamCachedGB,
+        ramCachedGB: _cachedRamCachedGB > 0
+          ? _cachedRamCachedGB
+          : (mem && mem.buffcache > 0 ? Math.round(mem.buffcache / (1024 * 1024 * 1024) * 10) / 10 : 0),
         disk: _cachedDiskPct,
         diskReadSpeed: _lhmDiskRead,
         diskWriteSpeed: _lhmDiskWrite,

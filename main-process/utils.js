@@ -11,7 +11,11 @@ let _psTempCounter = 0;
 function runPSScript(script, timeoutMs = 8000) {
   const tmpFile = path.join(os.tmpdir(), `gs_ps_${process.pid}_${++_psTempCounter}.ps1`);
   const wrappedScript = '$ErrorActionPreference = "SilentlyContinue"\n' + script + '\nexit 0';
-  fs.writeFileSync(tmpFile, wrappedScript, 'utf8');
+  try {
+    fs.writeFileSync(tmpFile, wrappedScript, 'utf8');
+  } catch (writeErr) {
+    return Promise.reject(writeErr);
+  }
   return execFileAsync(
     'powershell',
     ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', tmpFile],

@@ -14,6 +14,7 @@ import AppsPage from './pages/AppsPage';
 import SpaceAnalyzer from './pages/SpaceAnalyzer';
 import { ToastProvider } from './contexts/ToastContext';
 import { ToastContainer } from './components/ToastContainer';
+import AutoCleanupRunner from './components/AutoCleanupRunner';
 import { useRealtimeHardware } from './hooks/useRealtimeHardware';
 import './App.css';
 
@@ -214,6 +215,7 @@ function App() {
             </div>
           </div>
           <ToastContainer />
+          <AutoCleanupRunner ready={!isLoading} />
         </div>
       )}
     </ToastProvider>

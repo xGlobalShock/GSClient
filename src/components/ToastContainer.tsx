@@ -24,10 +24,10 @@ export const ToastContainer: React.FC = () => {
             <motion.div
               key={toast.id}
               className={cls}
-              initial={{ opacity: 0, x: 32, scale: 0.95 }}
-              animate={{ opacity: 1, x: 0, scale: 1 }}
-              exit={{ opacity: 0, x: 32, scale: 0.95 }}
-              transition={{ duration: 0.2 }}
+              initial={isRaw ? { opacity: 0 } : { opacity: 0, x: 32, scale: 0.95 }}
+              animate={isRaw ? { opacity: 1 } : { opacity: 1, x: 0, scale: 1 }}
+              exit={isRaw ? { opacity: 0 } : { opacity: 0, x: 32, scale: 0.95 }}
+              transition={{ duration: isRaw ? 0.15 : 0.2 }}
             >
               {isRaw ? (
                 // render the element directly for full-overlay toasts

@@ -9,6 +9,7 @@ interface AppSettings {
   startupLaunch: boolean;
   cleanupSchedule?: 'daily' | 'weekly' | 'monthly';
   lastCleanup?: string;
+  autoCleanupOnStartup?: boolean;
 }
 
 const SETTINGS_KEY = 'pc-controlcenter-settings';
@@ -20,6 +21,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   theme: 'dark',
   startupLaunch: true,
   cleanupSchedule: 'weekly',
+  autoCleanupOnStartup: false,
 };
 
 export function loadSettings(): AppSettings {

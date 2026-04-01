@@ -5,11 +5,86 @@
 .perf-page {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 14px;
   position: relative;
   padding: 0;
   transform: translateZ(0);
   contain: layout style;
+}
+
+/* ——— TAB BAR ——— */
+.perf-tabs {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  background: rgba(6, 8, 16, 0.55);
+  border: 1px solid rgba(0, 242, 255, 0.4);
+  border-radius: 12px;
+  width: fit-content;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow:
+    0 2px 12px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(0, 242, 255, 0.03);
+}
+
+.perf-tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 20px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  cursor: pointer;
+  transition: color 0.2s, background 0.2s, border-color 0.2s;
+}
+
+.perf-tab:hover {
+  color: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.perf-tab--active {
+  color: #00F2FF;
+  background: rgba(0, 242, 255, 0.06);
+  border-color: rgba(0, 242, 255, 0.12);
+  box-shadow:
+    0 0 20px rgba(0, 242, 255, 0.04),
+    inset 0 1px 0 rgba(0, 242, 255, 0.06);
+}
+
+.perf-tab--active:hover {
+  color: #00F2FF;
+  background: rgba(0, 242, 255, 0.08);
+}
+
+.perf-tab-label {
+  white-space: nowrap;
+}
+
+.perf-tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 18px;
+  padding: 0 6px;
+  background: rgba(110, 110, 110, 0.05);
+  border-radius: 5px;
+  font-size: 10px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  transition: background 0.2s, color 0.2s;
+}
+
+.perf-tab--active .perf-tab-count {
+  background: rgba(0, 242, 255, 0.12);
+  color: rgba(0, 242, 255, 0.9);
 }
 
 

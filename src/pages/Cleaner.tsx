@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import CleanerCard from '../components/CleanerCard';
 import { cleanerUtilities } from '../data/cleanerUtilities';
 import { useToast } from '../contexts/ToastContext';
 import CacheCleanupToast from '../components/CacheCleanupToast';
 import PageHeader from '../components/PageHeader';
-import { Trash2 } from 'lucide-react';
+import SystemRepairPanel from '../components/SystemRepairPanel';
+import { Monitor, Gamepad2, Wrench, Cpu } from 'lucide-react';
+import { Sparkle, SlidersHorizontal } from 'phosphor-react';
 import '../styles/Cleaner.css';
 
 interface CleanResult {
@@ -20,7 +22,7 @@ interface CleanResult {
 
 const Cleaner: React.FC = () => {
   const [cleaningId, setCleaningId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'windows' | 'games' | 'nvidia'>('windows');
+  const [activeCategory, setActiveCategory] = useState<'windows' | 'games' | 'nvidia' | 'repair'>('windows');
   const { addToast } = useToast();
 
   const handleShowClearAllToast = () => {
@@ -55,36 +57,47 @@ const Cleaner: React.FC = () => {
     'recent-files': 'cleaner:clear-recent-files',
   };
 
-  // Categorize utilities by tab
+  // Categorize utilities by category
   const utilityTabs = {
     windows: cleanerUtilities.filter(u => ['windows-temp', 'thumbnail-cache', 'windows-logs', 'crash-dumps', 'error-reports', 'delivery-optimization', 'recent-files', 'temp-files', 'update-cache', 'dns-cache', 'ram-cache', 'recycle-bin'].includes(u.id)),
     games: cleanerUtilities.filter(u => ['forza-shaders', 'apex-shaders', 'cod-shaders', 'cs2-shaders', 'fortnite-shaders', 'lol-shaders', 'overwatch-shaders', 'r6-shaders', 'rocket-league-shaders', 'valorant-shaders'].includes(u.id)),
     nvidia: cleanerUtilities.filter(u => ['nvidia-cache'].includes(u.id)),
   };
 
-  const tabs = [
-    { id: 'windows', label: 'Windows Cache', count: utilityTabs.windows.length },
-    { id: 'games', label: 'Games Cache', count: utilityTabs.games.length },
-    { id: 'nvidia', label: 'NVIDIA Cache', count: utilityTabs.nvidia.length },
+  const categories = [
+    {
+      id: 'windows' as const,
+      label: 'Windows Cache',
+      icon: <Monitor size={18} />,
+      count: utilityTabs.windows.length,
+      description: 'Clear temp files, DNS cache, logs, crash dumps and system junk.',
+      accent: '#00F2FF',
+    },
+    {
+      id: 'games' as const,
+      label: 'Game Shaders',
+      icon: <Gamepad2 size={18} />,
+      count: utilityTabs.games.length,
+      description: 'Remove game shader caches for smoother performance.',
+      accent: '#00D4AA',
+    },
+    {
+      id: 'nvidia' as const,
+      label: 'NVIDIA Cache',
+      icon: <Cpu size={18} />,
+      count: utilityTabs.nvidia.length,
+      description: 'Clear NVIDIA driver artifacts and shader cache.',
+      accent: '#76B900',
+    },
+    {
+      id: 'repair' as const,
+      label: 'System Repair',
+      icon: <Wrench size={18} />,
+      count: 3,
+      description: 'Run ChkDsk, SFC and DISM to fix corrupted files and disk errors.',
+      accent: '#FF9500',
+    },
   ];
-
-  const tabDescriptions: { [key in 'windows' | 'games' | 'nvidia']: React.ReactNode } = {
-    windows: (
-      <>
-        <strong>Windows Cache:</strong> clears out <strong>leftover temporary files</strong> and <strong>system junk</strong> from Windows and installed apps.
-      </>
-    ),
-    games: (
-      <>
-        Remove <strong>temporary game data caches</strong> to help keep games running smoothly.
-      </>
-    ),
-    nvidia: (
-      <>
-        Clear <strong>NVIDIA driver caches</strong> to resolve graphics hiccups.
-      </>
-    ),
-  };
 
   const handleClean = async (id: string) => {
     setCleaningId(id);
@@ -184,50 +197,75 @@ const Cleaner: React.FC = () => {
       animate={{ opacity: 1 }}
       transition={{ duration: 0.15 }}
     >
-      <PageHeader icon={<Trash2 size={16} />} title="Cleanup Toolkit" />
+      <PageHeader icon={<SlidersHorizontal size={16} weight="bold" />} title="Utilities" />
 
-      {/* Tab Navigation + description */}
-      <div className="cleaner-tabs-container">
-        <div className="cleaner-tabs">
-          {tabs.map((tab) => (
+      {activeCategory === 'windows' && (
+        <button className="cleaner-clearall-btn" onClick={handleShowClearAllToast}>
+          <Sparkle size={13} weight="fill" />
+          Full Cache Cleanup
+        </button>
+      )}
+
+      <div className="cleaner-split">
+        {/* ── LEFT: Vertical nav ── */}
+        <nav className="cleaner-sidenav">
+          {categories.map((cat) => (
             <button
-              key={tab.id}
-              className={`cleaner-tab ${activeTab === tab.id ? 'cleaner-tab--active' : ''}`}
-              onClick={() => setActiveTab(tab.id as any)}
+              key={cat.id}
+              className={`cleaner-navitem ${activeCategory === cat.id ? 'cleaner-navitem--active' : ''}`}
+              style={{ '--cat-accent': cat.accent } as React.CSSProperties}
+              onClick={() => setActiveCategory(cat.id)}
             >
-              <span className="cleaner-tab-label">{tab.label}</span>
-              <span className="cleaner-tab-count">{tab.count}</span>
+              <span className="cleaner-navitem-icon">{cat.icon}</span>
+              <span className="cleaner-navitem-body">
+                <span className="cleaner-navitem-label">{cat.label}</span>
+                <span className="cleaner-navitem-desc">{cat.description}</span>
+              </span>
+              <span className="cleaner-navitem-count">{cat.count}</span>
             </button>
           ))}
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1 }}>
-          <div className="cleaner-tab-desc">{tabDescriptions[activeTab]}</div>
-          <button className="clear-all-cache" onClick={handleShowClearAllToast} style={{ marginLeft: 'auto' }}>Clear All Cache</button>
-        </div>
-      </div>
 
-      {/* Cards grid */}
-      <div className="cleaner-grid cleaner-grid--small">
-        {utilityTabs[activeTab].map((utility, index) => (
-          <motion.div
-            key={utility.id}
-            initial={{ y: 25, opacity: 0, scale: 0.96 }}
-            animate={{ y: 0, opacity: 1, scale: 1 }}
-            transition={{ delay: index * 0.06, type: 'spring', stiffness: 200, damping: 22 }}
-          >
-            <CleanerCard
-              id={utility.id}
-              title={utility.title}
-              icon={utility.icon}
-              cacheType={utility.cacheType}
-              description={utility.description}
-              buttonText={utility.buttonText}
-              color={utility.color}
-              onClean={handleClean}
-              isLoading={cleaningId === utility.id}
-            />
-          </motion.div>
-        ))}
+        </nav>
+
+        {/* ── RIGHT: Content ── */}
+        <div className="cleaner-content">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeCategory}
+              initial={{ opacity: 0, x: 12 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -8 }}
+              transition={{ duration: 0.16 }}
+            >
+              {activeCategory === 'repair' ? (
+                <SystemRepairPanel />
+              ) : (
+                <div className="cleaner-grid cleaner-grid--small">
+                  {utilityTabs[activeCategory as 'windows' | 'games' | 'nvidia'].map((utility, index) => (
+                    <motion.div
+                      key={utility.id}
+                      initial={{ y: 20, opacity: 0, scale: 0.97 }}
+                      animate={{ y: 0, opacity: 1, scale: 1 }}
+                      transition={{ delay: index * 0.05, type: 'spring', stiffness: 200, damping: 22 }}
+                    >
+                      <CleanerCard
+                        id={utility.id}
+                        title={utility.title}
+                        icon={utility.icon}
+                        cacheType={utility.cacheType}
+                        description={utility.description}
+                        buttonText={utility.buttonText}
+                        color={utility.color}
+                        onClean={handleClean}
+                        isLoading={cleaningId === utility.id}
+                      />
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+            </motion.div>
+          </AnimatePresence>
+        </div>
       </div>
     </motion.div>
   );

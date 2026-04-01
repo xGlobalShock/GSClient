@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import {
   Home,
   Activity,
-  Trash2,
+  SlidersHorizontal,
   Settings,
   Gamepad2,
   Video,
@@ -38,7 +38,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage }) => {
     { id: 'obsPresets', label: 'Stream', icon: Video },
     { id: 'softwareUpdates', label: 'Updates', icon: RefreshCw },
     { id: 'apps', label: 'Apps', icon: Layers },
-    { id: 'cleaner', label: 'Cleanup', icon: Trash2 },
+    { id: 'cleaner', label: 'Utilities', icon: SlidersHorizontal },
     { id: 'space', label: 'Disk', icon: PieChart },
     { id: 'settings', label: 'Settings', icon: Settings },
   ], []);

@@ -477,6 +477,172 @@ function registerIPC() {
       return { success: false, message: `Error: ${error.message}` };
     }
   });
+
+  // ──────────────────────────────────────────────────────────────
+  // SYSTEM REPAIR — ChkDsk / SFC / DISM
+  // ──────────────────────────────────────────────────────────────
+
+  ipcMain.handle('repair:run-sfc', async (event) => {
+    if (!_isElevated) {
+      return { success: false, message: 'Administrator privileges required to run SFC. Please restart the app as administrator.' };
+    }
+
+    const sendLine = (line) => {
+      try {
+        if (!event.sender.isDestroyed()) {
+          event.sender.send('repair:progress', { tool: 'sfc', line });
+        }
+      } catch (_) {}
+    };
+
+    sendLine('SFC scan starting...');
+    sendLine('Initializing System File Checker. This may take a moment.');
+
+    return new Promise((resolve) => {
+      let ptyProcess;
+      try {
+        const pty = require('node-pty');
+        ptyProcess = pty.spawn('sfc.exe', ['/scannow'], {
+          name: 'xterm',
+          cols: 140,
+          rows: 40,
+          cwd: process.env.SystemRoot || 'C:\\Windows',
+          env: process.env,
+          useConpty: true,
+        });
+      } catch (e) {
+        resolve({ success: false, message: 'PTY unavailable: ' + e.message });
+        return;
+      }
+
+      let fullOutput = '';
+      let lineBuffer = '';
+
+      ptyProcess.onData((data) => {
+        // Strip ANSI/VT escape sequences produced by the PTY
+        const clean = data
+          .replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, '') // OSC (title, hyperlink, etc.)
+          .replace(/\x1b\[[\?]?[\d;]*[A-Za-z]/g, '')          // CSI sequences incl. private (?25h, ?1004h, etc.)
+          .replace(/\x1b[()][AB012]/g, '')                     // Charset designations
+          .replace(/\x1b[ABCDEFGHJKSTM]/g, '')                 // Single-char escape sequences
+          .replace(/\r\n/g, '\n')
+          .replace(/\r/g, '\n')
+          .replace(/\0/g, '');
+
+        // Buffer across chunks so fragmented lines (e.g. "B" + "eginning...") are joined
+        lineBuffer += clean;
+        const parts = lineBuffer.split('\n');
+        // Keep the last (potentially incomplete) fragment in the buffer
+        lineBuffer = parts.pop();
+        parts.forEach(raw => {
+          const line = raw.trim();
+          if (!line) return;
+          fullOutput += line + '\n';
+          sendLine(line);
+        });
+      });
+
+      ptyProcess.onExit(({ exitCode }) => {
+        // Flush any remaining buffered text
+        if (lineBuffer.trim()) {
+          fullOutput += lineBuffer.trim() + '\n';
+          sendLine(lineBuffer.trim());
+        }
+        resolve({
+          success: exitCode === 0,
+          message: fullOutput.trim() || (exitCode === 0 ? 'SFC scan completed successfully.' : 'SFC scan finished with errors.'),
+        });
+      });
+    });
+  });
+
+  ipcMain.handle('repair:run-dism', async (event) => {
+    if (!_isElevated) {
+      return { success: false, message: 'Administrator privileges required to run DISM. Please restart the app as administrator.' };
+    }
+    const { spawn } = require('child_process');
+
+    const sendLine = (line) => {
+      try {
+        if (!event.sender.isDestroyed()) {
+          event.sender.send('repair:progress', { tool: 'dism', line });
+        }
+      } catch (_) {}
+    };
+
+    sendLine('DISM scan starting...');
+    sendLine('Initializing Windows image repair. This may take 20-40 minutes.');
+
+    return new Promise((resolve) => {
+      const proc = spawn('DISM', [
+        '/Online', '/Cleanup-Image', '/RestoreHealth',
+      ], { windowsHide: true, shell: true });
+
+      let fullOutput = '';
+      const handleData = (buffer) => {
+        const raw = buffer.toString('utf8').replace(/\r/g, '').replace(/\0/g, '');
+        const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
+        lines.forEach(line => {
+          fullOutput += line + '\n';
+          sendLine(line);
+        });
+      };
+
+      proc.stdout.on('data', handleData);
+      proc.stderr.on('data', handleData);
+      proc.on('close', (code) => {
+        resolve({
+          success: code === 0,
+          message: fullOutput.trim() || (code === 0 ? 'DISM RestoreHealth completed successfully.' : 'DISM finished with errors.'),
+        });
+      });
+      proc.on('error', (err) => resolve({ success: false, message: err.message }));
+    });
+  });
+
+  ipcMain.handle('repair:run-chkdsk', async (event) => {
+    if (!_isElevated) {
+      return { success: false, message: 'Administrator privileges required to schedule ChkDsk. Please restart the app as administrator.' };
+    }
+    const { spawn } = require('child_process');
+
+    const sendLine = (line) => {
+      try {
+        if (!event.sender.isDestroyed()) {
+          event.sender.send('repair:progress', { tool: 'chkdsk', line });
+        }
+      } catch (_) {}
+    };
+
+    sendLine('ChkDsk starting...');
+    sendLine('Scheduling disk corruption scan on C:');
+
+    return new Promise((resolve) => {
+      const proc = spawn('cmd', ['/c', 'echo Y | chkdsk C: /F /R'], {
+        windowsHide: true,
+        shell: true,
+      });
+
+      let fullOutput = '';
+      const handleData = (buffer) => {
+        const raw = buffer.toString('utf8').replace(/\r/g, '').replace(/\0/g, '');
+        const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
+        lines.forEach(line => {
+          fullOutput += line + '\n';
+          sendLine(line);
+        });
+      };
+
+      proc.stdout.on('data', handleData);
+      proc.stderr.on('data', handleData);
+      proc.on('close', (code) => {
+        const summary = fullOutput.trim() || 'ChkDsk has been scheduled for the next system restart.';
+        resolve({ success: true, message: summary });
+      });
+      proc.on('error', (err) => resolve({ success: false, message: err.message }));
+    });
+  });
+
 } // end registerIPC
 
 module.exports = { init, registerIPC };
