@@ -2,6 +2,15 @@ const { app, BrowserWindow, ipcMain } = require('electron');
 const { execSync } = require('child_process');
 const path = require('path');
 
+// Ensure Windows taskbar uses our AppUserModelID (must match build.appId)
+if (process.platform === 'win32' && app && typeof app.setAppUserModelId === 'function') {
+  try {
+    app.setAppUserModelId('com.gscontrolcenter.app');
+  } catch (e) {
+    // Ignore if already set or not allowed
+  }
+}
+
 process.on('unhandledRejection', (reason, promise) => {
   console.error('[UNHANDLED_REJECTION]', reason, promise);
 });
@@ -327,14 +336,33 @@ app.on('ready', async () => {
 
   autoUpdater.initAutoUpdater();
 
-  // Reuse existing window reference (already bound above)
+  // ── Splash → Main Window Handshake (event-driven, no timeouts) ────────────
+  //
+  // Sequence:
+  //   1. Wait for Electron's ready-to-show (first compositor frame painted).
+  //   2. Wait for renderer's 'app:ready' IPC  (React finished initial load).
+  //   3. Show the main window (it's fully painted — no transparent flash).
+  //   4. Tell splash to fade out, wait for 'splash:fade-complete' IPC.
+  //   5. Close the splash window.
+  //
   const mainWindow = windowManager.getMainWindow();
-  await new Promise((resolve) => {
-    mainWindow?.webContents.on('did-finish-load', resolve);
-    setTimeout(resolve, 8000);
+
+  const readyToShowPromise = new Promise((resolve) => {
+    if (!mainWindow) return resolve();
+    mainWindow.once('ready-to-show', resolve);
   });
 
-  // Start heavy prewarm work after main window is ready and splash is done.
+  const appReadyPromise = new Promise((resolve) => {
+    const handler = (event) => {
+      if (mainWindow && event.sender && event.sender.id === mainWindow.webContents.id) {
+        ipcMain.removeListener('app:ready', handler);
+        resolve();
+      }
+    };
+    ipcMain.on('app:ready', handler);
+  });
+
+  // Kick off heavy background work while we wait.
   _prewarmScanCaches({ updateSplash: false }).catch(() => { });
   softwareUpdatesPromise.catch(() => { });
 
@@ -343,27 +371,22 @@ app.on('ready', async () => {
 
   hardwareMonitor._startRealtimePush();
 
-  await new Promise(r => setTimeout(r, 600));
+  // Block until the main window is fully painted AND React reports ready.
+  await Promise.all([readyToShowPromise, appReadyPromise]);
 
-  windowManager.sendSplashProgress(100);
-  windowManager.sendSplashStatus('Ready');
-
+  // Close splash 1 second before showing the app.
   const splashWin = windowManager.getSplashWindow();
   if (splashWin && !splashWin.isDestroyed()) {
-    splashWin.webContents.send('splash:done');
+    splashWin.close();
   }
 
-  await new Promise(r => setTimeout(r, 700));
+  await new Promise(r => setTimeout(r, 1000));
 
+  // Show the main window after the splash has been gone for 1 second.
   const win = windowManager.getMainWindow();
   if (win && !win.isDestroyed()) {
     win.show();
     win.focus();
-  }
-
-  const splashFinal = windowManager.getSplashWindow();
-  if (splashFinal && !splashFinal.isDestroyed()) {
-    splashFinal.close();
   }
 
   // ── Privacy & Silent Ad-Blocking (Suppress Terminal Noise) ──────────────────

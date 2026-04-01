@@ -103,6 +103,13 @@ function App() {
     }
   }, [isLoading, connected]);
 
+  // Signal the main process that the renderer is fully loaded.
+  useEffect(() => {
+    if (!isLoading) {
+      try { (window as any).electron?.ipcRenderer?.send('app:ready'); } catch (_) {}
+    }
+  }, [isLoading]);
+
   useEffect(() => {
     if (!isLoading) return;
     const timer = setTimeout(async () => {

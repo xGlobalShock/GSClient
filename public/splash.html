@@ -80,7 +80,7 @@
 
   /* Center Identity */
   .identity { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; margin-top: -10px; }
-  .hologram-wrap { position: relative; width: 350px; height: 350px; }
+  .hologram-wrap { position: relative; width: 300px; height: 300px; margin-bottom: -25px; }
   .holo-icon { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; animation: floatHolo 4s ease-in-out infinite alternate; }
   .holo-icon img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 0 16px rgba(0,255,136,0.6)); }
   @keyframes drawLine { to { stroke-dashoffset: 0; } }
@@ -124,9 +124,17 @@
   }
   @keyframes glintSweep { 0% { transform: translateX(-60px); } 100% { transform: translateX(60px); } }
 
-  /* Fade out */
-  .fade-out { animation: fadeFrame 0.6s forwards; }
-  @keyframes fadeFrame { to { opacity: 0; filter: blur(4px); transform: scale(1.02); } }
+  /* Fade out — GPU-composited for smooth exit */
+  .splash-container {
+    will-change: opacity, transform;
+  }
+  .fade-out {
+    animation: fadeFrame 0.5s cubic-bezier(0.4, 0, 1, 1) forwards;
+    pointer-events: none;
+  }
+  @keyframes fadeFrame {
+    to { opacity: 0; transform: scale(1.015); filter: blur(3px); }
+  }
 </style>
 </head>
 <body>
@@ -315,9 +323,17 @@
       setPercent(100);
       currentPct = 100;
 
-      setTimeout(() => {
-        document.getElementById('content').classList.add('fade-out');
-      }, 400);
+      // Start fade immediately — the main window is already visible behind us.
+      const content = document.getElementById('content');
+      if (content) {
+        content.classList.add('fade-out');
+        content.addEventListener('animationend', () => {
+          ipcRenderer.send('splash:fade-complete');
+        }, { once: true });
+      } else {
+        // Safety: if DOM is missing, unblock main process anyway.
+        ipcRenderer.send('splash:fade-complete');
+      }
     });
   </script>
 </body>

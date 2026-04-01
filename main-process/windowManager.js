@@ -30,6 +30,10 @@ function createSplashWindow() {
     splashWindow = null;
   }
   try {
+    const iconPath = isDev
+      ? path.join(_rootDir, 'public', 'app-icons', 'gs-center.png')
+      : path.join(_rootDir, 'build', 'app-icons', 'GSC.ico');
+
     splashWindow = new BrowserWindow({
       width: 380,
       height: 440,
@@ -39,6 +43,7 @@ function createSplashWindow() {
       alwaysOnTop: true,
       skipTaskbar: false,
       center: true,
+      icon: iconPath,
       webPreferences: {
         nodeIntegration: true,
         contextIsolation: false,
@@ -85,13 +90,19 @@ function createWindow() {
   }
 
   try {
+    const mainIconPath = isDev
+      ? path.join(_rootDir, 'public', 'app-icons', 'gs-center.png')
+      : path.join(_rootDir, 'build', 'app-icons', 'GSC.ico');
+
     mainWindow = new BrowserWindow({
       width: 1480,
       height: 860,
       resizable: false,
       frame: false,
       show: false,
+      backgroundColor: '#020606',
       autoHideMenuBar: true,
+      icon: mainIconPath,
       webPreferences: {
         preload: isDev
           ? path.join(_rootDir, 'public/preload.js')
