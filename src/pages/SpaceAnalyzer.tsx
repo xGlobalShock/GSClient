@@ -8,6 +8,12 @@ import {
 import PageHeader from '../components/PageHeader';
 import '../styles/SpaceAnalyzer.css';
 
+const AnimatedDots: React.FC = () => (
+  <span className="sa-animated-dots">
+    <span>.</span><span>.</span><span>.</span>
+  </span>
+);
+
 export interface SpaceChild {
   name: string;
   path: string;
@@ -360,25 +366,25 @@ export default function SpaceAnalyzer({ isActive }: { isActive: boolean }) {
         >
           <div className="sa-metric-card">
             <div className="sa-metric-header"><Cpu size={14} /> Total Files</div>
-            <div className="sa-metric-value">{currentFiles.toLocaleString()}</div>
+            <div className="sa-metric-value">{!isScanning && !result ? '—' : currentFiles.toLocaleString()}</div>
             <div className="sa-metric-desc">Files Found</div>
           </div>
 
           <div className="sa-metric-card">
             <div className="sa-metric-header"><Radar size={14} /> Subdirectories</div>
-            <div className="sa-metric-value">{currentDirs.toLocaleString()}</div>
+            <div className="sa-metric-value">{!isScanning && !result ? '—' : currentDirs.toLocaleString()}</div>
             <div className="sa-metric-desc">Folders Found</div>
           </div>
 
           <div className="sa-metric-card">
             <div className="sa-metric-header"><Orbit size={14} /> Used Space</div>
-            <div className="sa-metric-value" style={{color: "var(--sa-cyan)"}}>{result && result.driveCapacity > 0 ? formatBytes(result.driveCapacity - result.driveFree) : isScanning ? 'Scanning...' : '—'}</div>
+            <div className="sa-metric-value" style={{color: "var(--sa-cyan)"}}>{result && result.driveCapacity > 0 ? formatBytes(result.driveCapacity - result.driveFree) : isScanning ? <><span>Scanning</span><AnimatedDots /></> : '—'}</div>
             <div className="sa-metric-desc">{result?.driveCapacity > 0 ? `of ${formatBytes(result.driveCapacity)}` : 'Disk Usage'}</div>
           </div>
           
           <div className="sa-metric-card">
             <div className="sa-metric-header"><Sparkles size={14} /> Free Space</div>
-            <div className="sa-metric-value" style={{color: "var(--sa-purple)"}}>{result && result.driveFree >= 0 ? formatBytes(result.driveFree) : isScanning ? 'Scanning...' : '—'}</div>
+            <div className="sa-metric-value" style={{color: "var(--sa-purple)"}}>{result && result.driveFree >= 0 ? formatBytes(result.driveFree) : isScanning ? <><span>Scanning</span><AnimatedDots /></> : '—'}</div>
             <div className="sa-metric-desc">Available</div>
           </div>
         </motion.div>

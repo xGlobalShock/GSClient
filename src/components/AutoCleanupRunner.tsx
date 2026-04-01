@@ -80,21 +80,23 @@ const AutoCleanupRunner: React.FC<Props> = ({ ready }) => {
         'info'
       );
 
+      // Fire all cleaners in parallel — avoids holding the renderer's
+      // microtask queue hostage for the full sequential duration.
+      const entries = WINDOWS_IDS.map(id => ({ id, channel: CLEANER_MAP[id] })).filter(e => e.channel);
+      const results = await Promise.allSettled(
+        entries.map(({ channel }) =>
+          (window as any).electron.ipcRenderer.invoke(channel) as Promise<CleanResult>
+        )
+      );
+
       let succeeded = 0;
       let totalSavedMB = 0;
 
-      for (const id of WINDOWS_IDS) {
-        const channel = CLEANER_MAP[id];
-        if (!channel) continue;
-        try {
-          const res: CleanResult = await (window as any).electron.ipcRenderer.invoke(channel);
-          if (res?.success) {
-            succeeded++;
-            const mb = parseSizeToMB(res.spaceSaved);
-            if (mb !== null) totalSavedMB += mb;
-          }
-        } catch {
-          // Silently skip failed cleaners so startup is not interrupted.
+      for (const res of results) {
+        if (res.status === 'fulfilled' && res.value?.success) {
+          succeeded++;
+          const mb = parseSizeToMB(res.value.spaceSaved);
+          if (mb !== null) totalSavedMB += mb;
         }
       }
 
