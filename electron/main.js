@@ -262,17 +262,18 @@ app.on('ready', async () => {
   hardwareMonitor._startDiskRefresh();
   hardwareMonitor._startRamCacheRefresh();
 
+  // Start full hardware info fetch early so it runs in parallel during splash
+  hardwareInfo.initHardwareInfo();
+
   await new Promise(r => setTimeout(r, 400));
 
   windowManager.sendSplashStatus('Detecting system hardware...');
   windowManager.sendSplashProgress(20);
 
-  hardwareInfo.initHardwareInfo();
-
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const componentDelay = 350;
 
-  // Smooth progress ticker: slowly advances 20→55 while hardware info loads in background
+  // Smooth progress ticker: slowly advances 20→55 while LHM discovers hardware
   windowManager.sendSplashStatus('Reading system configuration...');
   let tickerPct = 20;
   const tickerTarget = 55;
@@ -283,42 +284,38 @@ app.on('ready', async () => {
     }
   }, 100);
 
+  // Wait for LHM hardware names (fast — comes from the already-running LHM service)
+  // Falls back to empty names after 8s timeout
   try {
-    const hwPromise = hardwareInfo.getHwInfoPromise();
-    if (hwPromise) {
-      const hwInfo = await hwPromise;
-      clearInterval(progressTicker);
+    const lhmNamesPromise = hardwareMonitor.getLhmHardwareNamesPromise();
+    const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 8000));
+    const hwNames = await Promise.race([lhmNamesPromise, timeoutPromise]);
+    clearInterval(progressTicker);
 
-      if (hwInfo) {
-        const cpuText = (hwInfo.cpuName || 'unknown cpu').slice(0, 28) + (hwInfo.cpuName && hwInfo.cpuName.length > 28 ? '...' : '');
-        const gpuText = (hwInfo.gpuName || 'unknown gpu').slice(0, 28) + (hwInfo.gpuName && hwInfo.gpuName.length > 28 ? '...' : '');
-        const ramText = (hwInfo.ramInfo || 'unknown ram').slice(0, 28) + (hwInfo.ramInfo && hwInfo.ramInfo.length > 28 ? '...' : '');
+    if (hwNames && (hwNames.cpuName || hwNames.gpuName)) {
+      const cpuText = (hwNames.cpuName || 'Unknown').slice(0, 28) + (hwNames.cpuName && hwNames.cpuName.length > 28 ? '...' : '');
+      const gpuText = (hwNames.gpuName || 'Unknown').slice(0, 28) + (hwNames.gpuName && hwNames.gpuName.length > 28 ? '...' : '');
+      const ramText = hwNames.ramTotalGB > 0 ? `${hwNames.ramTotalGB} GB` : 'Unknown';
 
-        windowManager.sendSplashStatus(`Processor: ${cpuText}`);
-        windowManager.sendSplashDetails(`CPU details: ${hwInfo.cpuName || 'unknown cpu'}`);
-        windowManager.sendSplashProgress(60);
-        await sleep(componentDelay);
+      windowManager.sendSplashStatus(`Processor: ${cpuText}`);
+      windowManager.sendSplashProgress(60);
+      await sleep(componentDelay);
 
-        windowManager.sendSplashStatus(`Graphics: ${gpuText}`);
-        windowManager.sendSplashDetails(`GPU details: ${hwInfo.gpuName || 'unknown gpu'}`);
-        windowManager.sendSplashProgress(70);
-        await sleep(componentDelay);
+      windowManager.sendSplashStatus(`Graphics: ${gpuText}`);
+      windowManager.sendSplashProgress(70);
+      await sleep(componentDelay);
 
-        windowManager.sendSplashStatus(`Installed Memory: ${ramText}`);
-        windowManager.sendSplashDetails(`RAM details: ${hwInfo.ramInfo || 'unknown ram'}`);
-        windowManager.sendSplashProgress(78);
-        await sleep(componentDelay);
-      } else {
-        windowManager.sendSplashProgress(78);
-      }
+      windowManager.sendSplashStatus(`Installed Memory: ${ramText}`);
+      windowManager.sendSplashProgress(78);
+      await sleep(componentDelay);
     } else {
-      clearInterval(progressTicker);
+      windowManager.sendSplashStatus('Hardware detected');
       windowManager.sendSplashProgress(78);
     }
   } catch (err) {
     clearInterval(progressTicker);
-    console.error('[MAIN] hardware discovery failed', err);
-    windowManager.sendSplashStatus('Hardware discovery skipped');
+    console.error('[MAIN] LHM hardware names failed', err);
+    windowManager.sendSplashStatus('Hardware detected');
     windowManager.sendSplashProgress(78);
     await sleep(300);
   }
@@ -369,38 +366,33 @@ app.on('ready', async () => {
 
   hardwareMonitor._startRealtimePush();
 
-  // Smooth ticker 90→100 while waiting for main window readiness
+  // Smooth ticker 90→99 while waiting for main window readiness
   windowManager.sendSplashStatus('Completing initialization...');
   let uiTickerPct = 90;
   const uiTicker = setInterval(() => {
-    if (uiTickerPct < 100) {
-      uiTickerPct = Math.min(100, uiTickerPct + 0.3);
+    if (uiTickerPct < 99) {
+      uiTickerPct = Math.min(99, uiTickerPct + 0.8);
       windowManager.sendSplashProgress(Math.round(uiTickerPct));
     }
-  }, 150);
+  }, 80);
 
   // Block until the main window is fully painted AND React reports ready.
   await Promise.all([readyToShowPromise, appReadyPromise]);
+
+  // Also wait for full hardware info to finish (max 3s so we don't block forever)
+  const hwInfoPromise = hardwareInfo.getHwInfoPromise();
+  if (hwInfoPromise) {
+    await Promise.race([hwInfoPromise, new Promise(r => setTimeout(r, 3000))]);
+  }
+
   clearInterval(uiTicker);
 
-  // Smoothly ramp from current position to 100% (1% per tick)
-  const rampTo100 = () => new Promise((resolve) => {
-    const ramp = setInterval(() => {
-      if (uiTickerPct < 100) {
-        uiTickerPct = Math.min(100, uiTickerPct + 1);
-        windowManager.sendSplashProgress(Math.round(uiTickerPct));
-      } else {
-        clearInterval(ramp);
-        resolve();
-      }
-    }, 60);
-  });
-
+  // Snap to 100% and fade out immediately
   windowManager.sendSplashStatus('Initialization complete');
-  await rampTo100();
+  windowManager.sendSplashProgress(100);
 
   // Brief pause at 100% so user sees it
-  await new Promise(r => setTimeout(r, 300));
+  await new Promise(r => setTimeout(r, 250));
 
   // Trigger smooth fade-out via splash:done IPC
   const splashWin = windowManager.getSplashWindow();

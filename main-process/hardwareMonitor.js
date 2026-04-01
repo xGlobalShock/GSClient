@@ -86,6 +86,13 @@ let _nvGpuTemp = -1;
 let _nvGpuVramUsed = -1;
 let _nvGpuVramTotal = -1;
 
+// ── LHM hardware identity (for splash screen) ──
+let _lhmHwNames = null;
+let _lhmHwNamesResolve = null;
+const _lhmHwNamesPromise = new Promise((resolve) => { _lhmHwNamesResolve = resolve; });
+
+function getLhmHardwareNamesPromise() { return _lhmHwNamesPromise; }
+
 // ── LHM sensor cache ──
 function _getLhmCachePath() {
   try { return path.join(app.getPath('userData'), 'gs_lhm_cache.json'); }
@@ -258,8 +265,26 @@ function startLHMService() {
     '',
     '    if ($cpuTemp -eq $null -and $mbCpuTemp -ne $null) { $cpuTemp = $mbCpuTemp }',
     '',
-    '    # Diagnostic dump on first iteration',
+    '    # Output hardware identifiers on first iteration (for splash screen)',
     '    if ($iteration -eq 0) {',
+    '      $hwCpuName = ""; $hwGpuName = ""; $hwRamTotalGB = 0',
+    '      foreach ($hw in $computer.Hardware) {',
+    '        $ht = $hw.HardwareType.ToString()',
+    '        if ($ht -eq "Cpu" -and $hwCpuName -eq "") { $hwCpuName = $hw.Name }',
+    '        if ($ht -match "Gpu" -and $hwGpuName -eq "") { $hwGpuName = $hw.Name }',
+    '        if ($ht -eq "Memory") {',
+    '          foreach ($s in $hw.Sensors) {',
+    '            if ($s.SensorType.ToString() -eq "Data" -and $s.Name -eq "Memory Used" -and $null -ne $s.Value) {',
+    '              # LHM shows used; we get total from system',
+    '            }',
+    '          }',
+    '        }',
+    '      }',
+    '      try { $hwRamTotalGB = [math]::Round((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB) } catch { $hwRamTotalGB = 0 }',
+    '      [Console]::Out.WriteLine("HWNAMES|CPU:" + $hwCpuName + "|GPU:" + $hwGpuName + "|RAMGB:" + $hwRamTotalGB)',
+    '      [Console]::Out.Flush()',
+    '',
+    '      # Diagnostic dump',
     '      $sensorInfo = @()',
     '      foreach ($hw in $computer.Hardware) {',
     '        $hwType = $hw.HardwareType.ToString()',
@@ -354,6 +379,24 @@ function startLHMService() {
     buffer = lines.pop();
     for (const line of lines) {
       const trimmed = line.trim();
+
+      // Parse hardware identity line (first iteration only)
+      if (trimmed.startsWith('HWNAMES|') && !_lhmHwNames) {
+        const names = { cpuName: '', gpuName: '', ramTotalGB: 0 };
+        for (const part of trimmed.split('|').slice(1)) {
+          const colonIdx = part.indexOf(':');
+          if (colonIdx === -1) continue;
+          const k = part.substring(0, colonIdx);
+          const val = part.substring(colonIdx + 1).trim();
+          if (k === 'CPU') names.cpuName = val;
+          else if (k === 'GPU') names.gpuName = val;
+          else if (k === 'RAMGB') names.ramTotalGB = parseInt(val, 10) || 0;
+        }
+        _lhmHwNames = names;
+        if (_lhmHwNamesResolve) { _lhmHwNamesResolve(names); _lhmHwNamesResolve = null; }
+        continue;
+      }
+
       const tokens = trimmed.split('|');
       for (const token of tokens) {
         const [key, valStr] = token.split(':');
@@ -902,6 +945,7 @@ function registerIPC() {
 module.exports = {
   startLHMService,
   stopLHMService,
+  getLhmHardwareNamesPromise,
   _startPerfCounterService,
   _stopPerfCounterService,
   _startDiskRefresh,
