@@ -10,6 +10,26 @@ export interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
   {
+    version: '1.6.4',
+    date: '2026-04-02',
+    highlights: 'Minor hotfix addressing critical bugs and improving stability.',
+    changes: [
+      // New Features
+      { type: 'new', text: 'Added Clear Delivery Optimization, Clear Quick Access History, and Clear System Temp as dedicated cleaner cards.' },
+
+      // Fixes
+      { type: 'fixed', text: 'Fixed Microsoft Edge appearing twice in the Windows Debloat app list.' },
+      { type: 'fixed', text: 'Fixed auto-updater freezing after download — app now auto-installs immediately without a manual Install step.' },
+      { type: 'fixed', text: 'Fixed potential double quitAndInstall call that could cause update failures.' },
+      { type: 'fixed', text: 'Fixed Full Cache Flush modal incorrectly including Quick Access History in its cleanup queue.' },
+
+      // Improvements
+      { type: 'improved', text: 'Windows Debloat now loads fresh on demand — removed stale preload cache that caused duplicates.' },
+      { type: 'improved', text: 'Auto Cleanup on startup now only runs cleaners visible in the UI, preventing hidden background operations.' },
+      { type: 'improved', text: 'autoInstallOnAppQuit enabled as a safety net so updates always apply if the app closes after a download.' },
+    ],
+  },
+  {
     version: '1.6.3',
     date: '2026-04-01',
     highlights: 'Major update with new features, UI/UX improvements, and critical fixes.',
