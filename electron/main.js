@@ -242,7 +242,9 @@ app.on('ready', async () => {
     .then(result => softwareUpdates.setSoftwareUpdatesCache(result))
     .catch(() => { });
 
-  windowManager.sendSplashStatus('Initializing core services...');
+  await new Promise(r => setTimeout(r, 400));
+
+  windowManager.sendSplashStatus('Initializing core components...');
   windowManager.sendSplashProgress(10);
 
   // Enable winget InstallerHashOverride (requires admin)
@@ -250,75 +252,79 @@ app.on('ready', async () => {
     try { execSync('winget settings --enable InstallerHashOverride', { stdio: 'ignore', windowsHide: true, timeout: 10000 }); } catch { }
   }
 
-  windowManager.sendSplashStatus('Loading hardware sensors...');
+  await new Promise(r => setTimeout(r, 400));
+
+  windowManager.sendSplashStatus('Loading sensor data...');
   windowManager.sendSplashProgress(15);
 
   hardwareMonitor.startLHMService();
-
-  windowManager.sendSplashStatus('Loading performance metrics...');
-  windowManager.sendSplashProgress(25);
-
   hardwareMonitor._startPerfCounterService();
   hardwareMonitor._startDiskRefresh();
   hardwareMonitor._startRamCacheRefresh();
 
-  windowManager.sendSplashStatus('Discovering Processor');
+  await new Promise(r => setTimeout(r, 400));
+
+  windowManager.sendSplashStatus('Detecting system hardware...');
   windowManager.sendSplashProgress(20);
 
   hardwareInfo.initHardwareInfo();
 
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-  const componentDelay = 900;
+  const componentDelay = 350;
+
+  // Smooth progress ticker: slowly advances 20→55 while hardware info loads in background
+  windowManager.sendSplashStatus('Reading system configuration...');
+  let tickerPct = 20;
+  const tickerTarget = 55;
+  const progressTicker = setInterval(() => {
+    if (tickerPct < tickerTarget) {
+      tickerPct = Math.min(tickerTarget, tickerPct + 0.5);
+      windowManager.sendSplashProgress(Math.round(tickerPct));
+    }
+  }, 100);
 
   try {
     const hwPromise = hardwareInfo.getHwInfoPromise();
     if (hwPromise) {
-      windowManager.sendSplashStatus('Discovering CPU');
-      windowManager.sendSplashProgress(20);
-      await sleep(componentDelay);
-
       const hwInfo = await hwPromise;
+      clearInterval(progressTicker);
+
       if (hwInfo) {
         const cpuText = (hwInfo.cpuName || 'unknown cpu').slice(0, 28) + (hwInfo.cpuName && hwInfo.cpuName.length > 28 ? '...' : '');
         const gpuText = (hwInfo.gpuName || 'unknown gpu').slice(0, 28) + (hwInfo.gpuName && hwInfo.gpuName.length > 28 ? '...' : '');
         const ramText = (hwInfo.ramInfo || 'unknown ram').slice(0, 28) + (hwInfo.ramInfo && hwInfo.ramInfo.length > 28 ? '...' : '');
 
-        windowManager.sendSplashStatus(`CPU: ${cpuText}`);
+        windowManager.sendSplashStatus(`Processor: ${cpuText}`);
         windowManager.sendSplashDetails(`CPU details: ${hwInfo.cpuName || 'unknown cpu'}`);
-        windowManager.sendSplashProgress(34);
+        windowManager.sendSplashProgress(60);
         await sleep(componentDelay);
 
-        windowManager.sendSplashStatus('Discovering GPU');
-        await sleep(componentDelay);
-        windowManager.sendSplashStatus(`GPU: ${gpuText}`);
+        windowManager.sendSplashStatus(`Graphics: ${gpuText}`);
         windowManager.sendSplashDetails(`GPU details: ${hwInfo.gpuName || 'unknown gpu'}`);
-        windowManager.sendSplashProgress(55);
+        windowManager.sendSplashProgress(70);
         await sleep(componentDelay);
 
-        windowManager.sendSplashStatus('Discovering RAM');
-        await sleep(componentDelay);
-        windowManager.sendSplashStatus(`RAM: ${ramText}`);
+        windowManager.sendSplashStatus(`Installed Memory: ${ramText}`);
         windowManager.sendSplashDetails(`RAM details: ${hwInfo.ramInfo || 'unknown ram'}`);
-        windowManager.sendSplashProgress(75);
+        windowManager.sendSplashProgress(78);
         await sleep(componentDelay);
-
-        windowManager.sendSplashStatus('Finalizing');
-        windowManager.sendSplashProgress(87);
-        await sleep(650);
+      } else {
+        windowManager.sendSplashProgress(78);
       }
+    } else {
+      clearInterval(progressTicker);
+      windowManager.sendSplashProgress(78);
     }
   } catch (err) {
+    clearInterval(progressTicker);
     console.error('[MAIN] hardware discovery failed', err);
-    windowManager.sendSplashStatus('Hardware discovery failed');
-    windowManager.sendSplashDetails('CPU: Unknown');
-    await sleep(200);
-    windowManager.sendSplashDetails('GPU: Unknown');
-    await sleep(200);
-    windowManager.sendSplashDetails('RAM: Unknown');
+    windowManager.sendSplashStatus('Hardware discovery skipped');
+    windowManager.sendSplashProgress(78);
+    await sleep(300);
   }
 
-  windowManager.sendSplashStatus('Preparing user interface...');
-  windowManager.sendSplashProgress(90);
+  windowManager.sendSplashStatus('Verifying system state...');
+  windowManager.sendSplashProgress(82);
 
   windowManager.createWindow();
   const appWindow = windowManager.getMainWindow();
@@ -336,15 +342,7 @@ app.on('ready', async () => {
 
   autoUpdater.initAutoUpdater();
 
-  // ── Splash → Main Window Handshake (event-driven, no timeouts) ────────────
-  //
-  // Sequence:
-  //   1. Wait for Electron's ready-to-show (first compositor frame painted).
-  //   2. Wait for renderer's 'app:ready' IPC  (React finished initial load).
-  //   3. Show the main window (it's fully painted — no transparent flash).
-  //   4. Tell splash to fade out, wait for 'splash:fade-complete' IPC.
-  //   5. Close the splash window.
-  //
+  // ── Splash → Main Window Handshake ────────────────────────────────────────
   const mainWindow = windowManager.getMainWindow();
 
   const readyToShowPromise = new Promise((resolve) => {
@@ -366,23 +364,66 @@ app.on('ready', async () => {
   _prewarmScanCaches({ updateSplash: false }).catch(() => { });
   softwareUpdatesPromise.catch(() => { });
 
-  windowManager.sendSplashStatus('Finalizing setup...');
-  windowManager.sendSplashProgress(95);
+  windowManager.sendSplashStatus('Loading interface...');
+  windowManager.sendSplashProgress(90);
 
   hardwareMonitor._startRealtimePush();
 
+  // Smooth ticker 90→100 while waiting for main window readiness
+  windowManager.sendSplashStatus('Completing initialization...');
+  let uiTickerPct = 90;
+  const uiTicker = setInterval(() => {
+    if (uiTickerPct < 100) {
+      uiTickerPct = Math.min(100, uiTickerPct + 0.3);
+      windowManager.sendSplashProgress(Math.round(uiTickerPct));
+    }
+  }, 150);
+
   // Block until the main window is fully painted AND React reports ready.
   await Promise.all([readyToShowPromise, appReadyPromise]);
+  clearInterval(uiTicker);
 
-  // Close splash 1 second before showing the app.
+  // Smoothly ramp from current position to 100% (1% per tick)
+  const rampTo100 = () => new Promise((resolve) => {
+    const ramp = setInterval(() => {
+      if (uiTickerPct < 100) {
+        uiTickerPct = Math.min(100, uiTickerPct + 1);
+        windowManager.sendSplashProgress(Math.round(uiTickerPct));
+      } else {
+        clearInterval(ramp);
+        resolve();
+      }
+    }, 60);
+  });
+
+  windowManager.sendSplashStatus('Initialization complete');
+  await rampTo100();
+
+  // Brief pause at 100% so user sees it
+  await new Promise(r => setTimeout(r, 300));
+
+  // Trigger smooth fade-out via splash:done IPC
   const splashWin = windowManager.getSplashWindow();
   if (splashWin && !splashWin.isDestroyed()) {
-    splashWin.close();
+    const fadePromise = new Promise((resolve) => {
+      const handler = () => {
+        ipcMain.removeListener('splash:fade-complete', handler);
+        resolve();
+      };
+      ipcMain.on('splash:fade-complete', handler);
+      // Safety timeout in case animation/IPC fails
+      setTimeout(resolve, 1200);
+    });
+
+    splashWin.webContents.send('splash:done');
+    await fadePromise;
+
+    if (!splashWin.isDestroyed()) {
+      splashWin.close();
+    }
   }
 
-  await new Promise(r => setTimeout(r, 1000));
-
-  // Show the main window after the splash has been gone for 1 second.
+  // Show main window immediately after splash fades out
   const win = windowManager.getMainWindow();
   if (win && !win.isDestroyed()) {
     win.show();

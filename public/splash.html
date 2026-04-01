@@ -135,6 +135,13 @@
   @keyframes fadeFrame {
     to { opacity: 0; transform: scale(1.015); filter: blur(3px); }
   }
+  .fade-out-bg {
+    animation: fadeBg 0.5s cubic-bezier(0.4, 0, 1, 1) forwards;
+    pointer-events: none;
+  }
+  @keyframes fadeBg {
+    to { opacity: 0; }
+  }
 </style>
 </head>
 <body>
@@ -146,7 +153,7 @@
   <div class="splash-container" id="content">
     
     <div class="header">
-      <div class="status-badge"><span class="pulse-dot"></span> SYSTEM_BOOT</div>
+      <div class="status-badge"><span class="pulse-dot"></span> APP_BOOT</div>
       <div class="version" id="versionTag">LOADING...</div>
     </div>
 
@@ -201,7 +208,7 @@
       if (discoverMatch) {
         let base = `Discovering ${discoverMatch[1]}`;
         let dots = 0;
-        statusEl.textContent = `${base}...`;
+        statusEl.textContent = `${base}`;
 
         statusDotTimer = setInterval(() => {
           dots = (dots + 1) % 4; // 0..3
@@ -218,32 +225,44 @@
     });
 
     let currentPct = 0;
+    let displayPct = 0;
     let percentAnimation = null;
+    let lastProgressTime = performance.now();
 
     const setPercent = (targetPct) => {
       const fill = document.getElementById('progressFill');
       const pctText = document.getElementById('progressPct');
       targetPct = Math.min(100, Math.max(0, targetPct));
 
+      // Never go backwards (except for explicit 100%)
+      if (targetPct <= displayPct && targetPct < 100) return;
+
+      lastProgressTime = performance.now();
+
       if (percentAnimation) {
         cancelAnimationFrame(percentAnimation);
+        percentAnimation = null;
       }
 
-      const startPct = currentPct;
+      const startPct = displayPct;
       const diff = targetPct - startPct;
-      const duration = 500;
+      if (diff <= 0) return;
+
+      const duration = Math.min(600, Math.max(150, diff * 12));
       const startTime = performance.now();
 
       const animate = (time) => {
         const progress = Math.min(1, (time - startTime) / duration);
-        const eased = startPct + diff * (1 - Math.pow(1 - progress, 2));
+        const eased = startPct + diff * (1 - Math.pow(1 - progress, 3));
 
+        displayPct = eased;
         fill.style.width = `${eased}%`;
         pctText.textContent = `${Math.round(eased)}%`;
 
         if (progress < 1) {
           percentAnimation = requestAnimationFrame(animate);
         } else {
+          displayPct = targetPct;
           currentPct = targetPct;
           fill.style.width = `${targetPct}%`;
           pctText.textContent = `${Math.round(targetPct)}%`;
@@ -253,6 +272,14 @@
 
       percentAnimation = requestAnimationFrame(animate);
     };
+
+    // Trickle: slowly advance progress when no updates received (prevents visual stall)
+    const trickleTimer = setInterval(() => {
+      const elapsed = performance.now() - lastProgressTime;
+      if (elapsed > 1200 && displayPct > 0 && displayPct < 92) {
+        setPercent(Math.min(92, Math.round(displayPct + 0.4)));
+      }
+    }, 200);
 
     ipcRenderer.on('splash:progress', (_e, pct) => {
       setPercent(pct);
@@ -306,6 +333,7 @@
     });
 
     ipcRenderer.on('splash:done', () => {
+      clearInterval(trickleTimer);
       if (hardwareDetailsTimer) {
         clearInterval(hardwareDetailsTimer);
         hardwareDetailsTimer = null;
@@ -319,21 +347,36 @@
         percentAnimation = null;
       }
 
-      setStatusText('READY. LAUNCHING...');
+      setStatusText('Starting GS Center...');
       setPercent(100);
       currentPct = 100;
+      displayPct = 100;
 
-      // Start fade immediately — the main window is already visible behind us.
-      const content = document.getElementById('content');
-      if (content) {
-        content.classList.add('fade-out');
-        content.addEventListener('animationend', () => {
+      // Brief pause at 100% so the user sees completion, then fade out
+      setTimeout(() => {
+        const content = document.getElementById('content');
+        const flare = document.querySelector('.ambient-flare');
+        const gridWrap = document.querySelector('.grid-wrap');
+        const scanOverlay = document.querySelector('.scan-overlay');
+
+        // Fade all layers for a clean exit
+        if (flare) flare.classList.add('fade-out-bg');
+        if (gridWrap) gridWrap.classList.add('fade-out-bg');
+        if (scanOverlay) scanOverlay.classList.add('fade-out-bg');
+
+        if (content) {
+          content.classList.add('fade-out');
+          content.addEventListener('animationend', () => {
+            ipcRenderer.send('splash:fade-complete');
+          }, { once: true });
+          // Safety timeout in case animationend never fires
+          setTimeout(() => {
+            ipcRenderer.send('splash:fade-complete');
+          }, 800);
+        } else {
           ipcRenderer.send('splash:fade-complete');
-        }, { once: true });
-      } else {
-        // Safety: if DOM is missing, unblock main process anyway.
-        ipcRenderer.send('splash:fade-complete');
-      }
+        }
+      }, 150);
     });
   </script>
 </body>
