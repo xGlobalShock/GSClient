@@ -425,10 +425,15 @@ const description = release.body?.trim() || undefined;
                     )}
                     <div className="whatsnew-changes">
                       {entry.changes.map((c, j) => (
-                        <div className="whatsnew-change" key={j}>
-                          <span className={`whatsnew-change-badge whatsnew-badge--${c.type}`}>{c.type}</span>
-                          <span>{c.text}</span>
-                        </div>
+                        <React.Fragment key={j}>
+                          {j > 0 && c.type !== entry.changes[j - 1].type && (
+                            <div className="whatsnew-separator" aria-hidden="true" />
+                          )}
+                          <div className="whatsnew-change">
+                            <span className={`whatsnew-change-badge whatsnew-badge--${c.type}`}>{c.type}</span>
+                            <span>{c.text}</span>
+                          </div>
+                        </React.Fragment>
                       ))}
                     </div>
                   </div>

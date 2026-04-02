@@ -10,9 +10,9 @@ export interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
   {
-    version: '1.6.8',
-    date: '2026-04-02',
-    highlights: 'Performance Tweaks update with new tweaks and improvements.',
+    version: '1.6.2 ➜ 1.6.8',
+    date: '2026-03-01 ➜ 2026-04-02',
+    highlights: 'Major Changes, Improvements and new features across the board',
     changes: [
       { type: 'new', text: 'Overlay HUD: frameless, always-on-top overlay with FPS and real-time system metrics (configurable position and hotkey).' },
       { type: 'new', text: 'System Repair Panel: unified interface for SFC, DISM, and ChkDsk with live output and real-time SFC progress.' },
