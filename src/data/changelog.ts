@@ -3,7 +3,7 @@ export interface ChangelogEntry {
   date: string;
   highlights?: string;
   changes: {
-    type: 'new' | 'improved' | 'fixed';
+    type: 'new' | 'improved' | 'fixed' | 'removed';
     text: string;
   }[];
 }
@@ -15,6 +15,7 @@ const changelog: ChangelogEntry[] = [
     highlights: 'PC Tweaks update with new features and improvements.',
     changes: [
       { type: 'new', text: 'Added two PC tweaks and integrated them into the Performance page.' },
+      { type: 'removed', text: 'Removed Scan HUD from the Performance page, to smooth out the user experience.' },
       { type: 'improved', text: 'Clarified the TdrLevel description in the UI for clearer guidance.' },
       { type: 'improved', text: 'Updated the Memory Compression tweak to more accurately reflect its function and benefits.' },
     ],
@@ -29,7 +30,7 @@ const changelog: ChangelogEntry[] = [
       { type: 'new', text: 'Overlay: FPS Overlay enable toggle moved into the section panel header, freeing the body for configuration controls.' },
       { type: 'new', text: 'Settings: Hardware Acceleration toggle added to the GPU card with full on/off support and per-boot persistence.' },
       { type: 'new', text: 'Settings: toggling HW Acceleration shows a popup with Restart Now (saves + relaunches) and Dismiss (reverts toggle).' },
-      { type: 'new', text: 'Settings: Rendering tab removed — Hardware Acceleration card consolidated into the About tab.' },
+      { type: 'removed', text: 'Settings: Rendering tab removed — Hardware Acceleration card consolidated into the About tab.' },
       { type: 'new', text: 'Settings: Check for Updates button moved inline into the About panel header next to the title.' },
 
       // Fixes
