@@ -165,7 +165,7 @@
 }
 
 /* ── Animated scan line — sweeps down the card for live HUD feel ── */
-.hud-scan-line {
+/* .hud-scan-line {
   position: absolute;
   top: 0;
   left: 0;
@@ -183,7 +183,7 @@
   opacity: 0.6;
   will-change: transform, opacity;
   transform: translateZ(0);
-}
+} */
 
 @keyframes hud-live-scan {
   0%   { transform: translateY(0) translateZ(0);   opacity: 0; }
