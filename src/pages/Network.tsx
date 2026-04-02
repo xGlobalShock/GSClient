@@ -59,7 +59,7 @@ const SpeedEngine = React.memo(({
     const wv = wvRef.current;
     if (!wv) return;
 
-    let failSafeTimer: NodeJS.Timeout;
+    let failSafeTimer: ReturnType<typeof setTimeout> | undefined;
     const clearLoader = () => {
       setWvLoading(false);
       if (failSafeTimer) clearTimeout(failSafeTimer);

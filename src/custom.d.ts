@@ -23,6 +23,21 @@ declare module '*.gif' {
   export default value;
 }
 
+// Style imports (allow side-effect or module CSS imports)
+declare module '*.css';
+declare module '*.scss';
+declare module '*.less';
+declare module '*.module.css';
+declare module '*.module.scss';
+
+// Minimal NodeJS type fallbacks to avoid needing @types/node in dev envs
+declare namespace NodeJS {
+  interface Timeout {}
+  interface ProcessEnv {
+    [key: string]: string | undefined;
+  }
+}
+
 interface Window {
   __WDEBLOAT_PRELOADED__?: any;
   electron: {
