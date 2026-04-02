@@ -45,6 +45,13 @@ ChkReg 'usb' 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\USB' 'DisableSelective
 ChkReg 'dvr' 'HKCU:\\System\\GameConfigStore' 'GameDVR_Enabled'
 ChkReg 'w32' 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\PriorityControl' 'Win32PrioritySeparation'
 ChkReg 'gprio' 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile\\Tasks\\Games' 'Priority'
+ChkReg 'lsc' 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management' 'LargeSystemCache'
+try {
+  $nti = Get-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile' -Name 'NetworkThrottlingIndex' -ErrorAction SilentlyContinue
+  if ($nti -and ($nti.PSObject.Properties.Name -contains 'NetworkThrottlingIndex')) {
+    $r['nti'] = @{ exists = $true; value = [uint32]$nti.NetworkThrottlingIndex }
+  } else { $r['nti'] = @{ exists = $false; value = $null } }
+} catch { $r['nti'] = @{ exists = $false; value = $null } }
 try {
   $mc = (Get-MMAgent -ErrorAction SilentlyContinue).MemoryCompression
   if ($null -ne $mc) { $r['mc'] = @{ exists = $true; value = [int]$mc } } else { $r['mc'] = @{ exists = $false; value = $null } }
@@ -271,6 +278,28 @@ function registerIPC() {
     }
   });
 
+  ipcMain.handle('tweak:apply-large-system-cache', async () => {
+    try {
+      const cmd = `Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management' -Name 'LargeSystemCache' -Value 1 -Type DWord -Force; Write-Host 'LargeSystemCache applied'`;
+      await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${cmd}"`, { shell: true });
+      _tweakCheckCache = null;
+      return { success: true, message: 'Large System Cache tweak applied successfully' };
+    } catch (error) {
+      return { success: false, message: `Error: ${error.message}` };
+    }
+  });
+
+  ipcMain.handle('tweak:apply-network-throttling-index', async () => {
+    try {
+      const cmd = `If (-not (Test-Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile')) { New-Item -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile' -Force | Out-Null }; Set-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile' -Name 'NetworkThrottlingIndex' -Value ([uint32]4294967295) -Type DWord -Force; Write-Host 'NetworkThrottlingIndex applied'`;
+      await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${cmd}"`, { shell: true });
+      _tweakCheckCache = null;
+      return { success: true, message: 'Network Throttling disabled successfully' };
+    } catch (error) {
+      return { success: false, message: `Error: ${error.message}` };
+    }
+  });
+
   // Check tweaks
   ipcMain.handle('tweak:check-irq-priority', async () => {
     try { return _tweakResult(await _runAllTweakChecks(), 'irq', 1); }
@@ -336,6 +365,16 @@ function registerIPC() {
     catch (error) { return { applied: false, exists: false, value: null, error: error.message || String(error) }; }
   });
 
+  ipcMain.handle('tweak:check-network-throttling-index', async () => {
+    try { return _tweakResult(await _runAllTweakChecks(), 'nti', 4294967295); }
+    catch (error) { return { applied: false, exists: false, value: null, error: error.message || String(error) }; }
+  });
+
+  ipcMain.handle('tweak:check-large-system-cache', async () => {
+    try { return _tweakResult(await _runAllTweakChecks(), 'lsc', 1); }
+    catch (error) { return { applied: false, exists: false, value: null, error: error.message || String(error) }; }
+  });
+
   // Reset tweaks
   ipcMain.handle('tweak:reset-games-priority', async () => {
     try {
@@ -344,6 +383,24 @@ function registerIPC() {
       _tweakCheckCache = null;
       return { success: true, message: 'Games Priority reset to default' };
     } catch (error) { return { success: false, message: 'Failed to reset Games Priority - Admin privileges required' }; }
+  });
+
+  ipcMain.handle('tweak:reset-network-throttling-index', async () => {
+    try {
+      const cmd = `Remove-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile' -Name 'NetworkThrottlingIndex' -Force -ErrorAction Stop`;
+      await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${cmd}"`, { shell: true });
+      _tweakCheckCache = null;
+      return { success: true, message: 'Network Throttling Index reset to default' };
+    } catch (error) { return { success: false, message: 'Failed to reset Network Throttling Index - Admin privileges required' }; }
+  });
+
+  ipcMain.handle('tweak:reset-large-system-cache', async () => {
+    try {
+      const cmd = `Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management' -Name 'LargeSystemCache' -Value 0 -Type DWord -Force`;
+      await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${cmd}"`, { shell: true });
+      _tweakCheckCache = null;
+      return { success: true, message: 'Large System Cache reset to default' };
+    } catch (error) { return { success: false, message: 'Failed to reset Large System Cache - Admin privileges required' }; }
   });
 
   ipcMain.handle('tweak:reset-irq-priority', async () => {

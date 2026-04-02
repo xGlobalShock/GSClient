@@ -25,6 +25,8 @@ const TWEAK_MAP: Record<string, string> = {
   'win32-priority': 'tweak:apply-win32-priority',
   'memory-compression': 'tweak:apply-memory-compression',
   'games-priority': 'tweak:apply-games-priority',
+  'network-throttling-index': 'tweak:apply-network-throttling-index',
+  'large-system-cache': 'tweak:apply-large-system-cache',
 };
 
 const RESET_MAP: Record<string, string> = {
@@ -42,6 +44,8 @@ const RESET_MAP: Record<string, string> = {
   'win32-priority': 'tweak:reset-win32-priority',
   'memory-compression': 'tweak:reset-memory-compression',
   'games-priority': 'tweak:reset-games-priority',
+  'network-throttling-index': 'tweak:reset-network-throttling-index',
+  'large-system-cache': 'tweak:reset-large-system-cache',
 };
 
 const CHECK_MAP: Record<string, string> = {
@@ -59,6 +63,8 @@ const CHECK_MAP: Record<string, string> = {
   'win32-priority': 'tweak:check-win32-priority',
   'memory-compression': 'tweak:check-memory-compression',
   'games-priority': 'tweak:check-games-priority',
+  'network-throttling-index': 'tweak:check-network-throttling-index',
+  'large-system-cache': 'tweak:check-large-system-cache',
 };
 
 type CategoryId = 'cpu' | 'gpu' | 'memory' | 'network' | 'display' | 'gamedvr' | 'hardware';
@@ -66,8 +72,8 @@ type CategoryId = 'cpu' | 'gpu' | 'memory' | 'network' | 'display' | 'gamedvr' |
 const TWEAK_CATEGORIES: Record<CategoryId, string[]> = {
   cpu:      ['irq-priority', 'win32-priority', 'games-priority'],
   gpu:      ['gpu-scheduling', 'tdr-level'],
-  memory:   ['memory-compression'],
-  network:  ['network-interrupts'],
+  memory:   ['memory-compression', 'large-system-cache'],
+  network:  ['network-interrupts', 'network-throttling-index'],
   display:  ['fullscreen-optimization', 'overlay-test-mode', 'fse-behavior-mode'],
   gamedvr:  ['game-dvr', 'gdrv-policy', 'appcapture-disabled'],
   hardware: ['usb-suspend'],

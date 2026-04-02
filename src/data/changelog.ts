@@ -10,6 +10,20 @@ export interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
   {
+    version: '1.6.7',
+    date: '2026-04-02',
+    highlights: 'PC Tweaks update with new features and improvements.',
+    changes: [
+      { type: 'new', text: 'PC Tweaks: Add "Disable Network Throttling" (NetworkThrottlingIndex = 0xFFFFFFFF) to allow multimedia/network workloads to use full bandwidth.' },
+      { type: 'new', text: 'PC Tweaks: Add "Expand System File Cache" (LargeSystemCache = 1) to increase system file caching on systems with ample RAM.' },
+      { type: 'improved', text: 'Tweaks backend: added apply/check/reset IPC handlers for the new tweaks and improved registry check logic to handle unsigned DWORD values.' },
+      { type: 'improved', text: 'UI: Registered the new tweaks in the PC Tweaks page maps and categories so they appear and can be applied/reverted from the app.' },
+      { type: 'new', text: 'Docs: Added a new documentation file (Docs/PC_Tweaks.md) listing each tweak with registry path, value name and value.' },
+      { type: 'improved', text: 'Clarified the `TdrLevel` description to explain gamer impact and risks more succinctly.' },
+      { type: 'fixed', text: 'Fixed DWORD serialization for max unsigned values by casting to [uint32] in PowerShell checks to avoid signed-json mismatch.' },
+    ],
+  },
+  {
     version: '1.6.6',
     date: '2026-04-02',
     highlights: 'Overlay & Hardware Acceleration updates with new features, UI improvements, and critical fixes.',
