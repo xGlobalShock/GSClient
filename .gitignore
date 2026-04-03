@@ -46,6 +46,8 @@ Backup/
 # ── Project-specific ──
 ToDoList.md
 PC_Tweaks.md
+Suggestions.md
+Christitus-Tools.md
 
 # ── TypeScript ──
 *.tsbuildinfo

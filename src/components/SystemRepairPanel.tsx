@@ -66,8 +66,10 @@ const SystemRepairPanel: React.FC = () => {
 
         // SFC: "Verification X% complete." — update progress, don't append
         const sfcMatch = trimmed.match(/verification\s+(\d+)%\s+complete/i);
-        // DISM: lines like "[ ======    ] 34.5%" or just "34.5%"
-        const dismMatch = !sfcMatch && trimmed.match(/^\[.*?\]\s*([\d.]+)%|^\s*([\d.]+)%\s*$/i);
+        // DISM: handles both "[ ====55.5%  ]" (% inside) and "[ ==  ] 55.5%" (% outside)
+        const dismMatch = !sfcMatch && trimmed.match(
+          /^\[.*?([\d.]+)%.*\]|^\[.*?\]\s*([\d.]+)%|^\s*([\d.]+)%\s*$/i
+        );
 
         if (sfcMatch) {
           const pct = parseInt(sfcMatch[1], 10);
@@ -79,7 +81,7 @@ const SystemRepairPanel: React.FC = () => {
         }
 
         if (dismMatch) {
-          const pct = parseFloat(dismMatch[1] ?? dismMatch[2]);
+          const pct = parseFloat(dismMatch[1] ?? dismMatch[2] ?? dismMatch[3]);
           if (!isNaN(pct)) {
             setToolStates(prev => ({
               ...prev,
@@ -359,7 +361,8 @@ const SystemRepairPanel: React.FC = () => {
                       {modalState.lines.map((line, j) => {
                         // Insert a spacer after lines that end a logical section
                         const isSectionEnd = /initializing|this may take a moment/i.test(line)
-                          || /beginning verification phase/i.test(line);
+                          || /beginning verification phase/i.test(line)
+                          || /^image version:/i.test(line);   // DISM header end
                         // Highlight the final result line
                         const isResult = /windows resource protection/i.test(line)   // SFC
                           || /restore operation completed successfully/i.test(line)   // DISM success
@@ -374,12 +377,26 @@ const SystemRepairPanel: React.FC = () => {
                           </React.Fragment>
                         );
                       })}
-                      {modalState.verificationProgress !== null && modalState.verificationProgress < 100 && (
+                      {/* DISM — animated text fill-bar */}
+                      {openModal === 'dism' && modalState.verificationProgress !== null && (() => {
+                        const pct = modalState.verificationProgress ?? 0;
+                        const total = 36;
+                        const filled = Math.round((pct / 100) * total);
+                        const fill = filled > 0 ? '═'.repeat(Math.max(0, filled - 1)) + '>' : '';
+                        const empty = ' '.repeat(total - filled);
+                        return (
+                          <div className="repair-log-line repair-log-line--progress repair-log-line--progress-gap">
+                            {`[ ${fill}${empty} ]  ${pct.toFixed(1)}%`}
+                          </div>
+                        );
+                      })()}
+                      {/* SFC / ChkDsk — text percentage */}
+                      {openModal !== 'dism' && modalState.verificationProgress !== null && modalState.verificationProgress < 100 && (
                         <div className="repair-log-line repair-log-line--progress repair-log-line--progress-gap">
                           Verification [{modalState.verificationProgress}%] complete.
                         </div>
                       )}
-                      {/* Spacer after verification line, before final result */}
+                      {/* Spacer after progress indicator, before final result */}
                       {modalState.verificationProgress !== null && (
                         <div className="repair-log-spacer" />
                       )}
