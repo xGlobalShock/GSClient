@@ -1,13 +1,62 @@
 .health-score-card {
-  background: rgba(6, 8, 16, 0.55);
-  border: 1px solid rgba(0, 242, 255, 0.07);
+  background: rgba(6, 8, 16, 0.72);
+  border: 1px solid rgba(0, 242, 255, 0.18);
   border-radius: 12px;
   padding: 14px 16px;
   margin-bottom: 12px;
-  transition: border-color 0.2s;
+  position: relative;
+
+  /* GPU compositor layer — only transform is compositable */
+  transform: translateZ(0);
+  will-change: transform;
+  /*
+    z-index: 10 is required because transform creates a stacking context.
+    Without it, the compact dropdown (which overflows below PageHeader into
+    DashboardHero space) is buried under the later-in-DOM DashboardHero cards
+    whose own transform stacking contexts paint over us in DOM order.
+  */
+  z-index: 10;
+
+  /* contain: paint intentionally omitted — it clips the AnimatePresence
+     height animation and traps the compact dropdown inside the card bounds */
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
 }
+
+/* Left accent bar — static, painted once */
+.health-score-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 14px;
+  bottom: 14px;
+  width: 2px;
+  border-radius: 0 2px 2px 0;
+  background: linear-gradient(180deg, rgba(0, 242, 255, 0.9) 0%, rgba(0, 242, 255, 0.25) 100%);
+  pointer-events: none;
+}
+
+/*
+  Pre-painted glow overlay on its own compositor layer.
+  GPU fades opacity — zero CPU paint per hover frame.
+*/
+.health-score-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 0 0 1px rgba(0, 242, 255, 0.2), 0 6px 24px rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+  will-change: opacity;
+}
+
 .health-score-card:hover {
-  border-color: rgba(0, 242, 255, 0.16);
+  transform: translateY(-1px) translateZ(0);
+}
+
+.health-score-card:hover::after {
+  opacity: 1;
 }
 .health-score-header {
   display: flex;
@@ -85,15 +134,31 @@
   text-align: right;
 }
 .health-factor-bar-wrap {
+  position: relative;      /* required for absolute fill child */
   flex: 1;
   height: 4px;
   background: rgba(255, 255, 255, 0.06);
   border-radius: 2px;
   overflow: hidden;
 }
+/*
+  GPU-composited bar: transform: scaleX(var(--bar-scale)) only.
+  @keyframes handles entrance from 0 on mount (AnimatePresence remounts).
+  transition handles incremental score updates while expanded.
+*/
+@keyframes healthBarFill {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(var(--bar-scale, 0)); }
+}
 .health-factor-bar {
-  height: 100%;
+  position: absolute;
+  inset: 0;
   border-radius: 2px;
+  transform-origin: left center;
+  transform: scaleX(var(--bar-scale, 0));
+  animation: healthBarFill 0.6s ease-out both;
+  transition: transform 0.6s ease-out;
+  will-change: transform;
 }
 .health-bar-good { background: #00F2FF; }
 .health-bar-warning { background: #f59e0b; }
@@ -106,27 +171,58 @@
 .health-icon-unknown { color: rgba(228, 228, 231, 0.3); }
 
 /* ── Compact variant (inside PageHeader actions) ────────────────────── */
+/*
+  Pill chip: left half is a colored score-badge panel, right half is text.
+  No overflow:hidden needed — ::before has its own border-radius that matches
+  the pill parent, so it won't bleed into the pill's rounded corners.
+  This also keeps the absolutely-positioned dropdown unclipped.
+*/
 .health-score-card--compact {
-  padding: 5px 10px;
+  padding: 0 10px 0 0;
   margin-bottom: 0;
-  border-radius: 8px;
-  width: 190px;
-  height: 42px;
+  border-radius: 999px;
+  width: 194px;
+  height: 44px;
   display: flex;
   flex-direction: column;
   justify-content: center;
   position: relative;
   box-sizing: border-box;
+  border: 1px solid rgba(0, 242, 255, 0.28);
+  background: rgba(7, 9, 20, 0.92);
+  box-shadow: 0 0 16px rgba(0, 242, 255, 0.07), inset 0 1px 0 rgba(0, 242, 255, 0.09);
+}
+
+/* Left score-badge panel — pill-half, no overflow:hidden required */
+.health-score-card--compact::before {
+  top: 0;
+  bottom: 0;
+  width: 46px;
+  border-radius: 999px 0 0 999px;
+  background: rgba(0, 242, 255, 0.13);
+  border-right: 1px solid rgba(0, 242, 255, 0.2);
+}
+
+.health-score-card--compact .health-score-header {
+  gap: 0;
+  height: 44px;
+  align-items: center;
 }
 .health-score-card--compact .health-score-gauge {
-  width: 28px;
-  height: 28px;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1; /* paints above the ::before colored panel */
 }
 .health-score-card--compact .health-score-number {
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 800;
 }
-.health-score-card--compact .health-score-header {
-  gap: 8px;
+.health-score-card--compact .health-score-info {
+  padding-left: 9px;
+  flex: 1;
+  min-width: 0;
 }
 .health-score-card--compact .health-score-title {
   font-size: 11px;

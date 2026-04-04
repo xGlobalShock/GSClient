@@ -5,11 +5,14 @@
 
 const { ipcMain } = require('electron');
 const { execAsync, runPSScript } = require('./utils');
+const repairOverlay = require('./repairOverlay');
 
 let _isElevated = false;
 let _tweakCheckCache = null;
 let _tweakCheckAge = 0;
 let _tweakCheckInFlight = null; // deduplicate concurrent calls
+let _activeRepairProc = null;
+let _activeRepairTool = null;
 
 function init({ isElevated }) {
   _isElevated = isElevated;
@@ -562,6 +565,7 @@ function registerIPC() {
       } catch (_) {}
     };
 
+    repairOverlay.setActiveRepair('sfc', 'System File Checker', '#00F2FF');
     sendLine('SFC scan starting...');
     sendLine('Initializing System File Checker. This may take a moment.');
 
@@ -578,10 +582,13 @@ function registerIPC() {
           useConpty: true,
         });
       } catch (e) {
+        repairOverlay.clearActiveRepair();
         resolve({ success: false, message: 'PTY unavailable: ' + e.message });
         return;
       }
 
+      _activeRepairProc = ptyProcess;
+      _activeRepairTool = 'sfc';
       let fullOutput = '';
       let lineBuffer = '';
 
@@ -606,6 +613,13 @@ function registerIPC() {
           if (!line) return;
           fullOutput += line + '\n';
           sendLine(line);
+          // Parse SFC progress and forward to overlay
+          const sfcMatch = line.match(/verification\s+(\d+)%\s+complete/i);
+          if (sfcMatch) {
+            repairOverlay.pushProgress({ progress: parseInt(sfcMatch[1], 10), line });
+          } else {
+            repairOverlay.pushProgress({ line });
+          }
         });
       });
 
@@ -615,9 +629,17 @@ function registerIPC() {
           fullOutput += lineBuffer.trim() + '\n';
           sendLine(lineBuffer.trim());
         }
+        _activeRepairProc = null;
+        _activeRepairTool = null;
+        const success = exitCode === 0;
+        repairOverlay.pushProgress({
+          progress: 100,
+          status: success ? 'done' : 'error',
+          line: success ? 'SFC scan completed.' : 'SFC scan finished with errors.',
+        });
         resolve({
-          success: exitCode === 0,
-          message: fullOutput.trim() || (exitCode === 0 ? 'SFC scan completed successfully.' : 'SFC scan finished with errors.'),
+          success,
+          message: fullOutput.trim() || (success ? 'SFC scan completed successfully.' : 'SFC scan finished with errors.'),
         });
       });
     });
@@ -637,6 +659,7 @@ function registerIPC() {
       } catch (_) {}
     };
 
+    repairOverlay.setActiveRepair('dism', 'Windows Image Repair', '#a78bfa');
     sendLine('DISM scan starting...');
     sendLine('Initializing Windows image repair. This may take 20-40 minutes.');
 
@@ -645,25 +668,51 @@ function registerIPC() {
         '/Online', '/Cleanup-Image', '/RestoreHealth',
       ], { windowsHide: true, shell: true });
 
+      _activeRepairProc = proc;
+      _activeRepairTool = 'dism';
       let fullOutput = '';
+      const dismProgressRe = /^\[.*?([\d.]+)%.*\]|^\[.*?\]\s*([\d.]+)%|^\s*([\d.]+)%\s*$/i;
       const handleData = (buffer) => {
         const raw = buffer.toString('utf8').replace(/\r/g, '').replace(/\0/g, '');
         const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
         lines.forEach(line => {
           fullOutput += line + '\n';
           sendLine(line);
+          // Parse DISM progress and forward to overlay
+          const m = line.match(dismProgressRe);
+          if (m) {
+            const pct = parseFloat(m[1] ?? m[2] ?? m[3]);
+            if (!isNaN(pct)) {
+              repairOverlay.pushProgress({ progress: Math.round(pct), line });
+              return;
+            }
+          }
+          repairOverlay.pushProgress({ line });
         });
       };
 
       proc.stdout.on('data', handleData);
       proc.stderr.on('data', handleData);
       proc.on('close', (code) => {
+        _activeRepairProc = null;
+        _activeRepairTool = null;
+        const success = code === 0;
+        repairOverlay.pushProgress({
+          progress: 100,
+          status: success ? 'done' : 'error',
+          line: success ? 'DISM RestoreHealth completed.' : 'DISM finished with errors.',
+        });
         resolve({
-          success: code === 0,
-          message: fullOutput.trim() || (code === 0 ? 'DISM RestoreHealth completed successfully.' : 'DISM finished with errors.'),
+          success,
+          message: fullOutput.trim() || (success ? 'DISM RestoreHealth completed successfully.' : 'DISM finished with errors.'),
         });
       });
-      proc.on('error', (err) => resolve({ success: false, message: err.message }));
+      proc.on('error', (err) => {
+        _activeRepairProc = null;
+        _activeRepairTool = null;
+        repairOverlay.pushProgress({ status: 'error', line: err.message });
+        resolve({ success: false, message: err.message });
+      });
     });
   });
 
@@ -681,6 +730,7 @@ function registerIPC() {
       } catch (_) {}
     };
 
+    repairOverlay.setActiveRepair('chkdsk', 'Disk Corruption Scan', '#f59e0b');
     sendLine('ChkDsk starting...');
     sendLine('Scheduling disk corruption scan on C:');
 
@@ -690,6 +740,8 @@ function registerIPC() {
         shell: true,
       });
 
+      _activeRepairProc = proc;
+      _activeRepairTool = 'chkdsk';
       let fullOutput = '';
       const handleData = (buffer) => {
         const raw = buffer.toString('utf8').replace(/\r/g, '').replace(/\0/g, '');
@@ -697,18 +749,38 @@ function registerIPC() {
         lines.forEach(line => {
           fullOutput += line + '\n';
           sendLine(line);
+          // Parse chkdsk progress (e.g. "12 percent complete")
+          const pctMatch = line.match(/(\d+)\s+percent\s+complete/i);
+          if (pctMatch) {
+            repairOverlay.pushProgress({ progress: parseInt(pctMatch[1], 10), line });
+          } else {
+            repairOverlay.pushProgress({ line });
+          }
         });
       };
 
       proc.stdout.on('data', handleData);
       proc.stderr.on('data', handleData);
       proc.on('close', (code) => {
+        _activeRepairProc = null;
+        _activeRepairTool = null;
         const summary = fullOutput.trim() || 'ChkDsk has been scheduled for the next system restart.';
+        repairOverlay.pushProgress({
+          progress: 100,
+          status: 'done',
+          line: 'ChkDsk completed.',
+        });
         resolve({ success: true, message: summary });
       });
-      proc.on('error', (err) => resolve({ success: false, message: err.message }));
+      proc.on('error', (err) => {
+        _activeRepairProc = null;
+        _activeRepairTool = null;
+        repairOverlay.pushProgress({ status: 'error', line: err.message });
+        resolve({ success: false, message: err.message });
+      });
     });
   });
+
 
 } // end registerIPC
 

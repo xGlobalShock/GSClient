@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShieldAlert, HardDrive, FileSearch, Wrench, CheckCircle, XCircle, Loader2, AlertTriangle, X, Terminal } from 'lucide-react';
+import { ShieldAlert, HardDrive, FileSearch, Wrench, CheckCircle, XCircle, Loader2, AlertTriangle, X, Terminal, Minimize2 } from 'lucide-react';
 import '../styles/SystemRepairPanel.css';
 
 type ToolStatus = 'idle' | 'running' | 'done' | 'error';
@@ -157,6 +157,32 @@ const SystemRepairPanel: React.FC = () => {
 
   const handleOpenModal = useCallback((toolId: string) => {
     setOpenModal(toolId);
+  }, []);
+
+  const handleMinimize = useCallback(async (toolId: string) => {
+    const tool = TOOLS.find(t => t.id === toolId);
+    if (!tool) return;
+    const state = toolStates[toolId];
+    try {
+      await window.electron?.ipcRenderer.invoke('repair:minimize-to-overlay', {
+        tool: toolId,
+        toolTitle: tool.title,
+        color: tool.color,
+        progress: state?.verificationProgress ?? 0,
+      });
+    } catch (_) {}
+    setOpenModal(null);
+  }, [toolStates]);
+
+  // Listen for restore-from-overlay to reopen modal
+  useEffect(() => {
+    const unsub = window.electron?.ipcRenderer.on(
+      'repair:restored',
+      (data: { tool: string }) => {
+        if (data?.tool) setOpenModal(data.tool);
+      }
+    );
+    return () => { if (typeof unsub === 'function') unsub(); };
   }, []);
 
   const modalTool = TOOLS.find(t => t.id === openModal);
@@ -339,6 +365,15 @@ const SystemRepairPanel: React.FC = () => {
                       </span>
                     </div>
                   </div>
+                  {activeRunRef.current.has(openModal) && (
+                    <button
+                      className="repair-modal-minimize"
+                      onClick={() => handleMinimize(openModal)}
+                      title="Minimize to overlay"
+                    >
+                      <Minimize2 size={15} />
+                    </button>
+                  )}
                   <button
                     className="repair-modal-close"
                     onClick={() => handleCloseModal(openModal)}
@@ -407,6 +442,15 @@ const SystemRepairPanel: React.FC = () => {
 
                 {/* Modal Footer */}
                 <div className="repair-modal-footer">
+                  {modalState.status === 'running' && (
+                    <button
+                      className="repair-minimize-btn"
+                      onClick={() => handleMinimize(openModal)}
+                    >
+                      <Minimize2 size={13} />
+                      <span>Minimize</span>
+                    </button>
+                  )}
                   {modalState.status !== 'running' && (
                     <button
                       className="repair-run-btn"

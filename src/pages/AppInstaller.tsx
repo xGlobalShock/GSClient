@@ -19,12 +19,10 @@ import {
   Check,
   LayoutGrid,
   Sparkles,
-  PackageX,
 } from 'lucide-react';
 
 import { useToast } from '../contexts/ToastContext';
 import { APP_CATALOG, APP_CATEGORIES, CatalogApp } from '../data/appCatalog';
-import PageHeader from '../components/PageHeader';
 import '../styles/AppInstaller.css';
 
 interface InstallProgress {
@@ -34,12 +32,10 @@ interface InstallProgress {
   percent: number;
 }
 
-type AppTab = 'install' | 'uninstall' | 'debloat';
+type AppTab = 'install' | 'uninstall' | 'debloat' | 'startup';
 
 interface AppInstallerProps {
   isActive?: boolean;
-  activeTab?: AppTab;
-  onTabChange?: (tab: AppTab) => void;
   refreshSignal?: number;
   onAppInstalled?: () => void;
 }
@@ -105,7 +101,7 @@ const AppIcon: React.FC<{ domain?: string; name: string; size?: number }> = ({ d
   );
 };
 
-const AppInstaller: React.FC<AppInstallerProps> = ({ isActive = false, activeTab = 'install', onTabChange, refreshSignal = 0, onAppInstalled }) => {
+const AppInstaller: React.FC<AppInstallerProps> = ({ isActive = false, refreshSignal = 0, onAppInstalled }) => {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [installed, setInstalled] = useState<Set<string>>(new Set());
   const [installingId, setInstallingId] = useState<string | null>(null);
@@ -256,9 +252,6 @@ const AppInstaller: React.FC<AppInstallerProps> = ({ isActive = false, activeTab
 
   return (
     <motion.div className="ai" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.15 }}>
-      {/* ── Page header ── */}
-      <PageHeader icon={<LayoutGrid size={16} />} title="Apps Manager" />
-
       {/* ── Toolbar ── */}
       <div className="ai-toolbar">
         <div className="ai-toolbar-l">
@@ -275,42 +268,6 @@ const AppInstaller: React.FC<AppInstallerProps> = ({ isActive = false, activeTab
             )}
           </div>
         </div>
-        <div className="ai-toolbar-c">
-          <div className="apps-hdr-sw">
-            <button
-              className={`apps-hdr-sw-btn apps-hdr-sw-btn--install${activeTab === 'install' ? ' apps-hdr-sw-btn--on' : ''}`}
-              onClick={() => onTabChange?.('install')}
-            >
-              <span className="apps-hdr-sw-btn-icon"><Download size={15} strokeWidth={2} /></span>
-              <span className="apps-hdr-sw-btn-body">
-                <span className="apps-hdr-sw-btn-title">Install Apps</span>
-                <span className="apps-hdr-sw-btn-sub">Deploy software</span>
-              </span>
-            </button>
-            <div className="apps-hdr-sw-sep" />
-            <button
-              className={`apps-hdr-sw-btn apps-hdr-sw-btn--uninstall${activeTab === 'uninstall' ? ' apps-hdr-sw-btn--on' : ''}`}
-              onClick={() => onTabChange?.('uninstall')}
-            >
-              <span className="apps-hdr-sw-btn-icon"><Trash2 size={15} strokeWidth={2} /></span>
-              <span className="apps-hdr-sw-btn-body">
-                <span className="apps-hdr-sw-btn-title">Uninstall Apps</span>
-                <span className="apps-hdr-sw-btn-sub">Remove &amp; clean up</span>
-              </span>
-            </button>
-            <div className="apps-hdr-sw-sep" />
-            <button
-              className={`apps-hdr-sw-btn apps-hdr-sw-btn--debloat${activeTab === 'debloat' ? ' apps-hdr-sw-btn--on' : ''}`}
-              onClick={() => onTabChange?.('debloat')}
-            >
-              <span className="apps-hdr-sw-btn-icon"><PackageX size={15} strokeWidth={2} /></span>
-              <span className="apps-hdr-sw-btn-body">
-                <span className="apps-hdr-sw-btn-title">Windows Debloat</span>
-                <span className="apps-hdr-sw-btn-sub">System cleanup</span>
-              </span>
-            </button>
-          </div>
-        </div>
         <div className="ai-toolbar-r">
           {checkingInstalled
             ? <span className="ai-stat"><Loader2 size={10} className="ai-spin" /> Scanning…</span>
@@ -318,9 +275,6 @@ const AppInstaller: React.FC<AppInstallerProps> = ({ isActive = false, activeTab
               ? <span className="ai-stat"><CheckCircle size={10} /> {installed.size}/{APP_CATALOG.length} Apps Installed</span>
               : null
           }
-          <button className="ai-icon-btn" onClick={refreshInstalled} disabled={checkingInstalled} title="Re-scan">
-            <RefreshCw size={13} className={checkingInstalled ? 'ai-spin' : ''} />
-          </button>
         </div>
       </div>
 

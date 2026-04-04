@@ -20,11 +20,10 @@ import {
   ShieldCheck,
   Check,
   LayoutGrid,
-  PackageX,
 } from 'lucide-react';
 
 import { useToast } from '../contexts/ToastContext';
-import PageHeader from '../components/PageHeader';
+
 import '../styles/AppUninstaller.css';
 
 /* ─── Types ──────────────────────────────────────────────────────── */
@@ -52,12 +51,10 @@ interface LeftoverItem {
 type Phase = 'list' | 'confirm' | 'uninstalling' | 'scanning' | 'leftovers' | 'deleting' | 'done';
 type ScanMode = 'safe' | 'moderate' | 'advanced';
 
-type AppTab = 'install' | 'uninstall' | 'debloat';
+type AppTab = 'install' | 'uninstall' | 'debloat' | 'startup';
 
 interface AppUninstallerProps {
   isActive?: boolean;
-  activeTab?: AppTab;
-  onTabChange?: (tab: AppTab) => void;
   refreshSignal?: number;
   onAppUninstalled?: () => void;
 }
@@ -270,7 +267,7 @@ function getAppDomain(name: string, publisher?: string): string | undefined {
 }
 
 /* ─── Component ──────────────────────────────────────────────────── */
-const AppUninstaller: React.FC<AppUninstallerProps> = ({ isActive = false, activeTab = 'uninstall', onTabChange, refreshSignal = 0, onAppUninstalled }) => {
+const AppUninstaller: React.FC<AppUninstallerProps> = ({ isActive = false, refreshSignal = 0, onAppUninstalled }) => {
   const [apps, setApps] = useState<InstalledApp[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -470,9 +467,6 @@ const AppUninstaller: React.FC<AppUninstallerProps> = ({ isActive = false, activ
 
   return (
     <motion.div className="au" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.15 }}>
-      {/* ── Page header ── */}
-      <PageHeader icon={<LayoutGrid size={16} />} title="Apps Manager" />
-
       {/* ── Toolbar ── */}
       <div className="au-toolbar">
         <div className="au-toolbar-l">
@@ -494,49 +488,10 @@ const AppUninstaller: React.FC<AppUninstallerProps> = ({ isActive = false, activ
             <span className="au-toolbar-ctx">{targetApp.name}</span>
           )}
         </div>
-        <div className="au-toolbar-c">
-          <div className="apps-hdr-sw">
-            <button
-              className={`apps-hdr-sw-btn apps-hdr-sw-btn--install${activeTab === 'install' ? ' apps-hdr-sw-btn--on' : ''}`}
-              onClick={() => onTabChange?.('install')}
-            >
-              <span className="apps-hdr-sw-btn-icon"><Download size={15} strokeWidth={2} /></span>
-              <span className="apps-hdr-sw-btn-body">
-                <span className="apps-hdr-sw-btn-title">Install Apps</span>
-                <span className="apps-hdr-sw-btn-sub">Deploy software</span>
-              </span>
-            </button>
-            <div className="apps-hdr-sw-sep" />
-            <button
-              className={`apps-hdr-sw-btn apps-hdr-sw-btn--uninstall${activeTab === 'uninstall' ? ' apps-hdr-sw-btn--on' : ''}`}
-              onClick={() => onTabChange?.('uninstall')}
-            >
-              <span className="apps-hdr-sw-btn-icon"><Trash2 size={15} strokeWidth={2} /></span>
-              <span className="apps-hdr-sw-btn-body">
-                <span className="apps-hdr-sw-btn-title">Uninstall Apps</span>
-                <span className="apps-hdr-sw-btn-sub">Remove &amp; clean up</span>
-              </span>
-            </button>
-            <div className="apps-hdr-sw-sep" />
-            <button
-              className={`apps-hdr-sw-btn apps-hdr-sw-btn--debloat${activeTab === 'debloat' ? ' apps-hdr-sw-btn--on' : ''}`}
-              onClick={() => onTabChange?.('debloat')}
-            >
-              <span className="apps-hdr-sw-btn-icon"><PackageX size={15} strokeWidth={2} /></span>
-              <span className="apps-hdr-sw-btn-body">
-                <span className="apps-hdr-sw-btn-title">Windows Debloat</span>
-                <span className="apps-hdr-sw-btn-sub">System cleanup</span>
-              </span>
-            </button>
-          </div>
-        </div>
         <div className="au-toolbar-r">
           {phase === 'list' && !loading && apps.length > 0 && (
             <span className="au-stat"><CheckCircle size={10} /> {apps.length} Apps Installed</span>
           )}
-          <button className="au-icon-btn" onClick={fetchApps} disabled={loading} title="Refresh">
-            <RefreshCw size={13} className={loading ? 'au-spin' : ''} />
-          </button>
         </div>
       </div>
 

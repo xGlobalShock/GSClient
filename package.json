@@ -1,6 +1,6 @@
 {
   "name": "gs-center",
-  "version": "1.7.2",
+  "version": "1.7.3",
   "description": "GS Center - Advanced System Optimization Tool",
   "author": "GS Center Team",
   "main": "electron/main.js",
@@ -20,6 +20,7 @@
     "client": "node electron/dev-launcher.js"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.101.1",
     "electron-is-dev": "^3.0.1",
     "electron-updater": "^6.8.3",
     "fast-speedtest-api": "^0.3.2",
@@ -75,7 +76,9 @@
       {
         "from": "public/app-icons",
         "to": "app-icons",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": "lib",

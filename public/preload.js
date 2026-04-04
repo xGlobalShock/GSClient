@@ -8,7 +8,7 @@ const ALLOWED_INVOKE_PREFIXES = [
   'obs:', 'gameprofile:', 'vconfig:', 'network:', 'preset:',
   'updater:', 'gpu:', 'app:', 'window-is-maximized',
   'overlay:', 'health:', 'advisor:',
-  'resolution:',
+  'resolution:', 'startup:',
 ];
 const ALLOWED_SEND_PREFIXES = [
   'window-', 'app:', 'splash:',

@@ -445,10 +445,7 @@
 }
 
 .gpu-card--active {
-  background: linear-gradient(135deg,
-    rgba(0, 242, 255, 0.04) 0%,
-    rgba(0, 20, 12, 0.6) 60%
-  );
+  background-color: rgba(0, 242, 255, 0.05);
   border: 1px solid rgba(0, 242, 255, 0.14);
   box-shadow: 0 0 30px rgba(0, 242, 255, 0.04), inset 0 1px 0 rgba(0, 242, 255, 0.08);
 }
@@ -546,8 +543,8 @@
 }
 
 .gpu-card--active .gpu-card-status-pill {
-  color: #00F2FF;
-  background: rgba(0, 242, 255, 0.08);
+  color: #15ff00;
+  background: rgb(9, 73, 0);
   border: 1px solid rgba(0, 242, 255, 0.2);
 }
 
@@ -565,8 +562,8 @@
 }
 
 .gpu-card--active .gpu-card-status-dot {
-  background: #00F2FF;
-  box-shadow: 0 0 6px #00F2FF;
+  background: #09ff00;
+  box-shadow: 0 0 6px #00ff0d;
   animation: gpu-pulse 2s ease-in-out infinite;
 }
 

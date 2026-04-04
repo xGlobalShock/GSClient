@@ -18,16 +18,24 @@ function clamp(val, min, max) { return Math.max(min, Math.min(max, val)); }
 function computeScore(stats, hardwareInfo) {
   const factors = [];
 
+  // Detect CPU vendor for temperature thresholds
+  const cpuName = (hardwareInfo?.cpuName || '').toLowerCase();
+  const isAMD = cpuName.includes('amd') || cpuName.includes('ryzen') || cpuName.includes('epyc');
+  // Intel: Tjunction ~100°C → warning 82°C, critical 92°C
+  // AMD: Tctl ~95°C → warning 80°C, critical 90°C
+  const cpuWarnTemp = isAMD ? 80 : 82;
+  const cpuCritTemp = isAMD ? 90 : 92;
+
   // ── CPU Temperature (20 %) ────────────────────────────────────────────────
   const cpuTemp = stats?.temperature ?? 0;
   if (cpuTemp > 0) {
-    // 30 °C = 100, 75 °C = 60, 90 °C = 0
+    // 30 °C = 100, warnTemp = 60, critTemp = 0
     const tempScore = cpuTemp <= 30 ? 100
-      : cpuTemp >= 90 ? 0
-      : 100 - ((cpuTemp - 30) / 60) * 100;
-    factors.push({ key: 'cpuTemp', label: 'CPU Temperature', score: clamp(tempScore, 0, 100), weight: 0.20, value: `${Math.round(cpuTemp)}°C`, status: cpuTemp > 80 ? 'critical' : cpuTemp > 65 ? 'warning' : 'good' });
+      : cpuTemp >= cpuCritTemp ? 0
+      : 100 - ((cpuTemp - 30) / (cpuCritTemp - 30)) * 100;
+    factors.push({ key: 'cpuTemp', label: 'CPU Temp', score: clamp(tempScore, 0, 100), weight: 0.20, value: `${Math.round(cpuTemp)}°C`, status: cpuTemp > cpuCritTemp ? 'critical' : cpuTemp > cpuWarnTemp ? 'warning' : 'good' });
   } else {
-    factors.push({ key: 'cpuTemp', label: 'CPU Temperature', score: 70, weight: 0.20, value: 'N/A', status: 'unknown' });
+    factors.push({ key: 'cpuTemp', label: 'CPU Temp', score: 70, weight: 0.20, value: 'N/A', status: 'unknown' });
   }
 
   // ── CPU Usage (15 %) ───────────────────────────────────────────────────────
@@ -57,9 +65,9 @@ function computeScore(stats, hardwareInfo) {
     const gpuTempScore = gpuTemp <= 35 ? 100
       : gpuTemp >= 95 ? 0
       : 100 - ((gpuTemp - 35) / 60) * 100;
-    factors.push({ key: 'gpuTemp', label: 'GPU Temperature', score: clamp(gpuTempScore, 0, 100), weight: 0.15, value: `${Math.round(gpuTemp)}°C`, status: gpuTemp > 85 ? 'critical' : gpuTemp > 75 ? 'warning' : 'good' });
+    factors.push({ key: 'gpuTemp', label: 'GPU Temp', score: clamp(gpuTempScore, 0, 100), weight: 0.15, value: `${Math.round(gpuTemp)}°C`, status: gpuTemp > 85 ? 'critical' : gpuTemp > 75 ? 'warning' : 'good' });
   } else {
-    factors.push({ key: 'gpuTemp', label: 'GPU Temperature', score: 80, weight: 0.15, value: 'N/A', status: 'unknown' });
+    factors.push({ key: 'gpuTemp', label: 'GPU Temp', score: 80, weight: 0.15, value: 'N/A', status: 'unknown' });
   }
 
   // ── Network Latency (10 %) ─────────────────────────────────────────────────
@@ -70,7 +78,7 @@ function computeScore(stats, hardwareInfo) {
       : latency >= 200 ? 10
       : 100 - ((latency - 20) / 180) * 90;
   }
-  factors.push({ key: 'networkLatency', label: 'Network Latency', score: clamp(netScore, 0, 100), weight: 0.10, value: latency > 0 ? `${Math.round(latency)}ms` : 'N/A', status: latency > 150 ? 'critical' : latency > 80 ? 'warning' : 'good' });
+  factors.push({ key: 'networkLatency', label: 'Latency', score: clamp(netScore, 0, 100), weight: 0.10, value: latency > 0 ? `${Math.round(latency)}ms` : 'N/A', status: latency > 150 ? 'critical' : latency > 80 ? 'warning' : 'good' });
 
   // ── Disk Health (10 %) ─────────────────────────────────────────────────────
   const diskHealth = (hardwareInfo?.diskHealth || '').toLowerCase();
@@ -83,7 +91,7 @@ function computeScore(stats, hardwareInfo) {
   } else if (diskHealth === 'bad' || diskHealth === 'critical') {
     healthVal = 10; healthStatus = 'critical';
   }
-  factors.push({ key: 'diskHealth', label: 'Disk Health', score: healthVal, weight: 0.10, value: diskHealth || 'Unknown', status: healthStatus });
+  factors.push({ key: 'diskHealth', label: 'Storage', score: healthVal, weight: 0.10, value: diskHealth || 'Unknown', status: healthStatus });
 
   // ── Compute weighted total ────────────────────────────────────────────────
   let totalScore = 0;

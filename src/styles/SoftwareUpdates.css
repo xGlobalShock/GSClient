@@ -1,30 +1,30 @@
 /* ═══════════════════════════════════════════════════════════════
-   SOFTWARE UPDATES — winget Package Manager UI
-   Void Black · Electric Cyan #00F2FF · Neon Emerald
+   SOFTWARE UPDATES — Tabbed Layout
+   Void Black · Electric Cyan #00F2FF · Neon Purple #9B59F0
 ═══════════════════════════════════════════════════════════════ */
 
 .su {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  padding: 0;
+  gap: 10px;
   transform: translateZ(0);
   contain: layout style;
 }
 
+/* ══════════════════════════════════════════════════════
+   ACTION BUTTONS & TABLE
+══════════════════════════════════════════════════════ */
 
-/* ── Last-checked label ── */
-.su-last-checked {
-  font-size: 11px;
-  color: var(--text-muted);
-  letter-spacing: 0.5px;
-}
-
-/* ── Header action buttons ── */
-.su-header-actions {
+/* ══════════════════════════════════════════════════════
+   TAB ACTION BAR
+══════════════════════════════════════════════════════ */
+.su-tab-actions {
   display: flex;
   gap: 10px;
   align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
 }
 
 /* ── Generic button ── */
@@ -66,6 +66,18 @@
 .su-btn--update-all:hover:not(:disabled) {
   background: linear-gradient(135deg, rgba(0, 242, 255, 0.2), rgba(0, 242, 255, 0.14));
   border-color: rgba(0, 242, 255, 0.45);
+}
+
+.su-btn--secondary {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.su-btn--secondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.85);
 }
 
 .su-btn--cancel {
@@ -289,6 +301,16 @@
   opacity: 0.6;
 }
 
+.su-info--muted {
+  background: rgba(255, 255, 255, 0.02);
+  border-color: rgba(255, 255, 255, 0.05);
+}
+
+.su-info--muted svg {
+  color: rgba(255, 255, 255, 0.4);
+  opacity: 1;
+}
+
 .su-info strong {
   color: var(--text-secondary);
 }
@@ -461,6 +483,69 @@
   100% {
     background-position: 200% 0;
   }
+}
+
+/* ══════════════════════════════════════════════════════
+   SEARCH & FILTER CONTROLS
+══════════════════════════════════════════════════════ */
+.su-search-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: rgba(6, 8, 16, 0.55);
+  border: 1px solid rgba(0, 242, 255, 0.1);
+  border-radius: 8px;
+  color: var(--text-muted);
+  transition: border-color 0.2s;
+}
+
+.su-search-wrap:focus-within {
+  border-color: rgba(0, 242, 255, 0.35);
+}
+
+.su-search {
+  background: none;
+  border: none;
+  outline: none;
+  font-size: 12px;
+  color: var(--text-primary);
+  width: 160px;
+}
+
+.su-search::placeholder {
+  color: rgba(160, 190, 210, 0.4);
+}
+
+.su-cat-chips {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.su-chip {
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  color: rgba(200, 220, 230, 0.6);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.su-chip:hover {
+  background: rgba(0, 242, 255, 0.04);
+  border-color: rgba(0, 242, 255, 0.15);
+  color: rgba(200, 220, 230, 0.85);
+}
+
+.su-chip--active {
+  background: rgba(0, 242, 255, 0.08);
+  border-color: rgba(0, 242, 255, 0.25);
+  color: #00F2FF;
 }
 
 

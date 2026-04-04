@@ -108,6 +108,20 @@ const getTrend = (history: MetricPoint[]): { dir: 'up' | 'down' | 'flat'; delta:
   return { dir: delta > 0 ? 'up' : 'down', delta: Math.abs(delta) };
 };
 
+/**
+ * Vendor-aware CPU temperature color.
+ * Intel: warning 82°C (Tjunction ~100°C), AMD: warning 80°C (Tctl ~95°C).
+ */
+const cpuTempColor = (temp: number, cpuName?: string): string => {
+  const name = (cpuName || '').toLowerCase();
+  const isAMD = name.includes('amd') || name.includes('ryzen') || name.includes('epyc');
+  const warn = isAMD ? 80 : 82;
+  const crit = isAMD ? 90 : 92;
+  if (temp >= crit) return '#FF2D55';
+  if (temp >= warn) return '#FFD600';
+  return '#FFFFFF';
+};
+
 /* ══════════════════════════════════════════
    Sparkline Chart
 ══════════════════════════════════════════ */
@@ -382,10 +396,10 @@ const HeroCard: React.FC<HeroCardProps> = ({
                   className="dh-info-btn"
                   onClick={() => setFlipped(true)}
                   title="More info"
-                  style={{ color: '#ffffff' }}
+                  style={{ color: accentColor }}
                 >
                   <Info size={13} />
-                  <span style={{ fontSize: '10px', letterSpacing: '0.04em' }}>More Info</span>
+                  <span style={{ fontSize: '10px' }}>More Info</span>
                 </button>
               )}
             </div>
@@ -452,7 +466,7 @@ const HeroCard: React.FC<HeroCardProps> = ({
                   className="dh-info-btn dh-info-btn-close"
                   onClick={() => setFlipped(false)}
                   title="Back to live metrics"
-                  style={{ color: '#ffffff' }}
+                  style={{ color: accentColor }}
                 >
                   <XIcon size={13} />
                 </button>
@@ -529,7 +543,7 @@ const DashboardHero: React.FC<DashboardHeroProps> = ({
           {/* Stat tiles: Temp · Cores · Max Clock */}
           <div className="dh-stat-tiles">
             {hasAnyTemp && (() => {
-              const tc = s.temperature >= 90 ? '#FF2D55' : s.temperature >= 70 ? '#FFD600' : '#FFFFFF';
+              const tc = cpuTempColor(s.temperature, hw?.cpuName);
               return (
                 <div className="dh-stat-tile">
                   <div className="dh-stat-tile-top">
@@ -999,32 +1013,26 @@ const DashboardHero: React.FC<DashboardHeroProps> = ({
           cardClass="dh-card--system"
           history={processHistory} gradId="dhGradProc"
           delay={0.35}
-          backContent={(hw?.biosVersion || hw?.windowsBuild || hw?.windowsActivation || hw?.lastWindowsUpdate || hw?.secureBoot) ? (
+          backContent={hw ? (
             <div className="dh-info-block">
               {(hw?.biosVersion || hw?.biosDate) && (
                 <div className="dh-info-row">
                   <span className="dh-info-key" style={{ color: '#00F2FF' }}>BIOS</span>
-                  <span className="dh-info-val">{hw?.biosVersion ?? 'Unknown'}{hw?.biosDate ? ' · ' + hw.biosDate : ''}</span>
+                  <span className="dh-info-val">{hw?.biosVersion || 'Unknown'}{hw?.biosDate ? ' · ' + hw.biosDate : ''}</span>
                 </div>
               )}
-              {hw?.windowsBuild && (
-                <div className="dh-info-row">
-                  <span className="dh-info-key" style={{ color: '#00F2FF' }}>Build</span>
-                  <span className="dh-info-val">{hw.windowsBuild}</span>
-                </div>
-              )}
-              {hw?.windowsActivation && (
-                <div className="dh-info-row">
-                  <span className="dh-info-key" style={{ color: '#00F2FF' }}>Activation</span>
-                  <span className="dh-info-val" style={{ color: hw.windowsActivation === 'Licensed' ? '#FFFFFF' : undefined }}>{hw.windowsActivation}</span>
-                </div>
-              )}
-              {hw?.secureBoot && (
-                <div className="dh-info-row">
-                  <span className="dh-info-key" style={{ color: '#00F2FF' }}>Secure Boot</span>
-                  <span className="dh-info-val" style={{ color: hw.secureBoot === 'Enabled' ? '#FFFFFF' : hw.secureBoot === 'Disabled' ? '#FF2D55' : undefined }}>{hw.secureBoot}</span>
-                </div>
-              )}
+              <div className="dh-info-row">
+                <span className="dh-info-key" style={{ color: '#00F2FF' }}>Build</span>
+                <span className="dh-info-val">{hw?.windowsBuild || 'Unavailable'}</span>
+              </div>
+              <div className="dh-info-row">
+                <span className="dh-info-key" style={{ color: '#00F2FF' }}>Activation</span>
+                <span className="dh-info-val" style={{ color: hw?.windowsActivation === 'Licensed' ? '#FFFFFF' : undefined }}>{hw?.windowsActivation || 'Unavailable'}</span>
+              </div>
+              <div className="dh-info-row">
+                <span className="dh-info-key" style={{ color: '#00F2FF' }}>Secure Boot</span>
+                <span className="dh-info-val" style={{ color: hw?.secureBoot === 'Enabled' ? '#FFFFFF' : hw?.secureBoot === 'Disabled' ? '#FF2D55' : undefined }}>{hw?.secureBoot || 'Unavailable'}</span>
+              </div>
               {hw?.lastWindowsUpdate && (
                 <div className="dh-info-row">
                   <span className="dh-info-key" style={{ color: '#00F2FF' }}>Last Update</span>
@@ -1067,7 +1075,7 @@ const DashboardHero: React.FC<DashboardHeroProps> = ({
               );
             })()}
           </div>
-          {(hw?.windowsVersion || hw?.motherboardProduct || hw?.motherboardManufacturer || hw?.keyboardName) && (
+          {hw && (
             <div className="dh-info-block" style={{ marginTop: 6 }}>
               {hw?.windowsVersion && (
                 <div className="dh-info-row">
@@ -1075,18 +1083,14 @@ const DashboardHero: React.FC<DashboardHeroProps> = ({
                   <span className="dh-info-val">{hw.windowsVersion}</span>
                 </div>
               )}
-              {(hw?.motherboardProduct || hw?.motherboardManufacturer) && (
-                <div className="dh-info-row">
-                  <span className="dh-info-key" style={{ color: 'rgba(255,255,255,0.55)' }}>Motherboard</span>
-                  <span className="dh-info-val">{hw?.motherboardProduct ? cleanBoard(hw.motherboardProduct) : hw?.motherboardManufacturer}</span>
-                </div>
-              )}
-              {hw?.keyboardName && (
-                <div className="dh-info-row">
-                  <span className="dh-info-key" style={{ color: 'rgba(255,255,255,0.55)' }}>Keyboard</span>
-                  <span className="dh-info-val">{hw.keyboardName}</span>
-                </div>
-              )}
+              <div className="dh-info-row">
+                <span className="dh-info-key" style={{ color: 'rgba(255,255,255,0.55)' }}>Motherboard</span>
+                <span className="dh-info-val">{hw?.motherboardProduct ? cleanBoard(hw.motherboardProduct) : hw?.motherboardManufacturer || 'Unavailable'}</span>
+              </div>
+              <div className="dh-info-row">
+                <span className="dh-info-key" style={{ color: 'rgba(255,255,255,0.55)' }}>Keyboard</span>
+                <span className="dh-info-val">{hw?.keyboardName || 'Unavailable'}</span>
+              </div>
             </div>
           )}
         </HeroCard>

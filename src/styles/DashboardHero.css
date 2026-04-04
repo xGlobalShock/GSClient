@@ -696,33 +696,67 @@
 }
 
 /* ── [i] info toggle button in card header ── */
+/*
+  Mechanical keycap: thick bottom border = keycap shadow/depth rail.
+  Hover presses DOWN (translateY +2px) — opposite of every other button.
+  The 3px bottom border stays static; the downward motion creates the
+  illusion of the depth being consumed as the key bottoms out.
+  Pure GPU — only transform animated.
+*/
 .dh-info-btn {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 5px;
-  font-weight: 700 ;
-  height: 26px;
-  border-radius: 7px;
-  border: 1px solid rgba(255, 255, 255, 0.486);
-  background: rgba(255, 255, 255, 0.123);
-  cursor: pointer;
+  height: 24px;
+  padding: 0 10px;
   flex-shrink: 0;
-  padding: 0 8px;
-  transition: background 0.18s ease, border-color 0.18s ease;
+  cursor: pointer;
+  position: relative;
+
+  border-radius: 5px;
+  border: 1px solid rgba(0, 242, 255, 0.3);
+  border-bottom: 3px solid rgba(0, 242, 255, 0.55);
+  background: rgba(0, 242, 255, 0.07);
+
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+
+  /* GPU */
+  transform: translateZ(0);
+  will-change: transform;
+  transition: transform 0.08s cubic-bezier(0.3, 0, 0.5, 1);
 }
 
+/* Pre-painted hover fill — opacity only, GPU composited */
+.dh-info-btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: rgba(0, 242, 255, 0.1);
+  opacity: 0;
+  will-change: opacity;
+  transition: opacity 0.1s ease;
+  pointer-events: none;
+}
+
+/* Key bottoms out — moves down 2px, very fast (0.08s) */
 .dh-info-btn:hover {
-  background: rgba(255, 255, 255, 0.329);
-  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(2px) translateZ(0);
 }
 
+.dh-info-btn:hover::after {
+  opacity: 1;
+}
+
+/* Close button — same keycap but square */
 .dh-info-btn-close {
   width: 26px;
   padding: 0;
-  font-weight: 700;
-  border-color: rgba(255, 255, 255, 0.18);
-  background-color: rgba(255, 255, 255, 0.2);
+  border-bottom: 3px solid rgba(0, 242, 255, 0.4);
 }
 
 /* Back face content wrapper */

@@ -8,6 +8,10 @@ import '../styles/Header.css';
 import '../styles/WhatsNew.css';
 import '../styles/DevUpdates.css';
 
+// ─── Feature flags ───────────────────────────────────────────────────────────
+const SHOW_WHATS_NEW = false; // Toggle What's New icon in header
+// ─────────────────────────────────────────────────────────────────────────────
+
 // Minimal markdown renderer for Dev Updates (supports GitHub-style formatting)
 const escapeHtml = (str: string) =>
   str
@@ -392,7 +396,8 @@ const description = release.body?.trim() || undefined;
       </div>
 
       <div className="window-controls">
-        {/* What's New button — always visible */}
+        {/* What's New button */}
+        {SHOW_WHATS_NEW && (
         <div className="whatsnew-wrapper" ref={whatsNewRef}>
           <button
             className={`whatsnew-btn${showWhatsNew ? ' whatsnew-btn--active' : ''}`}
@@ -445,6 +450,7 @@ const description = release.body?.trim() || undefined;
             </div>
           )}
         </div>
+        )}
 
         {/* Dev Updates button */}
         {hasGitHubUpdates && (

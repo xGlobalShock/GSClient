@@ -6,6 +6,42 @@ const { ipcMain } = require('electron');
  * and produce actionable recommendations.
  */
 
+/**
+ * Normalize RAM to nearest standard physical size.
+ * OS reports ~15.9GB for 16GB physical due to hardware-reserved memory.
+ * Uses 5% tolerance below each standard size.
+ */
+function normalizeRamTotal(reportedGB) {
+  if (!reportedGB || reportedGB <= 0) return 0;
+  const standardSizes = [2, 4, 6, 8, 12, 16, 24, 32, 48, 64, 96, 128, 256];
+  for (const size of standardSizes) {
+    const tolerance = size * 0.05;
+    if (reportedGB >= (size - tolerance) && reportedGB <= (size + 0.1)) {
+      return size;
+    }
+  }
+  return Math.round(reportedGB);
+}
+
+/**
+ * Classify CPU temperature with vendor-aware thresholds.
+ * Intel: Tjunction typically 100°C, warning at 82°C+
+ * AMD: Tctl typically 95°C, warning at 80°C+
+ * Returns: { status: 'normal'|'warning'|'critical', threshold: number }
+ */
+function classifyCpuTemp(temp, cpuName) {
+  if (!temp || temp <= 0) return { status: 'unknown', threshold: 0 };
+  const name = (cpuName || '').toLowerCase();
+  const isAMD = name.includes('amd') || name.includes('ryzen') || name.includes('epyc') || name.includes('threadripper');
+  // AMD: warning 80°C, critical 90°C (Tctl limit ~95°C)
+  // Intel: warning 82°C, critical 92°C (Tjunction ~100°C)
+  const warnThreshold = isAMD ? 80 : 82;
+  const critThreshold = isAMD ? 90 : 92;
+  if (temp >= critThreshold) return { status: 'critical', threshold: critThreshold };
+  if (temp >= warnThreshold) return { status: 'warning', threshold: warnThreshold };
+  return { status: 'normal', threshold: warnThreshold };
+}
+
 function analyzeBottlenecks(stats, hardwareInfo) {
   const insights = [];
   const cpuUsage = stats?.cpu ?? 0;
@@ -13,9 +49,11 @@ function analyzeBottlenecks(stats, hardwareInfo) {
   const ramUsage = stats?.ram ?? 0;
   const cpuTemp = stats?.temperature ?? 0;
   const gpuTemp = stats?.gpuTemp ?? -1;
-  const ramTotalGB = stats?.ramTotalGB ?? (hardwareInfo?.ramTotalGB ?? 0);
+  const rawRamTotalGB = stats?.ramTotalGB ?? (hardwareInfo?.ramTotalGB ?? 0);
+  const ramTotalGB = normalizeRamTotal(rawRamTotalGB);
   const latency = stats?.latencyMs ?? 0;
   const diskUsage = stats?.disk ?? 0;
+  const cpuName = hardwareInfo?.cpuName ?? '';
 
   // ── CPU Bottleneck Detection ────────────────────────────────────────────
   if (cpuUsage > 85 && gpuUsage >= 0 && gpuUsage < 60) {
@@ -51,19 +89,33 @@ function analyzeBottlenecks(stats, hardwareInfo) {
     });
   }
 
-  // ── Thermal Throttling ─────────────────────────────────────────────────
-  if (cpuTemp > 85) {
+  // ── Thermal Throttling (vendor-aware) ────────────────────────────────
+  const cpuTempClass = classifyCpuTemp(cpuTemp, cpuName);
+  if (cpuTempClass.status === 'critical') {
     insights.push({
       id: 'cpu-thermal',
       severity: 'critical',
       icon: 'thermometer',
       title: 'CPU Overheating',
-      description: `CPU temperature is ${Math.round(cpuTemp)}°C — this may cause thermal throttling and reduce performance.`,
+      description: `CPU temperature is ${Math.round(cpuTemp)}°C (above ${cpuTempClass.threshold}°C threshold) — this may cause thermal throttling and reduce performance.`,
       suggestions: [
         'Check CPU cooler mounting and thermal paste',
         'Improve case airflow (clean dust filters, add fans)',
         'Lower ambient room temperature',
         'Consider upgrading to a better CPU cooler',
+      ],
+    });
+  } else if (cpuTempClass.status === 'warning') {
+    insights.push({
+      id: 'cpu-thermal',
+      severity: 'warning',
+      icon: 'thermometer',
+      title: 'CPU Running Warm',
+      description: `CPU temperature is ${Math.round(cpuTemp)}°C — approaching the ${cpuTempClass.threshold}°C warning threshold. Monitor under sustained load.`,
+      suggestions: [
+        'Ensure good case airflow and clean dust filters',
+        'Check that CPU cooler fan is spinning at proper speed',
+        'Consider reapplying thermal paste if temps are rising over time',
       ],
     });
   }
@@ -100,7 +152,7 @@ function analyzeBottlenecks(stats, hardwareInfo) {
     });
   }
 
-  // ── Low RAM Amount ─────────────────────────────────────────────────────
+  // ── Low RAM Amount (tolerance-aware) ─────────────────────────────────
   if (ramTotalGB > 0 && ramTotalGB < 16) {
     insights.push({
       id: 'low-ram',
@@ -170,7 +222,7 @@ function generateUpgradeRecommendations(hardwareInfo) {
 
   if (!hardwareInfo) return recommendations;
 
-  const ramGB = hardwareInfo.ramTotalGB || 0;
+  const ramGB = normalizeRamTotal(hardwareInfo.ramTotalGB || 0);
   if (ramGB > 0 && ramGB < 16) {
     recommendations.push({
       component: 'RAM',

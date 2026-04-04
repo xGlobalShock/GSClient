@@ -133,14 +133,17 @@ const HealthScore: React.FC<HealthScoreProps> = ({ systemStats, extendedStats, h
                 {statusIcon(f.status)}
                 <span className="health-factor-label">{f.label}</span>
                 <span className="health-factor-value">{f.value}</span>
-                <div className="health-factor-bar-wrap">
-                  <motion.div
-                    className={`health-factor-bar health-bar-${f.status}`}
-                    initial={{ width: 0 }}
-                    animate={{ width: `${f.score}%` }}
-                    transition={{ duration: 0.6, ease: 'easeOut' }}
-                  />
-                </div>
+                {/*
+                GPU-composited bar: --bar-scale drives transform: scaleX() via CSS.
+                Replaces Framer Motion animate width → which triggered layout recalc per frame.
+                @keyframes healthBarFill handles entrance; CSS transition handles score updates.
+              */}
+              <div className="health-factor-bar-wrap">
+                <div
+                  className={`health-factor-bar health-bar-${f.status}`}
+                  style={{ '--bar-scale': `${f.score / 100}` } as React.CSSProperties}
+                />
+              </div>
               </div>
             ))}
           </motion.div>

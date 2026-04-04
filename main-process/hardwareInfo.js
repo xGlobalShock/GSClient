@@ -12,6 +12,24 @@ const windowManager = require('./windowManager');
 let _hwInfoResult = null;
 let _hwInfoPromise = null;
 
+/**
+ * Normalize reported RAM to the nearest standard size.
+ * OS-visible RAM is always slightly less than physical (hardware-reserved).
+ * E.g. 15.9 GB visible → 16 GB physical, 31.8 → 32, 7.9 → 8.
+ * Uses 5% tolerance: if reported is within 5% below a standard size, snap up.
+ */
+function normalizeRamTotal(reportedGB) {
+  if (!reportedGB || reportedGB <= 0) return 0;
+  const standardSizes = [2, 4, 6, 8, 12, 16, 24, 32, 48, 64, 96, 128, 256];
+  for (const size of standardSizes) {
+    const tolerance = size * 0.05; // 5% below
+    if (reportedGB >= (size - tolerance) && reportedGB <= (size + 0.1)) {
+      return size;
+    }
+  }
+  return Math.round(reportedGB);
+}
+
 function getDefaultHardwareInfo() {
   return {
     cpuName: 'Unknown CPU',
@@ -198,9 +216,24 @@ try {
     $s3 = "$($d.FriendlyName)|||$($d.MediaType)|||$hsStr|||$finalSize"
   } else {
     $d2 = Get-CimInstance Win32_DiskDrive | Select-Object -First 1
-    $pSize2 = [math]::Round($d2.Size/1GB)
+    $pSize2 = if ($d2) { [math]::Round($d2.Size/1GB) } else { 0 }
     $finalSize = if ($cSize -gt $pSize2) { $cSize } else { $pSize2 }
-    $s3 = "$($d2.Model)|||Unknown|||Unknown|||$finalSize"
+    # Try MSFT_Disk for health when Get-PhysicalDisk is unavailable (VMs, older systems)
+    $diskHealth = 'Unknown'
+    try {
+      $msftDisk = Get-CimInstance -Namespace root/microsoft/windows/storage -ClassName MSFT_Disk -EA 0 | Select-Object -First 1
+      if ($msftDisk) {
+        $diskHealth = switch ([int]$msftDisk.HealthStatus) { 0 { 'Healthy' } 1 { 'Warning' } 2 { 'Unhealthy' } default { 'Unknown' } }
+      }
+    } catch {}
+    # Fallback: check Win32_DiskDrive Status field
+    if ($diskHealth -eq 'Unknown' -and $d2 -and $d2.Status) {
+      $diskHealth = if ($d2.Status -eq 'OK') { 'Healthy' } else { "$($d2.Status)" }
+    }
+    $model = if ($d2) { $d2.Model } else { 'Unknown Disk' }
+    $mediaType = 'Unknown'
+    if ($d2 -and $d2.MediaType) { $mediaType = $d2.MediaType }
+    $s3 = "$model|||$mediaType|||$diskHealth|||$finalSize"
   }
 } catch {}
 
@@ -673,8 +706,9 @@ try {
 
     if ((!info.cpuName || info.cpuName === 'Unknown CPU') && cpu) {
       info.cpuName = `${cpu.manufacturer || ''} ${cpu.brand || ''}`.trim() || info.cpuName;
-      info.cpuCores = info.cpuCores || cpu.cores || cpu.physicalCores || 0;
-      info.cpuThreads = info.cpuThreads || cpu.processors || cpu.cores || 0;
+      // si.cpu(): physicalCores = physical cores, cores = logical threads, processors = sockets
+      info.cpuCores = info.cpuCores || cpu.physicalCores || 0;
+      info.cpuThreads = info.cpuThreads || cpu.cores || 0;
       if (!info.cpuMaxClock && cpu.speedMax) info.cpuMaxClock = `${cpu.speedMax} GHz`;
     }
 
@@ -704,6 +738,59 @@ try {
     }
   } catch (err) {
     console.error('[HW Info] systeminformation fallback failed:', err && err.message ? err.message : err);
+  }
+
+  // ── Sanity checks & normalization ──────────────────────────────────────
+  // CPU: cores must be <= threads. If reversed, swap them.
+  if (info.cpuCores > 0 && info.cpuThreads > 0 && info.cpuCores > info.cpuThreads) {
+    const tmp = info.cpuCores;
+    info.cpuCores = info.cpuThreads;
+    info.cpuThreads = tmp;
+  }
+  // If only one is set, derive the other with a reasonable default
+  if (info.cpuCores > 0 && info.cpuThreads === 0) info.cpuThreads = info.cpuCores;
+  if (info.cpuThreads > 0 && info.cpuCores === 0) info.cpuCores = Math.ceil(info.cpuThreads / 2);
+
+  // RAM: normalize ramTotalGB to nearest standard size (accounts for OS-reserved memory)
+  info.ramTotalGB = normalizeRamTotal(info.ramTotalGB);
+
+  // ── Ensure all display fields have a value (never blank in UI) ──────
+  // Clean up placeholder strings from OEM systems
+  const cleanField = (val) => {
+    if (!val) return '';
+    const v = String(val).trim();
+    const placeholders = ['default string', 'to be filled by o.e.m.', 'to be filled by oem',
+      'not specified', 'none', 'system product name', 'system manufacturer',
+      'base board product', 'base board manufacturer'];
+    if (placeholders.includes(v.toLowerCase())) return '';
+    if (/^0+$/.test(v)) return '';
+    if (v.length < 2) return '';
+    return v;
+  };
+
+  info.motherboardManufacturer = cleanField(info.motherboardManufacturer);
+  info.motherboardProduct = cleanField(info.motherboardProduct);
+  info.motherboardSerial = cleanField(info.motherboardSerial);
+  info.biosVersion = cleanField(info.biosVersion);
+  info.keyboardName = cleanField(info.keyboardName);
+  info.ramPartNumber = cleanField(info.ramPartNumber);
+  info.ramBrand = cleanField(info.ramBrand);
+
+  // Normalize disk health — standardize various status strings
+  if (info.diskHealth) {
+    const dh = info.diskHealth.toLowerCase().trim();
+    if (['healthy', 'ok', 'good', '0'].includes(dh)) info.diskHealth = 'Healthy';
+    else if (['warning', 'caution', 'degraded', '1'].includes(dh)) info.diskHealth = 'Warning';
+    else if (['unhealthy', 'bad', 'critical', '2'].includes(dh)) info.diskHealth = 'Unhealthy';
+    else if (dh === 'unknown' || dh === '') info.diskHealth = '';
+  }
+
+  // Normalize disk type
+  if (info.diskType) {
+    const dt = info.diskType.toLowerCase().trim();
+    if (dt.includes('ssd') || dt === '4' || dt === 'solid state') info.diskType = 'SSD';
+    else if (dt.includes('hdd') || dt === '3' || dt.includes('unspecified')) info.diskType = 'HDD';
+    else if (dt.includes('nvme')) info.diskType = 'NVMe';
   }
 
   return info;

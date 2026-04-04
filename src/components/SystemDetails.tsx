@@ -62,6 +62,20 @@ const isPlaceholderSerial = (s?: string) => {
   return false;
 };
 
+/**
+ * Vendor-aware CPU temperature color.
+ * Intel: warning 82°C, critical 92°C. AMD: warning 80°C, critical 90°C.
+ */
+const cpuTempColor = (temp: number, cpuName?: string): string => {
+  const name = (cpuName || '').toLowerCase();
+  const isAMD = name.includes('amd') || name.includes('ryzen') || name.includes('epyc');
+  const warn = isAMD ? 80 : 82;
+  const crit = isAMD ? 90 : 92;
+  if (temp >= crit) return '#FF2D55';
+  if (temp >= warn) return '#FFD600';
+  return '#00F2FF';
+};
+
 const parseLinkSpeedStr = (s?: string): number | undefined => {
   if (!s) return undefined;
   const str = String(s).trim();
@@ -114,7 +128,8 @@ const HudGradients: React.FC = () => (
 ═══════════════════════════════════════════ */
 const RadialGauge: React.FC<{
   value: number; unit?: string; displayValue?: string | number; size?: number;
-}> = ({ value, unit = '%', displayValue, size = 64 }) => {
+  colorOverride?: string;
+}> = ({ value, unit = '%', displayValue, size = 64, colorOverride }) => {
   const r = (size / 2) - 6;
   const circ = 2 * Math.PI * r;
   const pct = Math.max(0, Math.min(value, 100));
@@ -122,7 +137,7 @@ const RadialGauge: React.FC<{
   const offset = arcLen - (pct / 100) * arcLen;
   const rotation = 135;
   const center = size / 2;
-  const color = pct > 80 ? '#FF2D55' : pct > 60 ? '#FFD600' : '#00F2FF';
+  const color = colorOverride || (pct > 80 ? '#FF2D55' : pct > 60 ? '#FFD600' : '#00F2FF');
 
   return (
     <div className="hud-radial-gauge">
@@ -377,11 +392,12 @@ const BentoCard: React.FC<{
   gaugeValue?: number;
   gaugeUnit?: string;
   gaugeDisplay?: string | number;
+  gaugeColor?: string;
   className?: string;
   delay?: number;
   pulse?: 'high' | 'warn' | false;
   children: React.ReactNode;
-}> = ({ icon, title, subtitle, gaugeValue, gaugeUnit, gaugeDisplay, className = '', delay = 0, pulse = false, children }) => {
+}> = ({ icon, title, subtitle, gaugeValue, gaugeUnit, gaugeDisplay, gaugeColor, className = '', delay = 0, pulse = false, children }) => {
   const pulseClass = pulse === 'high' ? 'hud-pulse' : pulse === 'warn' ? 'hud-pulse-warn' : '';
   return (
   <motion.div
@@ -414,7 +430,7 @@ const BentoCard: React.FC<{
           {subtitle && <div className="hud-card-subtitle" title={subtitle}>{subtitle}</div>}
         </div>
         {gaugeValue !== undefined && (
-          <RadialGauge value={gaugeValue} unit={gaugeUnit} displayValue={gaugeDisplay} />
+          <RadialGauge value={gaugeValue} unit={gaugeUnit} displayValue={gaugeDisplay} colorOverride={gaugeColor} />
         )}
       </div>
 
@@ -501,6 +517,7 @@ const SystemDetails: React.FC<SystemDetailsProps> = ({ systemStats, hardwareInfo
           gaugeValue={hasAnyTemp ? Math.min(s!.temperature, 100) : undefined}
           gaugeUnit="°C"
           gaugeDisplay={hasAnyTemp ? Math.trunc(s!.temperature) : undefined}
+          gaugeColor={hasAnyTemp ? cpuTempColor(s!.temperature, hw?.cpuName) : undefined}
           className="hud-tile-cpu"
           delay={0.05}
           pulse={cpuPulse}
