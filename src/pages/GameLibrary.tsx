@@ -831,6 +831,8 @@ const GameLibrary: React.FC<GameLibraryProps> = ({ hardwareInfo, isActive }) => 
                     style={{ '--card-i': index } as React.CSSProperties}
                     onClick={() => !isLocked && handleGameClick(game)}
                   >
+                    {/* Top accent bar */}
+                    <div className="gl-card-accent" />
                     <div className="gl-card__img-wrap">
                       <img src={game.image} alt={game.title} className="gl-card__img" loading="lazy" />
                       <div className="gl-card__hover-overlay" />

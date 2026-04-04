@@ -10,171 +10,141 @@
   border-radius: 16px;
   overflow: hidden;
   background: rgba(6, 8, 16, 0.55);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(20px) saturate(1.5);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5);
   border: 1px solid rgba(0, 242, 255, 0.07);
   box-shadow:
-    0 2px 16px rgba(0, 0, 0, 0.35),
+    0 2px 20px rgba(0, 0, 0, 0.45),
+    0 0 1px rgba(0, 242, 255, 0.06),
     inset 0 1px 0 rgba(0, 242, 255, 0.04),
-    inset 0 0 0 0.5px rgba(255, 255, 255, 0.02);
+    inset 0 0 40px rgba(0, 242, 255, 0.008);
   transition:
+    transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
     border-color 0.35s ease,
-    box-shadow 0.45s ease,
-    transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+    box-shadow 0.35s ease;
   height: 100%;
-  min-height: 160px;
-  min-width: 260px;
-  max-width: 300px;
+  max-width: 270px;
+  min-height: 130px;
+  min-width: 220px;
   transform: translateZ(0);
+  will-change: transform, border-color, box-shadow;
   contain: layout style paint;
 }
 
-/* Gradient sheen overlay — matches hud-bento-card */
+/* Gradient sheen overlay — always visible, matches DashboardHero */
 .cc::before {
   content: '';
   position: absolute;
   inset: 0;
   border-radius: inherit;
   background: linear-gradient(
-    135deg,
-    rgba(0, 242, 255, 0.025) 0%,
-    transparent 40%,
-    transparent 60%,
-    rgba(0, 242, 255, 0.015) 100%
+    150deg,
+    rgba(255, 255, 255, 0.025) 0%,
+    transparent 50%
   );
   pointer-events: none;
   z-index: 1;
-  opacity: 0;
-  transition: opacity 0.45s ease;
 }
 
-.cc:hover::before {
-  opacity: 1;
-}
-
-/* Ambient radial glow on hover */
+/* Ambient radial glow — subtle always-on */
 .cc::after {
   content: '';
   position: absolute;
   inset: 0;
   border-radius: inherit;
   background:
-    radial-gradient(ellipse 70% 60% at 80% 20%, rgba(0, 242, 255, 0.035) 0%, transparent 60%),
-    radial-gradient(ellipse 50% 80% at 10% 90%, rgba(0, 242, 255, 0.02) 0%, transparent 60%);
+    radial-gradient(ellipse 70% 60% at 80% 20%, rgba(0, 242, 255, 0.02) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 80% at 10% 90%, rgba(0, 242, 255, 0.012) 0%, transparent 60%);
   pointer-events: none;
   z-index: 1;
-  opacity: 0;
-  transition: opacity 0.45s ease;
-}
-
-.cc:hover::after {
-  opacity: 1;
 }
 
 .cc:hover {
-  border-color: rgba(0, 242, 255, 0.15);
-  transform: translateY(-4px);
+  transform: translateY(-2px);
+  border-color: rgba(0, 242, 255, 0.16);
   box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.45),
-    0 0 32px rgba(0, 242, 255, 0.04),
-    inset 0 1px 0 rgba(0, 242, 255, 0.06),
-    inset 0 0 0 0.5px rgba(255, 255, 255, 0.03);
+    0 8px 32px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(0, 242, 255, 0.05),
+    0 0 24px rgba(0, 242, 255, 0.03),
+    inset 0 0 40px rgba(0, 242, 255, 0.012);
 }
 
 .cc--busy {
   pointer-events: none;
 }
 
-/* ——— TOP EDGE SWEEP ——— */
-.cc-edge {
+/* ——— TOP ACCENT BAR — matches DashboardHero ——— */
+.cc-accent {
   position: absolute;
   top: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
+  left: 10%;
+  right: 10%;
+  height: 1.5px;
+  border-radius: 0 0 4px 4px;
   z-index: 5;
   pointer-events: none;
-  overflow: hidden;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(0, 242, 255, 0.22) 30%,
-    rgba(0, 212, 170, 0.22) 70%,
-    transparent 100%
-  );
-  opacity: 0.35;
-  transition: opacity 0.4s ease;
-}
-
-.cc-edge::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -40%;
-  width: 40%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(0, 242, 255, 0.7), rgba(0, 212, 170, 0.5), transparent);
-  animation: ccEdgeSweep 4s ease-in-out infinite;
-  opacity: 0;
-  transition: opacity 0.4s ease;
-}
-
-.cc:hover .cc-edge {
-  opacity: 0.8;
-}
-
-.cc:hover .cc-edge::after {
-  opacity: 1;
-}
-
-@keyframes ccEdgeSweep {
-  0%   { left: -40%; }
-  100% { left: 100%; }
+  background: linear-gradient(90deg, transparent 0%, #00F2FF 50%, transparent 100%);
+  box-shadow: 0 0 12px rgba(0, 242, 255, 0.55);
 }
 
 /* ——— CORNER ACCENTS ——— */
+@keyframes ccCornerBreathe {
+  0%, 100% {
+    width: 10px;
+    height: 10px;
+    filter: drop-shadow(0 0 1px rgba(0, 242, 255, 0.2));
+  }
+  50% {
+    width: 14px;
+    height: 14px;
+    filter: drop-shadow(0 0 7px rgba(0, 242, 255, 0.85));
+  }
+}
+
 .cc-corner {
   position: absolute;
-  width: 14px;
-  height: 14px;
+  width: 10px;
+  height: 10px;
   z-index: 2;
   pointer-events: none;
-  opacity: 0.15;
-  transition: opacity 0.45s ease, width 0.4s ease, height 0.4s ease;
+  animation: ccCornerBreathe 3.2s ease-in-out infinite;
 }
 
 .cc:hover .cc-corner {
-  opacity: 0.5;
-  width: 18px;
-  height: 18px;
+  animation-play-state: paused;
+  filter: drop-shadow(0 0 9px rgba(0, 242, 255, 1));
 }
 
 .cc-corner--tl {
-  top: 0; left: 0;
-  border-top: 1.5px solid rgba(0, 242, 255, 0.5);
-  border-left: 1.5px solid rgba(0, 242, 255, 0.5);
-  border-top-left-radius: 2px;
+  top: 7px; left: 7px;
+  border-top: 1.5px solid rgba(0, 242, 255, 0.75);
+  border-left: 1.5px solid rgba(0, 242, 255, 0.75);
+  border-top-left-radius: 3px;
+  animation-delay: 0s;
 }
 
 .cc-corner--tr {
-  top: 0; right: 0;
-  border-top: 1.5px solid rgba(0, 242, 255, 0.5);
-  border-right: 1.5px solid rgba(0, 242, 255, 0.5);
-  border-top-right-radius: 2px;
+  top: 7px; right: 7px;
+  border-top: 1.5px solid rgba(0, 242, 255, 0.75);
+  border-right: 1.5px solid rgba(0, 242, 255, 0.75);
+  border-top-right-radius: 3px;
+  animation-delay: 0.8s;
 }
 
 .cc-corner--bl {
-  bottom: 0; left: 0;
-  border-bottom: 1.5px solid rgba(0, 242, 255, 0.3);
-  border-left: 1.5px solid rgba(0, 242, 255, 0.3);
-  border-bottom-left-radius: 2px;
+  bottom: 7px; left: 7px;
+  border-bottom: 1.5px solid rgba(0, 242, 255, 0.45);
+  border-left: 1.5px solid rgba(0, 242, 255, 0.45);
+  border-bottom-left-radius: 3px;
+  animation-delay: 2.4s;
 }
 
 .cc-corner--br {
-  bottom: 0; right: 0;
-  border-bottom: 1.5px solid rgba(0, 242, 255, 0.3);
-  border-right: 1.5px solid rgba(0, 242, 255, 0.3);
-  border-bottom-right-radius: 2px;
+  bottom: 7px; right: 7px;
+  border-bottom: 1.5px solid rgba(0, 242, 255, 0.45);
+  border-right: 1.5px solid rgba(0, 242, 255, 0.45);
+  border-bottom-right-radius: 3px;
+  animation-delay: 1.6s;
 }
 
 /* ——— LOADING SWEEP ——— */
@@ -198,12 +168,12 @@
 .cc-inner {
   position: relative;
   z-index: 3;
-  padding: 20px 20px 18px;
+  padding: 14px 15px 13px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  gap: 8px;
-  min-height: 210px;
+  gap: 6px;
+  min-height: 165px;
   height: 100%;
 }
 

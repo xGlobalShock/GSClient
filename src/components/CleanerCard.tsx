@@ -51,8 +51,8 @@ const CleanerCard: React.FC<CleanerCardProps> = ({
 
   return (
     <div className={`cc ${isLoading ? 'cc--busy' : ''}`}>
-      {/* Top edge sweep */}
-      <div className="cc-edge" />
+      {/* Top accent bar */}
+      <div className="cc-accent" />
 
       {/* Corner accents */}
       <div className="cc-corner cc-corner--tl" />

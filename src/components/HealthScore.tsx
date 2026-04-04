@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShieldCheck, ChevronDown, ChevronUp, AlertTriangle, CheckCircle2, XCircle, HelpCircle } from 'lucide-react';
+import { ChevronDown, ChevronUp, AlertTriangle, CheckCircle2, XCircle, HelpCircle } from 'lucide-react';
 import '../styles/HealthScore.css';
 
 interface HealthFactor {
@@ -36,8 +36,8 @@ const statusIcon = (status: string) => {
 };
 
 const scoreColor = (score: number) => {
-  if (score >= 80) return '#00F2FF';
-  if (score >= 60) return '#f59e0b';
+  if (score >= 75) return '#00CC6A';
+  if (score >= 60) return '#FFD600';
   if (score >= 40) return '#f97316';
   return '#ef4444';
 };
@@ -80,6 +80,8 @@ const HealthScore: React.FC<HealthScoreProps> = ({ systemStats, extendedStats, h
 
   const score = healthData?.score ?? 0;
   const color = scoreColor(score);
+  const textColor = color === '#00CC6A' ? '#FFFFFF' : color;
+  const labelColor = score >= 90 ? '#00CC6A' : textColor;
   const circumference = 2 * Math.PI * 42;
   const offset = circumference - (score / 100) * circumference;
 
@@ -102,16 +104,13 @@ const HealthScore: React.FC<HealthScoreProps> = ({ systemStats, extendedStats, h
               transition={{ duration: 1, ease: 'easeOut' }}
             />
           </svg>
-          <div className="health-score-number" style={{ color }}>
+          <div className="health-score-number" style={{ color: textColor }}>
             {healthData ? score : '—'}
           </div>
         </div>
         <div className="health-score-info">
-          <div className="health-score-title">
-            <ShieldCheck size={15} />
-            System Health
-          </div>
-          <div className="health-score-label" style={{ color }}>
+          <div className="health-score-title">System Health</div>
+          <div className="health-score-label" style={{ color: labelColor }}>
             {healthData ? scoreLabel(score) : 'Analyzing...'}
           </div>
         </div>

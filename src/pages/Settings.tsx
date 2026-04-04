@@ -59,9 +59,11 @@ const Settings: React.FC = () => {
 
   const OVERLAY_COLORS = [
     { hex: '#00F2FF', label: 'Cyan'   },
-    { hex: '#00F2FF', label: 'Green'  },
-    { hex: '#FF8C00', label: 'Orange' },
+    { hex: '#00FF88', label: 'Green'  },
+    { hex: '#4488FF', label: 'Blue'   },
     { hex: '#FF4444', label: 'Red'    },
+    { hex: '#FF8C00', label: 'Orange' },
+    { hex: '#FF69B4', label: 'Pink'   },
     { hex: '#A855F7', label: 'Purple' },
     { hex: '#FFFFFF', label: 'White'  },
   ];
@@ -473,8 +475,10 @@ const Settings: React.FC = () => {
                       {/* Visible Metrics */}
                       <div className="overlay-cfg-card">
                         <span className="overlay-cfg-card-title">Visible Metrics</span>
-                        <div className="overlay-toggle-list">
+                        <div className="overlay-toggle-list overlay-toggle-list--two-col">
 
+                          {/* Column 1: HUD + GPU + Network */}
+                          <div className="overlay-toggle-col">
                           <span className="overlay-toggle-group-label">HUD</span>
                           {([
                             ['showHeader',     'Header'    ],
@@ -487,21 +491,24 @@ const Settings: React.FC = () => {
                             </div>
                           ))}
 
-                          <span className="overlay-toggle-group-label">CPU</span>
+                          <span className="overlay-toggle-group-label">GPU</span>
                           {([
-                            ['showCpuUsage', 'Usage'],
-                            ['showCpuTemp',  'Temp' ],
+                            ['showGpuUsage', 'Usage'],
+                            ['showGpuTemp',  'Temp' ],
                           ] as const).map(([key, label]) => (
                             <div key={key} className="overlay-toggle-row" style={{ '--sensor-color': overlayColor } as React.CSSProperties} onClick={() => handleOverlaySensor(key)}>
                               <span className="overlay-toggle-label">{label}</span>
                               <div className={`overlay-toggle-switch${overlaySensors[key] ? ' overlay-toggle-switch--on' : ''}`}><div className="overlay-toggle-thumb" /></div>
                             </div>
                           ))}
+                          </div>
 
-                          <span className="overlay-toggle-group-label">GPU</span>
+                          {/* Column 2: CPU + Memory + Network */}
+                          <div className="overlay-toggle-col">
+                          <span className="overlay-toggle-group-label">CPU</span>
                           {([
-                            ['showGpuUsage', 'Usage'],
-                            ['showGpuTemp',  'Temp' ],
+                            ['showCpuUsage', 'Usage'],
+                            ['showCpuTemp',  'Temp' ],
                           ] as const).map(([key, label]) => (
                             <div key={key} className="overlay-toggle-row" style={{ '--sensor-color': overlayColor } as React.CSSProperties} onClick={() => handleOverlaySensor(key)}>
                               <span className="overlay-toggle-label">{label}</span>
@@ -530,6 +537,7 @@ const Settings: React.FC = () => {
                               <div className={`overlay-toggle-switch${overlaySensors[key] ? ' overlay-toggle-switch--on' : ''}`}><div className="overlay-toggle-thumb" /></div>
                             </div>
                           ))}
+                          </div>
 
                         </div>
                       </div>

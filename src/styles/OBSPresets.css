@@ -269,8 +269,8 @@
 
 .aur-deploy:hover:not(:disabled) {
   box-shadow:
-    0 4px 30px color-mix(in srgb, var(--a-accent) 20%, transparent),
-    0 0 60px color-mix(in srgb, var(--a-accent) 8%, transparent);
+    0 2px 10px color-mix(in srgb, var(--a-accent) 20%, transparent),
+    0 0 30px color-mix(in srgb, var(--a-accent) 8%, transparent);
   border-color: color-mix(in srgb, var(--a-accent) 50%, transparent);
 }
 

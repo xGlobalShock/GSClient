@@ -40,22 +40,42 @@
 
 
 /*  Corner bracket mixin (reused)  */
+@keyframes glCornerBreathe {
+  0%, 100% {
+    width: 10px;
+    height: 10px;
+    filter: drop-shadow(0 0 1px rgba(0, 242, 255, 0.2));
+  }
+  50% {
+    width: 14px;
+    height: 14px;
+    filter: drop-shadow(0 0 7px rgba(0, 242, 255, 0.85));
+  }
+}
+
 .gl-hero__corner,
 .gl-card__corner {
   position: absolute;
-  width: 14px;
-  height: 14px;
+  width: 10px;
+  height: 10px;
   z-index: 4;
   pointer-events: none;
+  animation: glCornerBreathe 3.2s ease-in-out infinite;
 }
+
+.gl-card:hover .gl-card__corner {
+  animation-play-state: paused;
+  filter: drop-shadow(0 0 9px rgba(0, 242, 255, 1));
+}
+
 .gl-hero__corner--tl,
-.gl-card__corner--tl { top: 0; left: 0; border-top: 2px solid rgba(0, 242, 255,0.5); border-left: 2px solid rgba(0, 242, 255,0.5); }
+.gl-card__corner--tl { top: 7px; left: 7px; border-top: 1.5px solid rgba(0, 242, 255, 0.75); border-left: 1.5px solid rgba(0, 242, 255, 0.75); border-top-left-radius: 3px; animation-delay: 0s; }
 .gl-hero__corner--tr,
-.gl-card__corner--tr { top: 0; right: 0; border-top: 2px solid rgba(0, 242, 255,0.5); border-right: 2px solid rgba(0, 242, 255,0.5); }
+.gl-card__corner--tr { top: 7px; right: 7px; border-top: 1.5px solid rgba(0, 242, 255, 0.75); border-right: 1.5px solid rgba(0, 242, 255, 0.75); border-top-right-radius: 3px; animation-delay: 0.8s; }
 .gl-hero__corner--bl,
-.gl-card__corner--bl { bottom: 0; left: 0; border-bottom: 2px solid rgba(0, 242, 255,0.5); border-left: 2px solid rgba(0, 242, 255,0.5); }
+.gl-card__corner--bl { bottom: 7px; left: 7px; border-bottom: 1.5px solid rgba(0, 242, 255, 0.45); border-left: 1.5px solid rgba(0, 242, 255, 0.45); border-bottom-left-radius: 3px; animation-delay: 2.4s; }
 .gl-hero__corner--br,
-.gl-card__corner--br { bottom: 0; right: 0; border-bottom: 2px solid rgba(0, 242, 255,0.5); border-right: 2px solid rgba(0, 242, 255,0.5); }
+.gl-card__corner--br { bottom: 7px; right: 7px; border-bottom: 1.5px solid rgba(0, 242, 255, 0.45); border-right: 1.5px solid rgba(0, 242, 255, 0.45); border-bottom-right-radius: 3px; animation-delay: 1.6s; }
 
 /* 
    HERO SECTION
@@ -268,16 +288,59 @@
 /*  Card  */
 .gl-card {
   position: relative;
-  border-radius: 12px;
+  border-radius: 16px;
   overflow: hidden;
   cursor: pointer;
-  border: 1px solid rgba(0, 242, 255, 0.08);
-  transition: border-color 0.25s, box-shadow 0.25s, transform 0.25s;
-  transform: translate3d(0,0,0);
-  background: rgba(8, 10, 18, 0.92);
+  background: rgba(6, 8, 16, 0.55);
+  backdrop-filter: blur(20px) saturate(1.5);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5);
+  border: 1px solid rgba(0, 242, 255, 0.07);
+  box-shadow:
+    0 2px 20px rgba(0, 0, 0, 0.45),
+    0 0 1px rgba(0, 242, 255, 0.06),
+    inset 0 1px 0 rgba(0, 242, 255, 0.04),
+    inset 0 0 40px rgba(0, 242, 255, 0.008);
+  transition:
+    transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.35s ease,
+    box-shadow 0.35s ease;
+  transform: translateZ(0);
+  will-change: transform, border-color, box-shadow;
   contain: layout style paint;
   animation: gl-card-in 0.25s ease both;
   animation-delay: calc(var(--card-i, 0) * 40ms);
+}
+
+/* Gradient sheen overlay — always visible, matches DashboardHero */
+.gl-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    150deg,
+    rgba(255, 255, 255, 0.025) 0%,
+    transparent 50%
+  );
+  pointer-events: none;
+  border-radius: inherit;
+  z-index: 1;
+}
+
+/* Scanline texture — matches DashboardHero */
+.gl-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.04) 2px,
+    rgba(0, 0, 0, 0.04) 4px
+  );
+  pointer-events: none;
+  border-radius: inherit;
+  z-index: 1;
 }
 
 @keyframes gl-card-in {
@@ -285,12 +348,28 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
+/* Top accent bar — matches DashboardHero */
+.gl-card-accent {
+  position: absolute;
+  top: 0;
+  left: 10%;
+  right: 10%;
+  height: 1.5px;
+  border-radius: 0 0 4px 4px;
+  z-index: 5;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent 0%, #00F2FF 50%, transparent 100%);
+  box-shadow: 0 0 12px rgba(0, 242, 255, 0.55);
+}
+
 .gl-card:hover {
-  border-color: rgba(0, 242, 255,0.4);
+  transform: translateY(-2px);
+  border-color: rgba(0, 242, 255, 0.16);
   box-shadow:
-    0 0 24px rgba(0, 242, 255,0.08),
-    inset 0 0 40px rgba(0, 242, 255,0.02);
-  transform: translate3d(0,-4px,0);
+    0 8px 32px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(0, 242, 255, 0.05),
+    0 0 24px rgba(0, 242, 255, 0.03),
+    inset 0 0 40px rgba(0, 242, 255, 0.012);
 }
 
 /* Locked card */
@@ -301,9 +380,13 @@
 }
 
 .gl-card--locked:hover {
-  border-color: rgba(0, 242, 255, 0.08);
-  box-shadow: none;
-  transform: translate3d(0,0,0);
+  border-color: rgba(0, 242, 255, 0.07);
+  box-shadow:
+    0 2px 20px rgba(0, 0, 0, 0.45),
+    0 0 1px rgba(0, 242, 255, 0.06),
+    inset 0 1px 0 rgba(0, 242, 255, 0.04),
+    inset 0 0 40px rgba(0, 242, 255, 0.008);
+  transform: translateZ(0);
 }
 
 .gl-card__lock-overlay {
@@ -387,9 +470,12 @@
   z-index: 4;
 }
 
-/* Card Body */
+/* Card Body — slight backdrop for readability on transparent card */
 .gl-card__body {
   padding: 0.85rem 0.9rem 0.75rem;
+  position: relative;
+  z-index: 2;
+  background: rgba(6, 8, 16, 0.25);
 }
 
 .gl-card__title {
@@ -1454,8 +1540,8 @@
   border-radius: 50%;
 }
 
-.lo-terminal-dots span:nth-child(1) { background: rgba(255, 90, 80, 0.55); }
-.lo-terminal-dots span:nth-child(2) { background: rgba(255, 200, 0, 0.55); }
+.lo-terminal-dots span:nth-child(1) { background: rgba(0, 242, 255, 0.55); }
+.lo-terminal-dots span:nth-child(2) { background: rgba(0, 242, 255, 0.55); }
 .lo-terminal-dots span:nth-child(3) { background: rgba(0, 242, 255, 0.55); }
 
 .lo-terminal-label {

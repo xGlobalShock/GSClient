@@ -53,8 +53,8 @@ const PerformanceTweakCard: React.FC<PerformanceTweakCardProps> = ({
 
   return (
     <div className={`tc ${isEnabled ? 'tc--active' : ''} ${isLoading ? 'tc--loading' : ''}`}>
-      {/* Animated border glow */}
-      <div className="tc-border-glow" />
+      {/* Top accent bar */}
+      <div className="tc-accent" />
       
       {/* Corner accents */}
       <div className="tc-corner tc-corner--tl" />

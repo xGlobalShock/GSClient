@@ -603,8 +603,8 @@ const pingArgsFast = pingArgs1; // keep single packet for smaller overhead
 const LATENCY_POLL_INTERVAL_ACTIVE_MS = 1000; // 1s for active view
 const LATENCY_POLL_INTERVAL_IDLE_MS = 10000; // 10s for inactive/minimized
 
-// Rolling window for packet-loss calculation (20 samples ≈ 20 seconds of history)
-const PING_WINDOW_SIZE = 20;
+// Rolling window for packet-loss calculation (100 samples = 1% granularity at 1s polling)
+const PING_WINDOW_SIZE = 100;
 const MIN_SAMPLES_FOR_LOSS = 5; // show packet loss only once we have enough data
 let _pingWindow = []; // 1 = received, 0 = dropped
 

@@ -372,8 +372,8 @@
   font-size: 9px;
   font-weight: 700;
   border: 1.5px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.03);
-  color: rgba(185, 205, 225, 0.25);
+  background: #00F2FF;
+  color: rgba(10, 20, 28, 0.95);
   transition: all 0.35s ease;
   flex-shrink: 0;
 }
@@ -388,10 +388,10 @@
 
 /* Active step */
 .au-wiz-step--active .au-wiz-step-dot {
-  border-color: rgba(34, 211, 238, 0.5);
-  background: rgba(34, 211, 238, 0.12);
-  color: #22d3ee;
-  box-shadow: 0 0 8px rgba(34, 211, 238, 0.25), 0 0 20px rgba(34, 211, 238, 0.08);
+  border-color: rgba(0, 242, 255, 0.5);
+  background: rgba(0, 242, 255, 0.12);
+  color: #00F2FF;
+  box-shadow: 0 0 8px rgba(0, 242, 255, 0.25), 0 0 20px rgba(0, 242, 255, 0.08);
   animation: au-step-pulse 2s ease-in-out infinite;
 }
 .au-wiz-step--active .au-wiz-step-label { color: rgba(34, 211, 238, 0.85); }

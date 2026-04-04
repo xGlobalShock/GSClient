@@ -484,10 +484,10 @@
 .purge-task-dot {
   width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
 }
-.purge-dot-idle   { background: rgba(255, 255, 255, 0.12); }
+.purge-dot-idle   { background: #00F2FF; box-shadow: 0 0 4px rgba(0,242,255,0.15); }
 .purge-dot-active { background: #00F2FF; box-shadow: 0 0 7px rgba(0, 242, 255,0.8); animation: iconPing 0.85s ease-in-out infinite; }
 .purge-dot-ok     { background: #00F2FF; box-shadow: 0 0 5px rgba(0, 242, 255,0.6); }
-.purge-dot-fail   { background: #FF2D55; box-shadow: 0 0 5px rgba(255,45,85,0.6); }
+.purge-dot-fail   { background: #00F2FF; box-shadow: 0 0 5px rgba(0,242,255,0.6); }
 
 .purge-task-name {
   flex: 1; font-size: 12px; font-weight: 500;

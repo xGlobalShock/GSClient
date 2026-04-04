@@ -360,7 +360,7 @@ const SoftwareUpdates: React.FC<SoftwareUpdatesProps> = ({ isActive = false }) =
                               <span className="su-progress-installing">Please wait…</span>
                             )}
                             {pkgProgress.phase === 'done' && (
-                              <span className="su-progress-speed" style={{color: '#00F2FF'}}>Complete</span>
+                              <span className="su-progress-speed" style={{color: '#FFFFFF'}}>Complete</span>
                             )}
                           </span>
                         </div>

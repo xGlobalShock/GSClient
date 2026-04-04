@@ -582,7 +582,7 @@ const SystemDetails: React.FC<SystemDetailsProps> = ({ systemStats, hardwareInfo
                         <span className="hud-usage-rt-dot" style={{ background: c, boxShadow: `0 0 5px ${c}` }} />
                         <span className="hud-usage-rt-key">VRAM Used</span>
                       </div>
-                      <span className="hud-usage-rt-big" style={{ color: c }}>
+                      <span className="hud-usage-rt-big" style={{ color: c === '#00F2FF' ? '#FFFFFF' : c }}>
                         {formatMiBtoGB(gpuVramUsed)}<small> / {formatMiBtoGB(gpuVramTotal)}</small>
                       </span>
                       <div className="hud-usage-rt-track">
@@ -631,7 +631,7 @@ const SystemDetails: React.FC<SystemDetailsProps> = ({ systemStats, hardwareInfo
                     <span className="hud-net-rt-dot" style={{ background: c, boxShadow: `0 0 5px ${c}` }} />
                     <span className="hud-net-rt-key">In-Use</span>
                   </div>
-                  <span className="hud-net-rt-big" style={{ color: c }}>
+                  <span className="hud-net-rt-big" style={{ color: c === '#00F2FF' ? '#FFFFFF' : c }}>
                     {ext.ramUsedGB.toFixed(1)}<small> / {ext.ramTotalGB.toFixed(1)} GB</small>
                   </span>
                   <div className="hud-usage-rt-track">
@@ -643,7 +643,7 @@ const SystemDetails: React.FC<SystemDetailsProps> = ({ systemStats, hardwareInfo
                     <span className="hud-net-rt-dot" style={{ background: '#00F2FF', boxShadow: '0 0 5px #00F2FF' }} />
                     <span className="hud-net-rt-key">Available</span>
                   </div>
-                  <span className="hud-net-rt-big" style={{ color: '#00F2FF' }}>
+                  <span className="hud-net-rt-big" style={{ color: '#FFFFFF' }}>
                     {ext.ramAvailableGB.toFixed(1)}<small> GB</small>
                   </span>
                   <div className="hud-usage-rt-track">
@@ -692,7 +692,7 @@ const SystemDetails: React.FC<SystemDetailsProps> = ({ systemStats, hardwareInfo
                     <span className="hud-stor-diag-dot" style={{ background: '#00F2FF', boxShadow: '0 0 6px #00F2FF88' }} />
                     <span className="hud-stor-diag-key">Type</span>
                   </div>
-                  <span className="hud-stor-diag-val" style={{ color: '#00F2FF' }}>{hw.diskType}</span>
+                  <span className="hud-stor-diag-val" style={{ color: '#FFFFFF' }}>{hw.diskType}</span>
                   <span className="hud-stor-diag-sub">{hw.diskType === 'SSD' ? 'Solid State Drive' : hw.diskType === 'HDD' ? 'Hard Disk Drive' : 'Storage Device'}</span>
                 </div>
               )}
@@ -707,7 +707,7 @@ const SystemDetails: React.FC<SystemDetailsProps> = ({ systemStats, hardwareInfo
                       <span className="hud-stor-diag-dot" style={{ background: c, boxShadow: `0 0 6px ${c}88` }} />
                       <span className="hud-stor-diag-key">Health</span>
                     </div>
-                    <span className="hud-stor-diag-val" style={{ color: c }}>{hw.diskHealth}</span>
+                    <span className="hud-stor-diag-val" style={{ color: c === '#00F2FF' ? '#FFFFFF' : c }}>{hw.diskHealth}</span>
                     <span className="hud-stor-diag-sub">{ok ? 'No issues detected' : 'Attention needed'}</span>
                   </div>
                 );
@@ -872,7 +872,7 @@ const SystemDetails: React.FC<SystemDetailsProps> = ({ systemStats, hardwareInfo
                           <span className="hud-net-rt-dot" style={{ background: c, boxShadow: `0 0 5px ${c}` }} />
                           <span className="hud-net-rt-key">Ping</span>
                         </div>
-                        <span className="hud-net-rt-big" style={{ color: c }}>{ms}<small>ms</small></span>
+                        <span className="hud-net-rt-big" style={{ color: c === '#00F2FF' ? '#FFFFFF' : c }}>{ms}<small>ms</small></span>
                       </div>
                       {pl >= 0 && (
                         <div className="hud-net-rt-stat">
@@ -880,7 +880,7 @@ const SystemDetails: React.FC<SystemDetailsProps> = ({ systemStats, hardwareInfo
                             <span className="hud-net-rt-dot" style={{ background: plColor, boxShadow: `0 0 5px ${plColor}` }} />
                             <span className="hud-net-rt-key">Packet Loss</span>
                           </div>
-                          <span className="hud-net-rt-big" style={{ color: plColor }}>{pl}<small>%</small></span>
+                          <span className="hud-net-rt-big" style={{ color: plColor === '#00F2FF' ? '#FFFFFF' : plColor }}>{pl}<small>%</small></span>
                         </div>
                       )}
                     </>

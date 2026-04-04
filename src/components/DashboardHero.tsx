@@ -7,6 +7,7 @@ import {
   Cpu, MonitorSpeaker, MemoryStick, HardDrive, Network, Wifi,
   Monitor, TrendingUp, TrendingDown, Minus as FlatIcon, CheckCircle,
   ArrowUp, ArrowDown, Info, X as XIcon,
+  Weight,
 } from 'lucide-react';
 import type { HardwareInfo, ExtendedStats } from '../App';
 import '../styles/DashboardHero.css';
@@ -46,7 +47,7 @@ interface DashboardHeroProps {
 const statusColor = (pct: number): string => {
   if (pct >= 85) return '#FF2D55';
   if (pct >= 65) return '#FFD600';
-  return '#00F2FF';
+  return '#00CC6A';
 };
 
 const statusLabel = (pct: number, labels = ['Normal', 'Moderate', 'High']): string => {
@@ -215,7 +216,7 @@ const DetailBar: React.FC<{ pct: number; label: string; display: string; color: 
   <div className="dh-bar-wrap">
     <div className="dh-bar-head">
       <span className="dh-bar-label">{label}</span>
-      <span className="dh-bar-display" style={{ color }}>{display}</span>
+      <span className="dh-bar-display" style={{ color: '#FFFFFF' }}>{display}</span>
     </div>
     <div className="dh-bar-track">
       <div className="dh-bar-fill" style={{
@@ -247,9 +248,9 @@ const CoreStrip: React.FC<{ cores: number[]; coreCount?: number; threadCount?: n
   return (
     <div className="dh-cores-wrap">
       <div className="dh-cores-head">
-        <span className="dh-cores-dot" style={{ background: loading ? 'rgba(255,255,255,0.1)' : ac, boxShadow: loading ? 'none' : `0 0 4px ${ac}` }} />
+        <span className="dh-cores-dot" style={{ background: '#00F2FF', boxShadow: loading ? 'none' : '0 0 4px #00F2FF' }} />
         <span className="dh-cores-label">Per-Core Load</span>
-        <span className="dh-cores-avg" style={{ color: loading ? 'rgba(255,255,255,0.15)' : ac }}>{loading ? '—' : `${avg}% avg`}</span>
+        <span className="dh-cores-avg" style={{ color: loading ? 'rgba(255,255,255,0.15)' : (ac === '#00F2FF' ? '#FFFFFF' : ac) }}>{loading ? '—' : `${avg}% avg`}</span>
       </div>
       <div className="dh-cores-bar">
         {grouped.map((raw, i) => {
@@ -273,24 +274,25 @@ const VolumeStrip: React.FC<{ drives: { letter: string; totalGB: number; freeGB:
   return (
     <div className="dh-vols">
       {drives.map(d => {
-        const pct   = d.totalGB > 0 ? Math.round(((d.totalGB - d.freeGB) / d.totalGB) * 100) : 0;
-        const color = pct > 90 ? '#FF2D55' : pct > 70 ? '#FFD600' : '#00F2FF';
-        const lit   = Math.round((pct / 100) * SEGS);
-        return (
-          <div key={d.letter} className="dh-vol-row">
-            <span className="dh-vol-id" style={{ color }}>{d.letter}</span>
-            <div className="dh-vol-cells">
-              {Array.from({ length: SEGS }, (_, i) => (
-                <div key={i} className="dh-vol-cell"
-                  style={i < lit ? { background: color, boxShadow: `0 0 3px ${color}77` } : undefined}
-                />
-              ))}
-            </div>
-            <span className="dh-vol-pct" style={{ color }}>{pct}%</span>
-            <span className="dh-vol-free">{d.freeGB}GB</span>
-          </div>
-        );
-      })}
+            const pct   = d.totalGB > 0 ? Math.round(((d.totalGB - d.freeGB) / d.totalGB) * 100) : 0;
+            const color = pct > 90 ? '#FF2D55' : pct > 70 ? '#FFD600' : '#00F2FF';
+            const textColor = color === '#00F2FF' ? '#FFFFFF' : color;
+            const lit   = Math.round((pct / 100) * SEGS);
+            return (
+              <div key={d.letter} className="dh-vol-row">
+                <span className="dh-vol-id" style={{ color: textColor }}>{d.letter}</span>
+                <div className="dh-vol-cells">
+                  {Array.from({ length: SEGS }, (_, i) => (
+                    <div key={i} className="dh-vol-cell"
+                      style={i < lit ? { background: color, boxShadow: `0 0 3px ${color}77` } : undefined}
+                    />
+                  ))}
+                </div>
+                <span className="dh-vol-pct" style={{ color: textColor }}>{pct}%</span>
+                <span className="dh-vol-free">{d.freeGB}GB</span>
+              </div>
+            );
+          })}
     </div>
   );
 };
@@ -321,6 +323,7 @@ interface HeroCardProps {
   statusPct: number;
   chipLabel: string;
   accentColor: string;
+  cardClass?: string;
   history?: MetricPoint[];
   gradId?: string;
   history2?: MetricPoint[];
@@ -338,17 +341,18 @@ const HeroCard: React.FC<HeroCardProps> = ({
   statusPct, chipLabel, accentColor,
   history, gradId, history2, gradId2, color2, label2,
   delay = 0, children, frontExtra, backContent,
+  cardClass,
 }) => {
   const [flipped, setFlipped] = useState(false);
   const sc = statusColor(statusPct);
   const trend = useMemo(() => history ? getTrend(history) : { dir: 'flat' as const, delta: 0 }, [history]);
   const TrendIcon = trend.dir === 'up' ? TrendingUp : trend.dir === 'down' ? TrendingDown : CheckCircle;
   const trendText  = trend.dir === 'flat' ? 'Stable' : `${trend.dir === 'up' ? '+' : '−'}${trend.delta}%`;
-  const trendColor = trend.dir === 'flat' ? '#00F2FF'
+  const trendColor = trend.dir === 'flat' ? '#FFFFFF'
     : trend.dir === 'up' ? (statusPct >= 65 ? '#FF2D55' : '#FFD600') : '#00F2FF';
 
   return (
-    <motion.div className={`dh-card${flipped ? ' is-flipped' : ''}`}
+    <motion.div className={`dh-card${flipped ? ' is-flipped' : ''}${cardClass ? ' ' + cardClass : ''}`}
       initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay, ease: [0.22, 1, 0.36, 1] }}
     >
@@ -372,7 +376,7 @@ const HeroCard: React.FC<HeroCardProps> = ({
                   className="dh-info-btn"
                   onClick={() => setFlipped(true)}
                   title="More info"
-                  style={{ color: `${accentColor}99` }}
+                  style={{ color: '#ffffff' }}
                 >
                   <Info size={13} />
                   <span style={{ fontSize: '10px', letterSpacing: '0.04em' }}>More Info</span>
@@ -381,7 +385,7 @@ const HeroCard: React.FC<HeroCardProps> = ({
             </div>
 
             <div className="dh-value-row">
-              <span className="dh-value-num" style={{ color: accentColor, textShadow: `0 0 28px ${accentColor}50` }}>
+              <span className="dh-value-num" style={{ color: '#FFFFFF', textShadow: `0 0 28px ${accentColor}50` }}>
                 {mainValue}
               </span>
               {mainSuffix && <span className="dh-value-suffix">{mainSuffix}</span>}
@@ -425,10 +429,10 @@ const HeroCard: React.FC<HeroCardProps> = ({
               background: `linear-gradient(90deg, transparent 0%, ${accentColor} 50%, transparent 100%)`,
               boxShadow: `0 0 12px ${accentColor}55`,
             }} />
-            <div className="dh-corner dh-tl" style={{ borderColor: `${accentColor}55` }} />
-            <div className="dh-corner dh-tr" style={{ borderColor: `${accentColor}55` }} />
-            <div className="dh-corner dh-bl" style={{ borderColor: `${accentColor}22` }} />
-            <div className="dh-corner dh-br" style={{ borderColor: `${accentColor}22` }} />
+            <div className="dh-corner dh-tl" style={{ borderColor: `${accentColor}CC` }} />
+            <div className="dh-corner dh-tr" style={{ borderColor: `${accentColor}CC` }} />
+            <div className="dh-corner dh-bl" style={{ borderColor: `${accentColor}77` }} />
+            <div className="dh-corner dh-br" style={{ borderColor: `${accentColor}77` }} />
             <div className="dh-scanline" />
 
             <div className="dh-inner">
@@ -442,7 +446,7 @@ const HeroCard: React.FC<HeroCardProps> = ({
                   className="dh-info-btn dh-info-btn-close"
                   onClick={() => setFlipped(false)}
                   title="Back to live metrics"
-                  style={{ color: accentColor }}
+                  style={{ color: '#ffffff' }}
                 >
                   <XIcon size={13} />
                 </button>
@@ -457,10 +461,10 @@ const HeroCard: React.FC<HeroCardProps> = ({
           background: `linear-gradient(90deg, transparent 0%, ${accentColor} 50%, transparent 100%)`,
           boxShadow: `0 0 12px ${accentColor}55`,
         }} />
-        <div className="dh-corner dh-tl" style={{ borderColor: `${accentColor}55` }} />
-        <div className="dh-corner dh-tr" style={{ borderColor: `${accentColor}55` }} />
-        <div className="dh-corner dh-bl" style={{ borderColor: `${accentColor}22` }} />
-        <div className="dh-corner dh-br" style={{ borderColor: `${accentColor}22` }} />
+        <div className="dh-corner dh-tl" style={{ borderColor: `${accentColor}CC` }} />
+        <div className="dh-corner dh-tr" style={{ borderColor: `${accentColor}CC` }} />
+        <div className="dh-corner dh-bl" style={{ borderColor: `${accentColor}77` }} />
+        <div className="dh-corner dh-br" style={{ borderColor: `${accentColor}77` }} />
         <div className="dh-scanline" />
     </motion.div>
   );
@@ -519,11 +523,11 @@ const DashboardHero: React.FC<DashboardHeroProps> = ({
           {/* Stat tiles: Temp · Cores · Max Clock */}
           <div className="dh-stat-tiles">
             {hasAnyTemp && (() => {
-              const tc = s.temperature >= 90 ? '#FF2D55' : s.temperature >= 70 ? '#FFD600' : '#00F2FF';
+              const tc = s.temperature >= 90 ? '#FF2D55' : s.temperature >= 70 ? '#FFD600' : '#FFFFFF';
               return (
                 <div className="dh-stat-tile">
                   <div className="dh-stat-tile-top">
-                    <span className="dh-stat-tile-dot" style={{ background: tc, boxShadow: `0 0 5px ${tc}` }} />
+                    <span className="dh-stat-tile-dot" style={{ background: '#00F2FF', boxShadow: '0 0 5px #00F2FF' }} />
                     <span className="dh-stat-tile-label">TEMP</span>
                   </div>
                   <span className="dh-stat-tile-val" style={{ color: tc }}>{Math.trunc(s.temperature)}<small>°C</small></span>
@@ -531,12 +535,12 @@ const DashboardHero: React.FC<DashboardHeroProps> = ({
               );
             })()}
             {hw && (
-              <div className="dh-stat-tile">
+                <div className="dh-stat-tile">
                 <div className="dh-stat-tile-top">
                   <span className="dh-stat-tile-dot" style={{ background: '#00F2FF', boxShadow: '0 0 5px #00F2FF' }} />
                   <span className="dh-stat-tile-label">CORES</span>
                 </div>
-                <span className="dh-stat-tile-val" style={{ color: '#00F2FF' }}>{hw.cpuCores}C<small> / {hw.cpuThreads}T</small></span>
+                <span className="dh-stat-tile-val" style={{ color: '#FFFFFF' }}>{hw.cpuCores}C<small> / {hw.cpuThreads}T</small></span>
               </div>
             )}
             {hw?.cpuMaxClock && (
@@ -545,7 +549,7 @@ const DashboardHero: React.FC<DashboardHeroProps> = ({
                   <span className="dh-stat-tile-dot" style={{ background: '#00F2FF', opacity: 0.6 }} />
                   <span className="dh-stat-tile-label">MAX CLK</span>
                 </div>
-                <span className="dh-stat-tile-val" style={{ color: '#00F2FF' }}>{hw.cpuMaxClock}</span>
+                <span className="dh-stat-tile-val" style={{ color: '#FFFFFF' }}>{hw.cpuMaxClock}</span>
               </div>
             )}
           </div>
@@ -575,66 +579,68 @@ const DashboardHero: React.FC<DashboardHeroProps> = ({
             <div className="dh-info-block">
               {hw?.gpuName && (
                 <div className="dh-info-row">
-                  <span className="dh-info-key" style={{ color: 'rgba(0, 242, 255,0.55)' }}>Model</span>
+                  <span className="dh-info-key" style={{ color: 'rgb(255, 174, 0)' }}>Model</span>
                   <span className="dh-info-val">{hw.gpuName}</span>
                 </div>
               )}
               {hw?.gpuDriverVersion && (
                 <div className="dh-info-row">
-                  <span className="dh-info-key" style={{ color: 'rgba(0, 242, 255,0.55)' }}>Driver</span>
+                  <span className="dh-info-key" style={{ color: 'rgb(255, 174, 0)' }}>Driver</span>
                   <span className="dh-info-val">{hw.gpuDriverVersion}</span>
                 </div>
               )}
               {(ext?.gpuFan != null && ext.gpuFan >= 0) && (
                 <div className="dh-info-row">
-                  <span className="dh-info-key" style={{ color: 'rgba(0, 242, 255,0.55)' }}>Fan Speed</span>
+                  <span className="dh-info-key" style={{ color: 'rgb(255, 174, 0)' }}>Fan Speed</span>
                   <span className="dh-info-val">{ext.gpuFan}%</span>
                 </div>
               )}
             </div>
           ) : undefined}
         >
-          {/* GPU stat tiles: Temp · VRAM% · Total · FAN */}
+          {/* GPU stat tiles: Temp · FAN · TOTAL (VRAM) — FAN and TOTAL swapped per request */}
           {(gpuTemp >= 0 || gpuVramT > 0 || (ext?.gpuFan != null && ext.gpuFan >= 0)) && (
             <div className="dh-stat-tiles">
               {gpuTemp >= 0 && (() => {
-                const tc = gpuTemp >= 85 ? '#FF2D55' : gpuTemp >= 65 ? '#FFD600' : '#00F2FF';
+                const tc = gpuTemp >= 85 ? '#FF2D55' : gpuTemp >= 65 ? '#FFD600' : '#FFFFFF';
                 return (
                   <div className="dh-stat-tile">
                     <div className="dh-stat-tile-top">
-                      <span className="dh-stat-tile-dot" style={{ background: tc, boxShadow: `0 0 5px ${tc}` }} />
+                      <span className="dh-stat-tile-dot" style={{ background: '#00F2FF', boxShadow: '0 0 5px #00F2FF' }} />
                       <span className="dh-stat-tile-label">GPU TEMP</span>
                     </div>
                     <span className="dh-stat-tile-val" style={{ color: tc }}>{Math.trunc(gpuTemp)}<small>°C</small></span>
                   </div>
                 );
               })()}
-              {gpuVramT > 0 && (
-                <div className="dh-stat-tile">
-                  <div className="dh-stat-tile-top">
-                    <span className="dh-stat-tile-dot" style={{ background: '#00F2FF', opacity: 0.6 }} />
-                    <span className="dh-stat-tile-label">TOTAL</span>
-                  </div>
-                  <span className="dh-stat-tile-val" style={{ color: '#00F2FF' }}>{fmtMiB(gpuVramT)}</span>
-                </div>
-              )}
+
               {(ext?.gpuFan != null && ext.gpuFan >= 0) && (() => {
                 const fc = ext.gpuFan > 80 ? '#FF2D55' : ext.gpuFan > 60 ? '#FFD600' : '#00F2FF';
                 const hasRpm = ext?.gpuFanRpm != null && ext.gpuFanRpm >= 0;
                 return (
                   <div className="dh-stat-tile">
                     <div className="dh-stat-tile-top">
-                      <span className="dh-stat-tile-dot" style={{ background: fc, boxShadow: `0 0 5px ${fc}` }} />
+                      <span className="dh-stat-tile-dot" style={{ background: '#00F2FF', boxShadow: '0 0 5px #00F2FF' }} />
                       <span className="dh-stat-tile-label">Fan Speed</span>
                     </div>
                     {hasRpm ? (
-                      <span className="dh-stat-tile-val" style={{ color: fc }}>{ext.gpuFanRpm!}<small> RPM</small></span>
+                      <span className="dh-stat-tile-val" style={{ color: '#FFFFFF' }}>{ext.gpuFanRpm!}<small> RPM</small></span>
                     ) : (
-                      <span className="dh-stat-tile-val" style={{ color: fc }}>{ext.gpuFan}<small>%</small></span>
+                      <span className="dh-stat-tile-val" style={{ color: '#FFFFFF' }}>{ext.gpuFan}<small>%</small></span>
                     )}
                   </div>
                 );
               })()}
+
+              {gpuVramT > 0 && (
+                <div className="dh-stat-tile">
+                  <div className="dh-stat-tile-top">
+                    <span className="dh-stat-tile-dot" style={{ background: '#00F2FF', opacity: 0.6 }} />
+                    <span className="dh-stat-tile-label">TOTAL</span>
+                  </div>
+                  <span className="dh-stat-tile-val" style={{ color: '#FFFFFF' }}>{fmtMiB(gpuVramT)}</span>
+                </div>
+              )}
             </div>
           )}
           {gpuVramT > 0 && (
@@ -670,38 +676,38 @@ const DashboardHero: React.FC<DashboardHeroProps> = ({
               {/* ── Specs ── */}
               {hw?.ramInfo && (
                 <div className="dh-info-row">
-                  <span className="dh-info-key" style={{ color: 'rgba(0, 242, 255,0.55)' }}>Config</span>
+                  <span className="dh-info-key" style={{ color: 'rgb(255, 174, 0)' }}>Config</span>
                   <span className="dh-info-val">{hw.ramInfo}</span>
                 </div>
               )}
               {hw?.ramPartNumber && (
                 <div className="dh-info-row">
-                  <span className="dh-info-key" style={{ color: 'rgba(0, 242, 255,0.55)' }}>Part No.</span>
+                  <span className="dh-info-key" style={{ color: 'rgb(255, 174, 0)' }}>Part No.</span>
                   <span className="dh-info-val">{hw.ramPartNumber}</span>
                 </div>
               )}
               {hw?.ramSticks && (
                 <div className="dh-info-row">
-                  <span className="dh-info-key" style={{ color: 'rgba(0, 242, 255,0.55)' }}>Sticks</span>
+                  <span className="dh-info-key" style={{ color: 'rgb(255, 174, 0)' }}>Sticks</span>
                   <span className="dh-info-val">{hw.ramSticks}{hw?.ramSlotMap ? ` · ${hw.ramSlotMap}` : ''}</span>
                 </div>
               )}
               {/* ── Usage ── */}
               {(hw?.ramPageFileTotal ?? 0) > 0 && (
                 <div className="dh-info-row">
-                  <span className="dh-info-key" style={{ color: 'rgba(0, 242, 255,0.55)' }}>Page File</span>
+                  <span className="dh-info-key" style={{ color: 'rgb(255, 174, 0)' }}>Page File</span>
                   <span className="dh-info-val">{hw!.ramPageFileUsed} / {hw!.ramPageFileTotal} MB</span>
                 </div>
               )}
               {(hw?.ramNonPagedPool ?? 0) > 0 && (
                 <div className="dh-info-row">
-                  <span className="dh-info-key" style={{ color: 'rgba(0, 242, 255,0.55)' }}>Non-Paged Pool</span>
+                  <span className="dh-info-key" style={{ color: 'rgb(255, 174, 0)' }}>Non-Paged Pool</span>
                   <span className="dh-info-val">{hw!.ramNonPagedPool} MB</span>
                 </div>
               )}
               {(hw?.ramStandby ?? 0) > 0 && (
                 <div className="dh-info-row">
-                  <span className="dh-info-key" style={{ color: 'rgba(0, 242, 255,0.55)' }}>Standby</span>
+                  <span className="dh-info-key" style={{ color: 'rgb(255, 174, 0)' }}>Standby</span>
                   <span className="dh-info-val">{hw!.ramStandby! > 1024 ? `${(hw!.ramStandby! / 1024).toFixed(1)} GB` : `${hw!.ramStandby} MB`}</span>
                 </div>
               )}
@@ -727,23 +733,23 @@ const DashboardHero: React.FC<DashboardHeroProps> = ({
           ) : undefined}
         >
           {ext && ext.ramTotalGB > 0 && (() => {
-            const uc = ramPct > 90 ? '#FF2D55' : ramPct > 70 ? '#FFD600' : '#00F2FF';
+            const uc = ramPct > 90 ? '#FF2D55' : ramPct > 70 ? '#FFD600' : '#00CC6A';
             return (
               <>
               <div className="dh-stat-tiles">
                 <div className="dh-stat-tile">
                   <div className="dh-stat-tile-top">
-                    <span className="dh-stat-tile-dot" style={{ background: uc, boxShadow: `0 0 5px ${uc}` }} />
+                    <span className="dh-stat-tile-dot" style={{ background: '#00F2FF', boxShadow: '0 0 5px #00F2FF' }} />
                     <span className="dh-stat-tile-label">IN‑USE</span>
                   </div>
-                  <span className="dh-stat-tile-val" style={{ color: uc }}>{ext.ramUsedGB.toFixed(1)}<small> GB</small></span>
+                  <span className="dh-stat-tile-val" style={{ color: '#FFFFFF' }}>{ext.ramUsedGB.toFixed(1)}<small> GB</small></span>
                 </div>
                 <div className="dh-stat-tile">
                   <div className="dh-stat-tile-top">
                     <span className="dh-stat-tile-dot" style={{ background: '#00F2FF', boxShadow: '0 0 5px #00F2FF' }} />
-                    <span className="dh-stat-tile-label">AVAIL</span>
+                    <span className="dh-stat-tile-label">Available</span>
                   </div>
-                  <span className="dh-stat-tile-val" style={{ color: '#00F2FF' }}>{ext.ramAvailableGB.toFixed(1)}<small> GB</small></span>
+                  <span className="dh-stat-tile-val" style={{ color: '#FFFFFF' }}>{ext.ramAvailableGB.toFixed(1)}<small> GB</small></span>
                 </div>
                 {ext.ramCachedGB > 0 && (
                   <div className="dh-stat-tile">
@@ -751,7 +757,7 @@ const DashboardHero: React.FC<DashboardHeroProps> = ({
                       <span className="dh-stat-tile-dot" style={{ background: '#00F2FF', boxShadow: '0 0 5px #00F2FF' }} />
                       <span className="dh-stat-tile-label">CACHED</span>
                     </div>
-                    <span className="dh-stat-tile-val" style={{ color: '#00F2FF' }}>{ext.ramCachedGB.toFixed(1)}<small> GB</small></span>
+                    <span className="dh-stat-tile-val" style={{ color: '#FFFFFF' }}>{ext.ramCachedGB.toFixed(1)}<small> GB</small></span>
                   </div>
                 )}
               </div>
@@ -786,6 +792,25 @@ const DashboardHero: React.FC<DashboardHeroProps> = ({
           accentColor="#00F2FF"
           history={diskHistory} gradId="dhGradDisk"
           delay={0.21}
+          backContent={hw?.allDrives && hw.allDrives.length > 2 ? (
+            <div style={{ padding: 8 }}>
+              <div className="dh-sect-hdr" style={{ marginBottom: 6 }}>Other Volumes</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {hw.allDrives.slice(2).map((d) => {
+                  const pct = d.totalGB > 0 ? Math.round(((d.totalGB - d.freeGB) / d.totalGB) * 100) : 0;
+                  const color = pct > 90 ? '#FF2D55' : pct > 70 ? '#FFD600' : '#00F2FF';
+                  const textColor = color === '#00F2FF' ? '#FFFFFF' : color;
+                  return (
+                    <div key={d.letter} className="dh-net-info-row">
+                      <span className="dh-net-info-key">{d.letter}</span>
+                      <span className="dh-net-info-val" style={{ color: textColor }}>{pct}%</span>
+                      <span className="dh-net-info-val" style={{ color: 'rgba(190,215,255,0.65)', marginLeft: 8 }}>{d.freeGB}GB</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : undefined}
         >
           {(hw?.diskType || hw?.diskHealth) && (
             <div className="dh-stat-tiles">
@@ -795,16 +820,16 @@ const DashboardHero: React.FC<DashboardHeroProps> = ({
                     <span className="dh-stat-tile-dot" style={{ background: '#00F2FF', boxShadow: '0 0 5px #00F2FF88' }} />
                     <span className="dh-stat-tile-label">TYPE</span>
                   </div>
-                  <span className="dh-stat-tile-val" style={{ color: '#00F2FF' }}>{hw.diskType}</span>
+                  <span className="dh-stat-tile-val" style={{ color: '#FFFFFF' }}>{hw.diskType}</span>
                 </div>
               )}
               {hw?.diskHealth && (() => {
                 const ok = hw.diskHealth.toLowerCase() === 'healthy';
-                const c  = ok ? '#00F2FF' : '#FFD600';
+                const c  = ok ? '#FFFFFF' : (hw.diskHealth.toLowerCase() === 'warning' ? '#FFD600' : '#FF2D55');
                 return (
                   <div className="dh-stat-tile">
                     <div className="dh-stat-tile-top">
-                      <span className="dh-stat-tile-dot" style={{ background: c, boxShadow: `0 0 5px ${c}88` }} />
+                      <span className="dh-stat-tile-dot" style={{ background: '#00F2FF', boxShadow: '0 0 5px #00F2FF88' }} />
                       <span className="dh-stat-tile-label">HEALTH</span>
                     </div>
                     <span className="dh-stat-tile-val" style={{ color: c }}>{hw.diskHealth}</span>
@@ -816,12 +841,12 @@ const DashboardHero: React.FC<DashboardHeroProps> = ({
           {ext && (
             <div className="dh-speed">
               <div className="dh-speed-half">
-                <ArrowDown size={9} className="dh-speed-ic read" />
+                <span className="dh-net-speed-ic dn"><ArrowDown size={10} /></span>
                 <span className="dh-speed-val read">{fmt(ext.diskReadSpeed)}</span>
               </div>
               <span className="dh-speed-div" />
               <div className="dh-speed-half">
-                <ArrowUp size={9} className="dh-speed-ic write" />
+                <span className="dh-net-speed-ic up"><ArrowUp size={10} /></span>
                 <span className="dh-speed-val write">{fmt(ext.diskWriteSpeed)}</span>
               </div>
             </div>
@@ -829,7 +854,7 @@ const DashboardHero: React.FC<DashboardHeroProps> = ({
           {hw?.allDrives && hw.allDrives.length > 0 && (
             <>
               <span className="dh-sect-hdr">Volumes</span>
-              <VolumeStrip drives={hw.allDrives} />
+              <VolumeStrip drives={hw.allDrives.slice(0, 2)} />
             </>
           )}
         </HeroCard>
@@ -871,16 +896,18 @@ const DashboardHero: React.FC<DashboardHeroProps> = ({
           {/* Quality tiles: PING · PACKET LOSS · LINK · (SSID / SIGNAL if WiFi) */}
           {(() => {
             const ms  = ext?.latencyMs ?? 0;
-            const mc  = ms <= 80 ? '#00F2FF' : ms <= 180 ? '#FFD600' : '#FF2D55';
+            const mc  = ms <= 95 ? '#FFFFFF' : ms <= 210 ? '#FFD600' : '#FF2D55';
             const pl  = ext?.packetLoss ?? -1;
-            const plc = pl <= 0 ? '#00F2FF' : pl < 3 ? '#FFD600' : '#FF2D55';
+            const plIsZero = pl === 0;
+            const plDotColor = plIsZero ? '#FFFFFF' : '#FF2D55';
+            const plValColor = plIsZero ? '#FFFFFF' : '#FF2D55';
             const link = ext?.activeLinkSpeed || hw?.networkLinkSpeed;
             if (!ms && !link) return null;
             return (
               <div className="dh-net-quality">
                 {ms > 0 && (
                   <div className="dh-net-q-tile">
-                    <span className="dh-net-q-dot" style={{ background: mc, boxShadow: `0 0 6px ${mc}` }} />
+                    <span className="dh-net-q-dot" style={{ background: '#00F2FF', boxShadow: '0 0 6px #00F2FF' }} />
                     <div>
                       <span className="dh-net-q-label">PING</span>
                       <span className="dh-net-q-val" style={{ color: mc }}>{ms}<small> ms</small></span>
@@ -889,10 +916,10 @@ const DashboardHero: React.FC<DashboardHeroProps> = ({
                 )}
                 {pl >= 0 && (
                   <div className="dh-net-q-tile">
-                    <span className="dh-net-q-dot" style={{ background: plc, boxShadow: `0 0 6px ${plc}` }} />
+                    <span className="dh-net-q-dot" style={{ background: plDotColor, boxShadow: plIsZero ? '0 0 6px rgba(255,255,255,0.12)' : '0 0 6px #FF2D55' }} />
                     <div>
                       <span className="dh-net-q-label">PACKET LOSS</span>
-                      <span className="dh-net-q-val" style={{ color: plc }}>{pl}<small>%</small></span>
+                      <span className="dh-net-q-val" style={{ color: plValColor }}>{pl}<small>%</small></span>
                     </div>
                   </div>
                 )}
@@ -901,13 +928,13 @@ const DashboardHero: React.FC<DashboardHeroProps> = ({
                     <span className="dh-net-q-dot" style={{ background: '#00F2FF', boxShadow: '0 0 6px #00F2FF66' }} />
                     <div>
                       <span className="dh-net-q-label">LINK</span>
-                      <span className="dh-net-q-val" style={{ color: '#00F2FF' }}>{fmtLinkSpeed(link)}</span>
+                      <span className="dh-net-q-val" style={{ color: '#FFFFFF' }}>{fmtLinkSpeed(link)}</span>
                     </div>
                   </div>
                 )}
                 {isWifi && ext?.ssid && (
                   <div className="dh-net-q-tile">
-                    <span className="dh-net-q-dot" style={{ background: '#FFD600', boxShadow: '0 0 6px #FFD60099' }} />
+                    <span className="dh-net-q-dot" style={{ background: '#00F2FF', boxShadow: '0 0 6px #00F2FF99' }} />
                     <div>
                       <span className="dh-net-q-label">SSID</span>
                       <span className="dh-net-q-val">{ext.ssid}</span>
@@ -916,10 +943,10 @@ const DashboardHero: React.FC<DashboardHeroProps> = ({
                 )}
                 {isWifi && (ext?.wifiSignal ?? 0) > 0 && (
                   <div className="dh-net-q-tile">
-                    <span className="dh-net-q-dot" style={{ background: ext!.wifiSignal > 70 ? '#00F2FF' : ext!.wifiSignal > 40 ? '#FFD600' : '#FF2D55', boxShadow: `0 0 6px ${ext!.wifiSignal > 70 ? '#00F2FF' : ext!.wifiSignal > 40 ? '#FFD600' : '#FF2D55'}` }} />
+                    <span className="dh-net-q-dot" style={{ background: '#00F2FF', boxShadow: '0 0 6px #00F2FF' }} />
                     <div>
                       <span className="dh-net-q-label">SIGNAL</span>
-                      <span className="dh-net-q-val" style={{ color: ext!.wifiSignal > 70 ? '#00F2FF' : ext!.wifiSignal > 40 ? '#FFD600' : '#FF2D55' }}>{ext!.wifiSignal}<small>%</small></span>
+                      <span className="dh-net-q-val" style={{ color: ext!.wifiSignal > 70 ? '#FFFFFF' : ext!.wifiSignal > 40 ? '#FFD600' : '#FF2D55' }}>{ext!.wifiSignal}<small>%</small></span>
                     </div>
                   </div>
                 )}
@@ -962,37 +989,38 @@ const DashboardHero: React.FC<DashboardHeroProps> = ({
           statusPct={ext?.processCount ? Math.min((ext.processCount / 500) * 100, 100) : 0}
           chipLabel={hw?.windowsActivation === 'Licensed' ? 'Licensed' : hw?.windowsActivation ?? 'System'}
           accentColor="#00F2FF"
+          cardClass="dh-card--system"
           history={processHistory} gradId="dhGradProc"
           delay={0.35}
           backContent={(hw?.biosVersion || hw?.windowsBuild || hw?.windowsActivation || hw?.lastWindowsUpdate || hw?.secureBoot) ? (
             <div className="dh-info-block">
               {(hw?.biosVersion || hw?.biosDate) && (
                 <div className="dh-info-row">
-                  <span className="dh-info-key" style={{ color: 'rgba(0, 242, 255,0.55)' }}>BIOS</span>
+                  <span className="dh-info-key" style={{ color: 'rgb(255, 174, 0)' }}>BIOS</span>
                   <span className="dh-info-val">{hw?.biosVersion ?? 'Unknown'}{hw?.biosDate ? ' · ' + hw.biosDate : ''}</span>
                 </div>
               )}
               {hw?.windowsBuild && (
                 <div className="dh-info-row">
-                  <span className="dh-info-key" style={{ color: 'rgba(0, 242, 255,0.55)' }}>Build</span>
+                  <span className="dh-info-key" style={{ color: 'rgb(255, 174, 0)' }}>Build</span>
                   <span className="dh-info-val">{hw.windowsBuild}</span>
                 </div>
               )}
               {hw?.windowsActivation && (
                 <div className="dh-info-row">
-                  <span className="dh-info-key" style={{ color: 'rgba(0, 242, 255,0.55)' }}>Activation</span>
-                  <span className="dh-info-val" style={{ color: hw.windowsActivation === 'Licensed' ? '#00F2FF' : undefined }}>{hw.windowsActivation}</span>
+                  <span className="dh-info-key" style={{ color: 'rgb(255, 174, 0)' }}>Activation</span>
+                  <span className="dh-info-val" style={{ color: hw.windowsActivation === 'Licensed' ? '#FFFFFF' : undefined }}>{hw.windowsActivation}</span>
                 </div>
               )}
               {hw?.secureBoot && (
                 <div className="dh-info-row">
-                  <span className="dh-info-key" style={{ color: 'rgba(0, 242, 255,0.55)' }}>Secure Boot</span>
-                  <span className="dh-info-val" style={{ color: hw.secureBoot === 'Enabled' ? '#00F2FF' : hw.secureBoot === 'Disabled' ? '#FF2D55' : undefined }}>{hw.secureBoot}</span>
+                  <span className="dh-info-key" style={{ color: 'rgb(255, 174, 0)' }}>Secure Boot</span>
+                  <span className="dh-info-val" style={{ color: hw.secureBoot === 'Enabled' ? '#FFFFFF' : hw.secureBoot === 'Disabled' ? '#FF2D55' : undefined }}>{hw.secureBoot}</span>
                 </div>
               )}
               {hw?.lastWindowsUpdate && (
                 <div className="dh-info-row">
-                  <span className="dh-info-key" style={{ color: 'rgba(0, 242, 255,0.55)' }}>Last Update</span>
+                  <span className="dh-info-key" style={{ color: 'rgb(255, 174, 0)' }}>Last Update</span>
                   <span className="dh-info-val">{hw.lastWindowsUpdate}</span>
                 </div>
               )}
@@ -1002,12 +1030,12 @@ const DashboardHero: React.FC<DashboardHeroProps> = ({
           {/* Runtime stat tiles */}
           <div className="dh-stat-tiles">
             {(ext?.systemUptime || hw?.systemUptime) && (
-              <div className="dh-stat-tile" style={{ flex: 2 }}>
+                  <div className="dh-stat-tile" style={{ flex: 2 }}>
                 <div className="dh-stat-tile-top">
                   <span className="dh-stat-tile-dot" style={{ background: '#00F2FF', boxShadow: '0 0 5px #00F2FF' }} />
                   <span className="dh-stat-tile-label">UPTIME</span>
                 </div>
-                <span className="dh-stat-tile-val" style={{ color: '#00F2FF' }}>{ext?.systemUptime || hw?.systemUptime}</span>
+                <span className="dh-stat-tile-val dh-stat-tile-val--small" style={{ color: '#FFFFFF' }}>{ext?.systemUptime || hw?.systemUptime}</span>
               </div>
             )}
             {hw?.powerPlan && (
@@ -1016,19 +1044,19 @@ const DashboardHero: React.FC<DashboardHeroProps> = ({
                   <span className="dh-stat-tile-dot" style={{ background: '#00F2FF', boxShadow: '0 0 5px #00F2FF' }} />
                   <span className="dh-stat-tile-label">POWER</span>
                 </div>
-                <span className="dh-stat-tile-val" style={{ color: '#00F2FF' }}>{hw.powerPlan}</span>
+                <span className="dh-stat-tile-val dh-stat-tile-val--small" style={{ color: '#FFFFFF' }}>{hw.powerPlan}</span>
               </div>
             )}
             {hw?.hasBattery && (() => {
               const bc = (hw.batteryPercent ?? 100) < 20 ? '#FF2D55' : (hw.batteryPercent ?? 100) < 50 ? '#FFD600' : '#00F2FF';
               return (
-                <div className="dh-stat-tile">
-                  <div className="dh-stat-tile-top">
-                    <span className="dh-stat-tile-dot" style={{ background: bc, boxShadow: `0 0 5px ${bc}` }} />
-                    <span className="dh-stat-tile-label">BATTERY</span>
+                  <div className="dh-stat-tile">
+                    <div className="dh-stat-tile-top">
+                      <span className="dh-stat-tile-dot" style={{ background: '#00F2FF', boxShadow: '0 0 5px #00F2FF' }} />
+                      <span className="dh-stat-tile-label">BATTERY</span>
+                    </div>
+                    <span className="dh-stat-tile-val" style={{ color: bc }}>{hw.batteryPercent}<small>%</small></span>
                   </div>
-                  <span className="dh-stat-tile-val" style={{ color: bc }}>{hw.batteryPercent}<small>%</small></span>
-                </div>
               );
             })()}
           </div>
@@ -1036,19 +1064,19 @@ const DashboardHero: React.FC<DashboardHeroProps> = ({
             <div className="dh-info-block" style={{ marginTop: 6 }}>
               {hw?.windowsVersion && (
                 <div className="dh-info-row">
-                  <span className="dh-info-key" style={{ color: 'rgba(0, 242, 255,0.55)' }}>Operating System</span>
+                  <span className="dh-info-key" style={{ color: 'rgba(255,255,255,0.55)' }}>Operating System</span>
                   <span className="dh-info-val">{hw.windowsVersion}</span>
                 </div>
               )}
               {(hw?.motherboardProduct || hw?.motherboardManufacturer) && (
                 <div className="dh-info-row">
-                  <span className="dh-info-key" style={{ color: 'rgba(0, 242, 255,0.55)' }}>Motherboard</span>
+                  <span className="dh-info-key" style={{ color: 'rgba(255,255,255,0.55)' }}>Motherboard</span>
                   <span className="dh-info-val">{hw?.motherboardProduct ? cleanBoard(hw.motherboardProduct) : hw?.motherboardManufacturer}</span>
                 </div>
               )}
               {hw?.keyboardName && (
                 <div className="dh-info-row">
-                  <span className="dh-info-key" style={{ color: 'rgba(0, 242, 255,0.55)' }}>Keyboard</span>
+                  <span className="dh-info-key" style={{ color: 'rgba(255,255,255,0.55)' }}>Keyboard</span>
                   <span className="dh-info-val">{hw.keyboardName}</span>
                 </div>
               )}

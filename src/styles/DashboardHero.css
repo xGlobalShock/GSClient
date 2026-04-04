@@ -84,6 +84,19 @@
 /* ══════════════════════════════════════════
    Corner Bracket Accents
 ══════════════════════════════════════════ */
+@keyframes dhCornerBreathe {
+  0%, 100% {
+    width: 10px;
+    height: 10px;
+    filter: drop-shadow(0 0 1px rgba(0, 242, 255, 0.2));
+  }
+  50% {
+    width: 14px;
+    height: 14px;
+    filter: drop-shadow(0 0 7px rgba(0, 242, 255, 0.85));
+  }
+}
+
 .dh-corner {
   position: absolute;
   width: 10px;
@@ -92,11 +105,12 @@
   border-width: 0;
   pointer-events: none;
   z-index: 2;
+  animation: dhCornerBreathe 3.2s ease-in-out infinite;
 }
-.dh-tl { top: 7px; left: 7px; border-top-width: 1.5px; border-left-width: 1.5px; border-top-left-radius: 3px; }
-.dh-tr { top: 7px; right: 7px; border-top-width: 1.5px; border-right-width: 1.5px; border-top-right-radius: 3px; }
-.dh-bl { bottom: 7px; left: 7px; border-bottom-width: 1.5px; border-left-width: 1.5px; border-bottom-left-radius: 3px; }
-.dh-br { bottom: 7px; right: 7px; border-bottom-width: 1.5px; border-right-width: 1.5px; border-bottom-right-radius: 3px; }
+.dh-tl { top: 7px; left: 7px; border-top-width: 1.5px; border-left-width: 1.5px; border-top-left-radius: 3px; animation-delay: 0s; }
+.dh-tr { top: 7px; right: 7px; border-top-width: 1.5px; border-right-width: 1.5px; border-top-right-radius: 3px; animation-delay: 0.8s; }
+.dh-bl { bottom: 7px; left: 7px; border-bottom-width: 1.5px; border-left-width: 1.5px; border-bottom-left-radius: 3px; animation-delay: 2.4s; }
+.dh-br { bottom: 7px; right: 7px; border-bottom-width: 1.5px; border-right-width: 1.5px; border-bottom-right-radius: 3px; animation-delay: 1.6s; }
 
 /* ── Scanline texture overlay ── */
 .dh-scanline {
@@ -157,7 +171,7 @@
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.11em;
-  color: rgba(180, 210, 240, 0.55);
+  color: #FFFFFF;
   text-transform: none;
   white-space: nowrap;
   overflow: hidden;
@@ -166,8 +180,8 @@
 
 .dh-subtitle {
   font-size: 10px;
-  font-weight: 400;
-  color: rgba(160, 190, 230, 0.38);
+  font-weight: 700;
+  color: rgb(255, 174, 0);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -235,6 +249,8 @@
   border-radius: 50%;
   flex-shrink: 0;
   animation: dhDotBreath 2.6s ease-in-out infinite;
+  background: #00F2FF;
+  box-shadow: 0 0 5px rgba(0,242,255,0.25);
 }
 
 @keyframes dhDotBreath {
@@ -294,7 +310,6 @@
 .dh-trend--stable {
   background: rgba(0, 242, 255, 0.08);
   border: 1px solid rgba(0, 242, 255, 0.2);
-  box-shadow: 0 0 8px rgba(0, 242, 255, 0.12);
   letter-spacing: 0.04em;
 }
 
@@ -460,7 +475,7 @@
 /* ── Detail bar ── */
 .dh-bar-wrap   { display: flex; flex-direction: column; gap: 2px; }
 .dh-bar-head   { display: flex; justify-content: space-between; align-items: center; }
-.dh-bar-label  { font-size: 10px; color: rgba(140,170,210,0.45); font-weight: 500; }
+.dh-bar-label  { font-size: 10px; color: rgb(255, 255, 255); font-weight: 500; }
 .dh-bar-display{ font-size: 10.5px; font-variant-numeric: tabular-nums; font-weight: 600; }
 .dh-bar-track  { height: 3px; background: rgba(255,255,255,0.05); border-radius: 2px; overflow: hidden; }
 .dh-bar-fill   { height: 100%; border-radius: 2px; transition: width 0.8s cubic-bezier(0.4,0,0.2,1); }
@@ -468,8 +483,8 @@
 /* ── Core strip ── */
 .dh-cores-wrap { display: flex; flex-direction: column; gap: 4px; }
 .dh-cores-head { display: flex; align-items: center; gap: 5px; }
-.dh-cores-dot  { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
-.dh-cores-label{ font-size: 10px; color: rgba(140,170,210,0.45); flex: 1; font-weight: 500; }
+.dh-cores-dot  { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; background: #00F2FF; box-shadow: 0 0 4px rgba(0,242,255,0.2); }
+.dh-cores-label{ font-size: 10px; color: rgb(255, 255, 255); flex: 1; font-weight: 500; }
 .dh-cores-avg  { font-size: 10px; font-variant-numeric: tabular-nums; font-weight: 700; }
 .dh-cores-bar  { display: flex; gap: 2px; height: 14px; }
 .dh-core-seg   { flex: 1; border-radius: 2px; min-width: 0; transition: background 0.4s ease, opacity 0.4s ease; }
@@ -486,7 +501,7 @@
 /* ── Storage diagnostic ── */
 .dh-diag      { display: flex; gap: 8px; padding: 6px 8px; background: rgba(255,255,255,0.025); border-radius: 6px; border: 1px solid rgba(255,255,255,0.04); }
 .dh-diag-cell { display: flex; align-items: center; gap: 6px; flex: 1; }
-.dh-diag-dot  { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.dh-diag-dot  { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; background: #00F2FF; box-shadow: 0 0 5px rgba(0,242,255,0.18); }
 .dh-diag-info { display: flex; flex-direction: column; gap: 0; }
 .dh-diag-key  { font-size: 8.5px; color: rgba(140,170,210,0.45); font-weight: 600; letter-spacing: 0.06em; text-transform: none; }
 .dh-diag-val  { font-size: 11px; font-weight: 700; }
@@ -495,12 +510,12 @@
 .dh-speed       { display: flex; align-items: center; gap: 6px; padding: 5px 8px; background: rgba(255,255,255,0.025); border-radius: 6px; border: 1px solid rgba(255,255,255,0.04); }
 .dh-speed-half  { display: flex; align-items: center; gap: 4px; flex: 1; }
 .dh-speed-div   { width: 1px; height: 14px; background: rgba(255,255,255,0.08); flex-shrink: 0; }
-.dh-speed-ic    { flex-shrink: 0; }
-.dh-speed-ic.read  { color: #00F2FF; }
-.dh-speed-ic.write { color: #00F2FF; }
+.dh-speed-ic    { display: flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 4px; flex-shrink: 0; }
+.dh-speed-ic.read  { color: #FFFFFF; background: rgba(0, 242, 255, 0.12); }
+.dh-speed-ic.write { color: #FFFFFF; background: rgba(0, 242, 255, 0.12); }
 .dh-speed-val   { font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.dh-speed-val.read  { color: #00F2FF; }
-.dh-speed-val.write { color: #00F2FF; }
+.dh-speed-val.read  { color: #FFFFFF; }
+.dh-speed-val.write { color: #FFFFFF; }
 
 /* ── Section sub-header ── */
 .dh-sect-hdr {
@@ -511,15 +526,15 @@
 /* ── Network speed bars (legacy, kept for safety) ── */
 .dh-net-bar-row   { display: flex; align-items: center; gap: 6px; }
 .dh-net-ic        { flex-shrink: 0; }
-.dh-net-ic.dn     { color: #00F2FF; }
-.dh-net-ic.up     { color: #00F2FF; }
+.dh-net-ic.dn     { color: #FFFFFF; }
+.dh-net-ic.up     { color: #FFFFFF; }
 .dh-net-bar-track { flex: 1; height: 3px; background: rgba(255,255,255,0.05); border-radius: 2px; overflow: hidden; }
 .dh-net-bar-fill  { height: 100%; border-radius: 2px; transition: width 0.8s ease; }
 .dh-net-bar-fill.dn { background: linear-gradient(90deg, #00F2FF00, #00F2FF); box-shadow: 0 0 6px #00F2FF55; }
 .dh-net-bar-fill.up { background: linear-gradient(90deg, #00F2FF00, #00F2FF); box-shadow: 0 0 6px #00F2FF55; }
 .dh-net-bar-val   { font-size: 10px; font-weight: 700; font-variant-numeric: tabular-nums; width: 64px; text-align: right; flex-shrink: 0; }
-.dh-net-bar-val.dn { color: #00F2FF; }
-.dh-net-bar-val.up { color: #00F2FF; }
+.dh-net-bar-val.dn { color: #FFFFFF; }
+.dh-net-bar-val.up { color: #FFFFFF; }
 
 /* ── Network ping/signal stats (legacy) ── */
 .dh-net-stats         { display: flex; gap: 8px; flex-wrap: wrap; padding: 4px 0; }
@@ -535,15 +550,15 @@
 
 /* ── Combined Ping + Loss sparkline ── */
 .dh-net-dual-leg    { display: flex; align-items: center; gap: 4px; font-size: 8px; font-weight: 700; letter-spacing: 0.09em; text-transform: none; }
-.dh-net-dual-dot    { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.dh-net-dual-dot    { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; background: #00F2FF; box-shadow: 0 0 5px rgba(0,242,255,0.18); }
 .dh-net-speed-top   { display: flex; align-items: center; gap: 5px; }
 .dh-net-speed-ic    { display: flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 4px; flex-shrink: 0; }
-.dh-net-speed-ic.dn { color: #00F2FF; background: rgba(0, 242, 255,0.12); }
-.dh-net-speed-ic.up { color: #00F2FF; background: rgba(0, 242, 255,0.12); }
-.dh-net-speed-lbl   { font-size: 8px; font-weight: 700; letter-spacing: 0.1em; text-transform: none; color: rgba(140,170,210,0.4); }
-.dh-net-speed-num   { font-size: 16px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; letter-spacing: -0.01em; }
-.dh-net-speed-num.dn{ color: #00F2FF; text-shadow: 0 0 18px rgba(0, 242, 255,0.35); }
-.dh-net-speed-num.up{ color: #00F2FF; text-shadow: 0 0 18px rgba(0, 242, 255,0.35); }
+.dh-net-speed-ic.dn { color: #FFFFFF; background: rgba(0, 242, 255,0.12); }
+.dh-net-speed-ic.up { color: #FFFFFF; background: rgba(0, 242, 255,0.12); }
+.dh-net-speed-lbl   { font-size: 8px; font-weight: 700; letter-spacing: 0.1em; text-transform: none; color: #FFFFFF; }
+.dh-net-speed-num   { font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; letter-spacing: -0.01em; }
+.dh-net-speed-num.dn{ color: #FFFFFF; text-shadow: 0 0 12px rgba(255,255,255,0.06); }
+.dh-net-speed-num.up{ color: #FFFFFF; text-shadow: 0 0 12px rgba(255,255,255,0.06); }
 .dh-net-speed-track { height: 2px; background: rgba(255,255,255,0.06); border-radius: 1px; overflow: hidden; }
 .dh-net-speed-fill  { height: 100%; border-radius: 1px; transition: width 0.9s cubic-bezier(0.4,0,0.2,1); }
 .dh-net-speed-fill.dn { background: linear-gradient(90deg, transparent, #00F2FF); box-shadow: 0 0 8px #00F2FF99; }
@@ -552,43 +567,49 @@
 /* ── Quality tiles (Ping / Packet Loss / WiFi) ── */
 .dh-net-quality   { display: flex; gap: 5px; }
 .dh-net-q-tile    { display: flex; align-items: center; gap: 7px; flex: 1; padding: 6px 8px; background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.05); border-radius: 6px; min-width: 0; }
-.dh-net-q-dot     { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.dh-net-q-dot     { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; align-self: flex-start; margin-top: 2px; background: #00F2FF; box-shadow: 0 0 6px rgba(0,242,255,0.18); }
 .dh-net-q-label   { display: block; font-size: 7.5px; font-weight: 700; text-transform: none; letter-spacing: 0.09em; color: rgba(140,170,210,0.4); white-space: nowrap; }
-.dh-net-q-val     { display: block; font-size: 16px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.1; }
-.dh-net-q-val small { font-size: 9px; font-weight: 500; opacity: 0.55; margin-left: 1px; }
+.dh-net-q-val     { display: block; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.dh-net-q-val small { font-size: 8px; font-weight: 500; opacity: 0.55; margin-left: 1px; }
+
+/* Keep SYSTEM card stat sizes at 11px */
+.dh-card--system .dh-stat-tile-val { font-size: 11px; }
+.dh-card--system .dh-net-q-val { font-size: 11px; }
 
 /* ── Connection info terminal block ── */
 .dh-net-info          { display: flex; flex-direction: column; background: rgba(0,0,0,0.18); border: 1px solid rgba(255,255,255,0.05); border-radius: 6px; overflow: hidden; }
-.dh-net-info-row      { display: flex; align-items: center; gap: 8px; padding: 4px 10px; border-bottom: 1px solid rgba(255,255,255,0.03); }
+.dh-net-info-row      { display: flex; gap: 8px; padding: 4px 10px; border-bottom: 1px solid rgba(255,255,255,0.03); }
 .dh-net-info-row:last-child { border-bottom: none; }
-.dh-net-info-key      { font-size: 8px; font-weight: 800; letter-spacing: 0.06em; text-transform: none; color: rgba(0, 242, 255,0.55); flex-shrink: 0; white-space: nowrap; }
-.dh-net-info-val      { font-size: 10px; font-weight: 500; color: rgba(190,215,255,0.65); flex: 1; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+.dh-net-info-key      { font-size: 11px; font-weight: 700; color: rgb(255, 174, 0); flex-shrink: 0; white-space: nowrap; }
+.dh-net-info-val      { font-size: 9px; color: rgb(255, 255, 255); flex: 1; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
 
 /* ── Generic stat tiles (CPU / GPU / System) ── */
 .dh-stat-tiles      { display: flex; gap: 5px; }
 .dh-stat-tile       { display: flex; flex-direction: column; gap: 5px; flex: 1; padding: 7px 9px; background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.06); border-radius: 7px; min-width: 0; }
 .dh-stat-tile-top   { display: flex; align-items: center; gap: 5px; }
-.dh-stat-tile-dot   { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+.dh-stat-tile-dot   { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; background: #00F2FF; box-shadow: 0 0 5px rgba(0,242,255,0.18); }
 .dh-stat-tile-label { font-size: 7.5px; font-weight: 700; text-transform: none; letter-spacing: 0.09em; color: rgba(140,170,210,0.4); white-space: nowrap; }
-.dh-stat-tile-val   { font-size: 16px; font-weight: 800; font-variant-numeric: tabular-nums; color: rgba(210,230,255,0.88); line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.dh-stat-tile-val small { font-size: 9px; font-weight: 500; opacity: 0.55; margin-left: 1px; }
+.dh-stat-tile-val   { font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; color: rgba(210,230,255,0.88); line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dh-stat-tile-val small { font-size: 8px; font-weight: 500; opacity: 0.55; margin-left: 1px; }
+
+.dh-stat-tile-val--small { font-size: 11px; font-weight: 700; line-height: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* ── Generic terminal info block (GPU / RAM / System) ── */
 .dh-info-block     { display: flex; flex-direction: column; background: rgba(0,0,0,0.18); border: 1px solid rgba(255,255,255,0.05); border-radius: 6px; overflow: hidden; }
-.dh-info-row       { display: flex; align-items: center; gap: 8px; padding: 4px 10px; border-bottom: 1px solid rgba(255,255,255,0.03); }
+.dh-info-row       { display: flex; align-items: center; gap: 8px; padding: 4px 10px; border-bottom: 1px solid rgba(255, 255, 255, 0.03); }
 .dh-info-row:last-child { border-bottom: none; }
 .dh-info-divider   { height: 1px; background: rgba(255,255,255,0.07); margin: 3px 10px; }
 
 /* ── RAM Top Processes mini-table ── */
 .dh-ram-procs        { margin: 4px 0 0; }
-.dh-ram-procs-hdr    { display: flex; justify-content: space-between; padding: 5px 10px 4px; border-top: 1px solid rgba(0, 242, 255,0.15); border-bottom: 1px solid rgba(0, 242, 255,0.1); font-size: 8px; font-weight: 700; letter-spacing: 0.1em; text-transform: none; color: rgba(0, 242, 255,0.5); }
+.dh-ram-procs-hdr    { display: flex; justify-content: space-between; padding: 5px 10px 4px; border-top: 1px solid rgba(0, 242, 255,0.15); border-bottom: 1px solid rgba(0, 242, 255,0.1); font-size: 11px; font-weight: 700; text-transform: none; color: rgb(255, 255, 255); }
 .dh-ram-procs-row    { display: flex; align-items: center; gap: 6px; padding: 4px 10px; border-bottom: 1px solid rgba(255,255,255,0.03); }
 .dh-ram-procs-row:last-child { border-bottom: none; }
-.dh-ram-procs-rank   { font-size: 8px; font-weight: 700; color: rgba(0, 242, 255,0.4); flex-shrink: 0; width: 16px; }
-.dh-ram-procs-name   { flex: 1; font-size: 10.5px; font-weight: 500; color: rgba(200,216,240,0.85); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dh-ram-procs-val    { font-size: 10.5px; font-weight: 700; color: rgba(0, 242, 255,0.8); flex-shrink: 0; font-variant-numeric: tabular-nums; }
-.dh-info-key       { font-size: 8px; font-weight: 800; letter-spacing: 0.06em; text-transform: none; color: rgba(0, 242, 255,0.55); flex-shrink: 0; white-space: nowrap; }
-.dh-info-val       { font-size: 10px; font-weight: 500; color: rgba(190,215,255,0.65); flex: 1; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+.dh-ram-procs-rank   { font-size: 8px; font-weight: 700; color: rgba(255,255,255,0.4); flex-shrink: 0; width: 16px; }
+.dh-ram-procs-name   { flex: 1; font-size: 10.5px; font-weight: 700; color: rgb(255, 187, 0); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dh-ram-procs-val    { font-size: 10.5px; font-weight: 400; color: rgb(255, 255, 255); flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.dh-info-key       { font-size: 11px; font-weight: 700; text-transform: none; color: rgb(255, 255, 255); flex-shrink: 0; white-space: nowrap; }
+.dh-info-val       { font-size: 10px; font-weight: 400; color: rgb(255, 255, 255); flex: 1; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
 
 /* ── Privacy blur ── */
 .dh-blur-field { cursor: pointer; transition: filter 0.25s ease; }
@@ -644,10 +665,11 @@
   align-items: center;
   justify-content: center;
   gap: 5px;
+  font-weight: 700 ;
   height: 26px;
   border-radius: 7px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.486);
+  background: rgba(255, 255, 255, 0.123);
   cursor: pointer;
   flex-shrink: 0;
   padding: 0 8px;
@@ -655,15 +677,16 @@
 }
 
 .dh-info-btn:hover {
-  background: rgba(255, 255, 255, 0.09);
+  background: rgba(255, 255, 255, 0.329);
   border-color: rgba(255, 255, 255, 0.2);
 }
 
 .dh-info-btn-close {
   width: 26px;
   padding: 0;
+  font-weight: 700;
   border-color: rgba(255, 255, 255, 0.18);
-  background: rgba(255, 255, 255, 0.07);
+  background-color: rgba(255, 255, 255, 0.2);
 }
 
 /* Back face content wrapper */
