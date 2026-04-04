@@ -27,7 +27,7 @@ function getOverlayBounds() {
   const { screen } = require('electron');
   const display = screen.getPrimaryDisplay();
   const { width: sw, height: sh } = display.workAreaSize;
-  const ow = 234, oh = 248;
+  const ow = 234, oh = 310;
   const margin = 10;
 
   switch (_overlayConfig.position) {

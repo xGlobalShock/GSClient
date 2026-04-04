@@ -44,17 +44,21 @@ const TOOLS = [
   },
 ];
 
+// Module-level singleton — survives tab switches (component remounts)
+const _activeRuns = new Set<string>();
+
 const SystemRepairPanel: React.FC = () => {
-  const [toolStates, setToolStates] = useState<Record<string, ToolState>>({
-    chkdsk: { status: 'idle', lines: [], verificationProgress: null },
-    sfc:    { status: 'idle', lines: [], verificationProgress: null },
-    dism:   { status: 'idle', lines: [], verificationProgress: null },
-  });
+  // Initialise from the module-level singleton so remounts reflect in-flight scans
+  const [toolStates, setToolStates] = useState<Record<string, ToolState>>(() => ({
+    chkdsk: { status: _activeRuns.has('chkdsk') ? 'running' : 'idle', lines: [], verificationProgress: null },
+    sfc:    { status: _activeRuns.has('sfc')    ? 'running' : 'idle', lines: [], verificationProgress: null },
+    dism:   { status: _activeRuns.has('dism')   ? 'running' : 'idle', lines: [], verificationProgress: null },
+  }));
   // which tool's modal is open
   const [openModal, setOpenModal] = useState<string | null>(null);
   const [showChkdskConfirm, setShowChkdskConfirm] = useState(false);
   const logRef = useRef<HTMLDivElement | null>(null);
-  const activeRunRef = useRef<Set<string>>(new Set());
+  const activeRunRef = useRef<Set<string>>(_activeRuns);
 
   useEffect(() => {
     const unsubscribe = window.electron?.ipcRenderer.on(
@@ -114,8 +118,9 @@ const SystemRepairPanel: React.FC = () => {
   }, [toolStates, openModal]);
 
   const handleRun = useCallback(async (toolId: string, channel: string) => {
-    if (activeRunRef.current.has(toolId)) return;
-    activeRunRef.current.add(toolId);
+    if (_activeRuns.has(toolId)) return;
+    _activeRuns.add(toolId);
+    activeRunRef.current = _activeRuns;
 
     setToolStates(prev => ({ ...prev, [toolId]: { status: 'running', lines: [], verificationProgress: null } }));
     setOpenModal(toolId);
@@ -145,7 +150,8 @@ const SystemRepairPanel: React.FC = () => {
         },
       }));
     } finally {
-      activeRunRef.current.delete(toolId);
+      _activeRuns.delete(toolId);
+      activeRunRef.current = _activeRuns;
     }
   }, []);
 
@@ -239,6 +245,10 @@ const SystemRepairPanel: React.FC = () => {
                     className="repair-run-btn"
                     disabled={isRunning}
                     onClick={() => {
+                      if (isRunning) {
+                        handleOpenModal(tool.id);
+                        return;
+                      }
                       if (tool.id === 'chkdsk') {
                         setShowChkdskConfirm(true);
                       } else {
@@ -247,7 +257,7 @@ const SystemRepairPanel: React.FC = () => {
                     }}
                   >
                     {isRunning ? <Loader2 size={13} className="repair-spin" /> : <Icon size={13} />}
-                    <span>{isRunning ? 'Running...' : hasResult ? 'Run Again' : 'Run Scan'}</span>
+                    <span>{isRunning ? 'View Scan' : hasResult ? 'Run Again' : 'Run Scan'}</span>
                   </button>
                   {(isRunning || hasResult) && (
                     <button
