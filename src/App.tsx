@@ -12,6 +12,7 @@ import Network from './pages/Network';
 import SoftwareUpdates from './pages/SoftwareUpdates';
 import AppsPage from './pages/AppsPage';
 import SpaceAnalyzer from './pages/SpaceAnalyzer';
+import ServiceOptimizer from './pages/ServiceOptimizer';
 import ResolutionManager from './pages/ResolutionManager';
 import { ToastProvider } from './contexts/ToastContext';
 import { ToastContainer } from './components/ToastContainer';
@@ -197,6 +198,7 @@ function App() {
   const staticPages = useMemo(() => (
     <>
       <div style={pageStyle('performance')}><Performance /></div>
+      <div style={pageStyle('serviceOptimizer')}><ServiceOptimizer /></div>
       <div style={pageStyle('cleaner')}><Cleaner /></div>
       <div style={pageStyle('network')}><Network /></div>
       <div style={pageStyle('obsPresets')}><OBSPresets /></div>

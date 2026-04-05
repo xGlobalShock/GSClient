@@ -115,6 +115,7 @@ const advisor = require('../main-process/advisor');
 const resolutionManager = require('../main-process/resolutionManager');
 const repairOverlay = require('../main-process/repairOverlay');
 const startup = require('../main-process/startup');
+const serviceTweaks = require('../main-process/serviceTweaks');
 const { execAsync } = require('../main-process/utils');
 
 // ── GPU status tracking ─────────────────────────────────────────────────────
@@ -229,6 +230,7 @@ appUninstaller.init({ isElevated });
 softwareUpdates.init({ isElevated, invalidateInstallerCaches: appInstaller.invalidateCaches });
 windowsDebloat.init({ isElevated });
 startup.init({ isElevated });
+serviceTweaks.init({ isElevated });
 
 // ── Register all IPC handlers ───────────────────────────────────────────────
 hardwareMonitor.registerIPC();
@@ -250,6 +252,7 @@ advisor.registerIPC();
 resolutionManager.registerIPC();
 repairOverlay.registerIPC();
 startup.registerIPC();
+serviceTweaks.registerIPC();
 
 // ── Pre-warm scan caches (orchestrator) ─────────────────────────────────────
 async function _prewarmScanCaches({ updateSplash = false } = {}) {
