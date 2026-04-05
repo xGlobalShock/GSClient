@@ -588,7 +588,8 @@ function registerIPC() {
         return { success: true, message: 'No eligible services to modify.', applied: 0 };
       }
 
-      // 1. Create a Windows System Restore Point FIRST
+      // 1. Attempt a Windows System Restore Point FIRST (best-effort)
+      let restoreOk = false;
       try {
         const restoreDesc = `GS Center - Before Service Optimization (${mode || 'safe'} mode)`.replace(/'/g, "''");
         await runPSScript(
@@ -596,14 +597,29 @@ function registerIPC() {
           `Checkpoint-Computer -Description '${restoreDesc}' -RestorePointType 'MODIFY_SETTINGS' -ErrorAction Stop`,
           60000
         );
+        restoreOk = true;
       } catch (rpErr) {
-        // Restore point creation is best-effort — don't block the apply
-        console.warn('[ServiceTweaks] Restore point creation failed:', rpErr.message || rpErr);
+        // Restore point creation may fail on some systems; record and continue to attempt backup
+        restoreOk = false;
+        console.warn('[ServiceTweaks] Restore point creation failed:', rpErr && rpErr.message ? rpErr.message : rpErr);
       }
 
       // 2. Backup current service states (JSON)
       const backupNames = toApply.map(s => s.name);
-      await _backupCurrentStates(backupNames);
+      let backupOk = false;
+      let backupData = null;
+      try {
+        backupData = await _backupCurrentStates(backupNames);
+        if (backupData && Array.isArray(backupData) && backupData.length > 0) backupOk = true;
+      } catch (bErr) {
+        backupOk = false;
+        console.warn('[ServiceTweaks] Backup of current service states failed:', bErr && bErr.message ? bErr.message : bErr);
+      }
+
+      // 2.5 Safety check: require at least one of restore point OR backup to have succeeded
+      if (!restoreOk && !backupOk) {
+        return { success: false, message: 'Failed to create System Restore point and failed to backup current service states. Aborting to preserve system safety.', applied: 0 };
+      }
 
       // 3. Apply changes
       const result = await _applyServices(toApply);
