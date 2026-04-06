@@ -11,7 +11,7 @@ const ALLOWED_INVOKE_PREFIXES = [
   'resolution:', 'startup:', 'svc:', 'auth:', 'paypal:',
 ];
 const ALLOWED_SEND_PREFIXES = [
-  'window-', 'app:', 'splash:',
+  'window-', 'app:', 'splash:', 'auth:',
 ];
 const ALLOWED_ON_PREFIXES = [
   'hw-info-update', 'realtime-hw-update', 'wdebloat:', 'appinstall:',

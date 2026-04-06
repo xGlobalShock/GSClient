@@ -158,7 +158,7 @@ function createWindow() {
     mainWindow.on('maximize', () => mainWindow?.webContents.send('window-maximized-changed', true));
     mainWindow.on('unmaximize', () => mainWindow?.webContents.send('window-maximized-changed', false));
 
-    // Block all keyboard shortcuts that could open developer tools
+    // DISABLED/ENABLED DEVTOOLS IN PRODUCTION 
     mainWindow.webContents.on('before-input-event', (event, input) => {
       if (
         input.control &&
@@ -172,6 +172,8 @@ function createWindow() {
       }
     });
 
+
+    // Load the main page (index.html in production, localhost:3000 in development)
     const startUrl = isDev
       ? 'http://localhost:3000'
       : `file://${path.join(_rootDir, 'build', 'index.html')}`;
