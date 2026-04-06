@@ -127,24 +127,141 @@
   }
   @keyframes glintSweep { 0% { transform: translateX(-60px); } 100% { transform: translateX(60px); } }
 
-  /* Fade out — GPU-composited for smooth exit */
-  .splash-container {
-    will-change: opacity, transform;
+  /* Update mode overlay */
+  .update-overlay {
+    display: none;
+    position: absolute;
+    inset: 0;
+    z-index: 200;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    padding: 32px;
+    box-sizing: border-box;
+    background: rgba(3, 4, 6, 0.72);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    animation: updateFadeIn 0.4s ease forwards;
   }
+  .update-overlay.visible { display: flex; }
+  @keyframes updateFadeIn { from { opacity: 0; transform: scale(0.97); } to { opacity: 1; transform: scale(1); } }
+
+  .update-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(0, 242, 255, 0.08);
+    border: 1px solid rgba(0, 242, 255, 0.25);
+    border-radius: 3px;
+    padding: 5px 14px;
+    margin-bottom: 22px;
+    font-family: 'Consolas', monospace;
+    font-size: 9px;
+    letter-spacing: 3px;
+    color: #00f2ff;
+    text-transform: uppercase;
+  }
+  .update-badge-dot {
+    width: 6px; height: 6px;
+    background: #00f2ff;
+    border-radius: 50%;
+    box-shadow: 0 0 8px rgba(0,242,255,0.8);
+    animation: updateDotBlink 1.2s ease-in-out infinite;
+  }
+  @keyframes updateDotBlink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  .update-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: 6px;
+    text-transform: uppercase;
+    background: linear-gradient(to right, #ffffff, #00f2ff);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    margin-bottom: 6px;
+  }
+  .update-version {
+    font-family: 'Consolas', monospace;
+    font-size: 11px;
+    letter-spacing: 3px;
+    color: rgba(0,242,255,0.6);
+    margin-bottom: 28px;
+  }
+
+  .update-bar-wrap {
+    width: 100%;
+    max-width: 280px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .update-bar-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .update-bar-label {
+    font-family: 'Consolas', monospace;
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: rgba(255,255,255,0.4);
+    text-transform: uppercase;
+  }
+  .update-bar-pct {
+    font-family: 'Consolas', monospace;
+    font-size: 18px;
+    font-weight: 700;
+    color: #00f2ff;
+    text-shadow: 0 0 12px rgba(0,242,255,0.6);
+    line-height: 1;
+  }
+  .update-bar-track {
+    width: 100%;
+    height: 3px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .update-bar-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, rgba(0,100,140,0.8), #00f2ff);
+    box-shadow: 0 0 10px rgba(0,242,255,0.5);
+    border-radius: 2px;
+    transition: width 0.35s cubic-bezier(0.25,1,0.5,1);
+  }
+
+  .update-foot {
+    margin-top: 20px;
+    font-family: 'Consolas', monospace;
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: rgba(255,255,255,0.2);
+    text-transform: uppercase;
+  }
+  .update-error-msg {
+    margin-top: 16px;
+    font-size: 10px;
+    color: #ff4d6a;
+    letter-spacing: 1px;
+    text-align: center;
+  }
+
+  /* Fade out — GPU-composited for smooth exit */
+  .splash-container { will-change: opacity, transform; }
   .fade-out {
     animation: fadeFrame 0.5s cubic-bezier(0.4, 0, 1, 1) forwards;
     pointer-events: none;
   }
-  @keyframes fadeFrame {
-    to { opacity: 0; transform: scale(1.015); filter: blur(3px); }
-  }
+  @keyframes fadeFrame { to { opacity: 0; transform: scale(1.015); filter: blur(3px); } }
   .fade-out-bg {
     animation: fadeBg 0.5s cubic-bezier(0.4, 0, 1, 1) forwards;
     pointer-events: none;
   }
-  @keyframes fadeBg {
-    to { opacity: 0; }
-  }
+  @keyframes fadeBg { to { opacity: 0; } }
 </style>
 </head>
 <body>
@@ -152,6 +269,24 @@
   <div class="ambient-flare"></div>
   <div class="grid-wrap"><div class="grid-plane"></div></div>
   <div class="scan-overlay"></div>
+
+  <!-- Update overlay (hidden until update is detected) -->
+  <div class="update-overlay" id="updateOverlay">
+    <div class="update-badge"><span class="update-badge-dot"></span>UPDATE AVAILABLE</div>
+    <div class="update-title">GS CENTER</div>
+    <div class="update-version" id="updateVersionLabel">DOWNLOADING…</div>
+    <div class="update-bar-wrap">
+      <div class="update-bar-row">
+        <span class="update-bar-label" id="updateBarLabel">Downloading</span>
+        <span class="update-bar-pct" id="updateBarPct">0%</span>
+      </div>
+      <div class="update-bar-track">
+        <div class="update-bar-fill" id="updateBarFill"></div>
+      </div>
+    </div>
+    <div class="update-foot">Do not close the application</div>
+    <div class="update-error-msg" id="updateErrorMsg" style="display:none"></div>
+  </div>
 
   <div class="splash-container" id="content">
     
@@ -381,6 +516,48 @@
           api.sendFadeComplete();
         }
       }, 150);
+    });
+
+    // ── Update mode handlers ──────────────────────────────────────────────
+    api.onUpdateFound((data) => {
+      // Freeze the normal progress bar and reveal the update overlay
+      clearInterval(trickleTimer);
+      if (statusDotTimer)   { clearInterval(statusDotTimer);   statusDotTimer   = null; }
+      if (percentAnimation) { cancelAnimationFrame(percentAnimation); percentAnimation = null; }
+
+      const overlay = document.getElementById('updateOverlay');
+      if (overlay) overlay.classList.add('visible');
+
+      const versionLabel = document.getElementById('updateVersionLabel');
+      if (versionLabel && data && data.version) {
+        versionLabel.textContent = 'v' + data.version + ' — DOWNLOADING\u2026';
+      }
+    });
+
+    api.onUpdateProgress((data) => {
+      const pct = Math.min(100, Math.max(0, Math.round(data.percent || 0)));
+      const fill  = document.getElementById('updateBarFill');
+      const pctEl = document.getElementById('updateBarPct');
+      const label = document.getElementById('updateBarLabel');
+
+      if (fill)  fill.style.width = pct + '%';
+      if (pctEl) pctEl.textContent = pct + '%';
+
+      if (pct >= 100) {
+        if (label)  label.textContent  = 'Installing';
+        const versionLabel = document.getElementById('updateVersionLabel');
+        if (versionLabel) versionLabel.textContent = 'INSTALLING UPDATE\u2026';
+      }
+    });
+
+    api.onUpdateError((data) => {
+      const errEl = document.getElementById('updateErrorMsg');
+      if (errEl) {
+        errEl.textContent = (data && data.message) ? data.message : 'Update failed. Please restart.';
+        errEl.style.display = 'block';
+      }
+      const label = document.getElementById('updateBarLabel');
+      if (label) label.textContent = 'Error';
     });
   </script>
 </body>

@@ -541,6 +541,24 @@
   color: #f87171;
 }
 
+.pd-action--upgrade {
+  background: linear-gradient(90deg, rgba(234, 179, 8, 0.07) 0%, rgba(251, 146, 60, 0.05) 100%);
+  color: rgba(251, 191, 36, 0.8);
+  border: 1px solid rgba(251, 191, 36, 0.1);
+}
+.pd-action--upgrade .pd-action-icon {
+  background: rgba(251, 191, 36, 0.1);
+  color: rgba(251, 191, 36, 0.75);
+}
+.pd-action--upgrade:hover {
+  background: linear-gradient(90deg, rgba(234, 179, 8, 0.13) 0%, rgba(251, 146, 60, 0.09) 100%);
+  color: #fbbf24;
+}
+.pd-action--upgrade:hover .pd-action-icon {
+  background: rgba(251, 191, 36, 0.18);
+  color: #fbbf24;
+}
+
 /* ─── Subscription section ────────────────────────────────── */
 .pd-sub {
   padding: 8px 10px 6px;

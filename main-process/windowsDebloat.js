@@ -3,6 +3,7 @@
 const { ipcMain } = require('electron');
 const { execAsync } = require('./utils');
 const windowManager = require('./windowManager');
+const authSession = require('./authSession');
 
 /* ─── Module state ──────────────────────────────────────────────────────── */
 let _isElevated = false;

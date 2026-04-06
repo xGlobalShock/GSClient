@@ -116,7 +116,7 @@
     "publish": {
       "provider": "github",
       "owner": "xGlobalShock",
-      "repo": "GSClient"
+      "repo": "GS-Center"
     },
     "win": {
       "target": [

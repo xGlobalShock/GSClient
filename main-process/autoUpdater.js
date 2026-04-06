@@ -144,7 +144,13 @@ function registerIPC() {
     }
     try {
       const result = await autoUpdater.checkForUpdates();
-      return { event: 'checked', version: result?.updateInfo?.version || app.getVersion() };
+      const latestVersion = result?.updateInfo?.version;
+      const currentVersion = app.getVersion();
+      const isNewer = latestVersion && latestVersion !== currentVersion;
+      return {
+        event: isNewer ? 'available' : 'not-available',
+        version: latestVersion || currentVersion,
+      };
     } catch (err) {
       return { event: 'error', message: err?.message || 'Check failed' };
     }
@@ -201,4 +207,109 @@ function registerIPC() {
   });
 }
 
-module.exports = { initAutoUpdater, registerIPC };
+/**
+ * checkForUpdateEarly()
+ * Called once during the splash boot sequence before any UI is shown.
+ * Resolves with { hasUpdate: true } if an update was found (download has started).
+ * Resolves with { hasUpdate: false } if up-to-date, check failed, or timed out.
+ * In the hasUpdate=true path the download runs to completion and quitAndInstall()
+ * is invoked automatically — the main boot sequence should halt and never show the app.
+ */
+async function checkForUpdateEarly() {
+  if (!app.isPackaged) return { hasUpdate: false };
+
+  // initAutoUpdater() runs AFTER this function, so apply critical settings now
+  // to prevent electron-updater from auto-downloading on its own before we
+  // control the process ourselves.
+  autoUpdater.autoDownload = false;
+  autoUpdater.allowDowngrade = false;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  return new Promise((resolve) => {
+    let resolved = false;
+    const done = (val) => {
+      if (resolved) return;
+      resolved = true;
+      clearTimeout(timeout);
+      autoUpdater.removeListener('update-available',   onAvailable);
+      autoUpdater.removeListener('update-not-available', onNotAvailable);
+      autoUpdater.removeListener('error',              onEarlyError);
+      resolve(val);
+    };
+
+    // Safety net — if the update server doesn't respond in 12 s, boot normally.
+    const timeout = setTimeout(() => done({ hasUpdate: false }), 12000);
+
+    const onAvailable = async (info) => {
+      // Notify the splash that an update is downloading
+      windowManager.sendSplashStatus(`Update v${info.version} found — downloading...`);
+      windowManager.sendSplashProgress(0);
+      _sendToSplash('splash:update-found', { version: info.version });
+
+      // Resolve true immediately so main.js halts the boot sequence.
+      // The download + install carry on independently.
+      done({ hasUpdate: true });
+
+      // Wire download progress → splash
+      const onProgress = (progress) => {
+        const pct = Math.round(progress.percent);
+        windowManager.sendSplashStatus(`Downloading update…  ${pct}%`);
+        _sendToSplash('splash:update-progress', { percent: pct });
+      };
+
+      const onDownloaded = (dlInfo) => {
+        autoUpdater.removeListener('download-progress', onProgress);
+        autoUpdater.removeListener('update-downloaded', onDownloaded);
+
+        _sendToSplash('splash:update-progress', { percent: 100 });
+        windowManager.sendSplashStatus('Update downloaded — installing…');
+
+        setTimeout(() => {
+          try {
+            autoUpdater.quitAndInstall(true, true);
+          } catch (e) {
+            console.error('[AutoUpdater-Early] quitAndInstall failed:', e?.message);
+            _sendToSplash('splash:update-error', { message: 'Install failed. Please restart manually.' });
+          }
+        }, 800);
+      };
+
+      autoUpdater.on('download-progress', onProgress);
+      autoUpdater.on('update-downloaded',  onDownloaded);
+
+      try {
+        const { CancellationToken } = require('electron-updater');
+        await autoUpdater.downloadUpdate(new CancellationToken());
+      } catch (e) {
+        if (e?.message !== 'cancelled') {
+          console.error('[AutoUpdater-Early] Download error:', e?.message);
+          _sendToSplash('splash:update-error', { message: e?.message || 'Download failed.' });
+        }
+      }
+    };
+
+    const onNotAvailable = () => done({ hasUpdate: false });
+    const onEarlyError    = (err) => {
+      console.warn('[AutoUpdater-Early] Error:', err?.message);
+      done({ hasUpdate: false });
+    };
+
+    autoUpdater.once('update-available',    onAvailable);
+    autoUpdater.once('update-not-available', onNotAvailable);
+    autoUpdater.once('error',               onEarlyError);
+
+    autoUpdater.checkForUpdates().catch((err) => {
+      console.warn('[AutoUpdater-Early] checkForUpdates failed:', err?.message);
+      done({ hasUpdate: false });
+    });
+  });
+}
+
+function _sendToSplash(channel, data) {
+  const splash = windowManager.getSplashWindow();
+  if (splash && !splash.isDestroyed()) {
+    splash.webContents.send(channel, data);
+  }
+}
+
+module.exports = { initAutoUpdater, registerIPC, checkForUpdateEarly };

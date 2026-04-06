@@ -6,6 +6,7 @@
 const { ipcMain } = require('electron');
 const { execAsync, runPSScript } = require('./utils');
 const repairOverlay = require('./repairOverlay');
+const authSession = require('./authSession');
 
 let _isElevated = false;
 let _tweakCheckCache = null;

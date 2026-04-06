@@ -468,30 +468,49 @@ async function _scanServices() {
   const allNames = SERVICE_DEFINITIONS.map(s => s.name);
   const namesJSON = JSON.stringify(allNames);
 
+  // Batch query: fetch all services in one CIM call (works on PS5 + PS7),
+  // then do a fast hashtable lookup per name. Avoids N individual WMI calls
+  // that would timeout on slow machines.
   const script = `
-$names = '${namesJSON.replace(/'/g, "''")}' | ConvertFrom-Json
+$wanted = '${namesJSON.replace(/'/g, "''")}' | ConvertFrom-Json
+$wantedSet = @{}
+foreach ($n in $wanted) { $wantedSet[$n.ToLower()] = $n }
+
+# Single batch queries — dramatically faster than per-service lookups
+$cimSvcs   = @{}
+$gsSvcs    = @{}
+try {
+  Get-CimInstance -ClassName Win32_Service -ErrorAction SilentlyContinue | ForEach-Object {
+    $cimSvcs[$_.Name.ToLower()] = $_
+  }
+} catch {}
+try {
+  Get-Service -ErrorAction SilentlyContinue | ForEach-Object {
+    $gsSvcs[$_.Name.ToLower()] = $_
+  }
+} catch {}
+
 $result = @{}
-foreach ($n in $names) {
-  try {
-    $svc = Get-Service -Name $n -ErrorAction SilentlyContinue
-    if ($svc) {
-      $startMode = (Get-WmiObject Win32_Service -Filter "Name='$n'" -ErrorAction SilentlyContinue).StartMode
-      $result[$n] = @{
-        Exists = $true
-        Status = $svc.Status.ToString()
-        StartType = $startMode
-      }
-    } else {
-      $result[$n] = @{ Exists = $false; Status = $null; StartType = $null }
+foreach ($n in $wanted) {
+  $key = $n.ToLower()
+  $cim = $cimSvcs[$key]
+  $gs  = $gsSvcs[$key]
+  if ($cim) {
+    $result[$n] = @{
+      Exists    = $true
+      Status    = if ($gs) { $gs.Status.ToString() } else { $cim.State }
+      StartType = $cim.StartMode
     }
-  } catch {
+  } elseif ($gs) {
+    $result[$n] = @{ Exists = $true; Status = $gs.Status.ToString(); StartType = $null }
+  } else {
     $result[$n] = @{ Exists = $false; Status = $null; StartType = $null }
   }
 }
-$result | ConvertTo-Json -Compress
+$result | ConvertTo-Json -Compress -Depth 3
 `;
 
-  const raw = await runPSScript(script, 45000);
+  const raw = await runPSScript(script, 30000);
   if (!raw) return {};
 
   try {

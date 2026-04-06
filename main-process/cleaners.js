@@ -8,6 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { execAsync, isPermissionError } = require('./utils');
+const authSession = require('./authSession');
 
 function registerIPC() {
 

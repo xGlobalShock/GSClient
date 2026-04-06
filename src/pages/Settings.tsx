@@ -246,6 +246,10 @@ const Settings: React.FC = () => {
       setCheckState(state);
       if (version) setCheckVersion(version);
       unsubFn?.();
+      // Reset to idle after a short display window so the button is clickable again
+      if (state === 'up-to-date') {
+        setTimeout(() => setCheckState('idle'), 3000);
+      }
     };
 
     unsubFn = updater.onStatus((data: any) => {
@@ -263,6 +267,7 @@ const Settings: React.FC = () => {
       // Fallback for dev mode where status events are never fired
       if (!resolved) {
         if (result?.dev || result?.event === 'not-available') resolve('up-to-date');
+        else if (result?.event === 'available') resolve('available', result?.version || '');
         else resolve('idle');
       }
     } catch {

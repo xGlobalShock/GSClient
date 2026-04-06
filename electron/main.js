@@ -364,6 +364,17 @@ app.on('ready', async () => {
   windowManager.sendSplashStatus('Checking for updates...');
   windowManager.sendSplashProgress(5);
   windowManager.sendSplashDetails('Waiting for hardware discovery...');
+
+  // ── Early update check — must complete before hardware boot ──────────────
+  // If an update is found, download starts automatically on the splash screen
+  // and the app will quitAndInstall(). Boot halts here to prevent the main
+  // window from briefly appearing before the restart.
+  const earlyUpdateResult = await autoUpdater.checkForUpdateEarly();
+  if (earlyUpdateResult.hasUpdate) {
+    // Splash stays open; autoUpdater handles the rest (download → quitAndInstall).
+    return;
+  }
+
   const softwareUpdatesPromise = softwareUpdates.checkSoftwareUpdatesImpl()
     .then(result => softwareUpdates.setSoftwareUpdatesCache(result))
     .catch(() => { });
