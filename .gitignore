@@ -35,14 +35,6 @@ V-Config\apex-legends/
 Thumbs.db
 auth.js
 paypal.js
-AdminPanel.tsx
-ManageSubscription.tsx
-AuthContext.tsx
-ProPreviewBanner.tsx
-UpgradeModal.tsx
-ProLockedWrapper.tsx
-ProfileDropdown.tsx
-PaywallModal.tsx
 GC Center.sln
 
 # ── Logs ──
