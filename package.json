@@ -112,6 +112,13 @@
         "filter": [
           "**/*"
         ]
+      },
+      {
+        "from": "scripts",
+        "to": "scripts",
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "directories": {

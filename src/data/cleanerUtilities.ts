@@ -259,15 +259,5 @@ export const cleanerUtilities: CleanerUtility[] = [
     buttonText: 'Clear History',
     color: '#0074D9',
     buttonColor: '#F39C12',
-  },
-  {
-    id: 'revert-startmenu',
-    title: 'Revert to Classic Start Menu',
-    icon: Wrench,
-    cacheType: 'Start Menu Layout',
-    description: 'Reverts to the classic Windows 10 Start Menu layout by disabling the new Windows 11 Start Menu, providing a more familiar interface for users who prefer the older design.',
-    buttonText: 'Revert Start Menu',
-    color: '#7C3AED',
-    buttonColor: '#7C3AED',
-  },
+  }
 ];

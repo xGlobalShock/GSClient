@@ -331,106 +331,86 @@ function registerIPC() {
   });
 
   // WPFTweaks: Revert new Windows Start Menu via ViVeTool script
-  ipcMain.handle('tweak:apply-revert-startmenu', async () => {
+  ipcMain.handle('pref:check-revert-startmenu', async () => {
+    try {
+      const path = require('path');
+      const fs = require('fs');
+      const candidates = [
+        path.resolve(__dirname, '..', 'scripts', 'vivetool', 'vivetool.exe'),
+        path.resolve(process.resourcesPath || '', 'scripts', 'vivetool', 'vivetool.exe'),
+        path.resolve(process.cwd(), 'scripts', 'vivetool', 'vivetool.exe'),
+      ];
+      let viveToolPath = null;
+      for (const p of candidates) {
+        if (fs.existsSync(p)) { viveToolPath = p; break; }
+      }
+      if (!viveToolPath) return { applied: false };
+      
+      const res = await execAsync(`"${viveToolPath}" /query /id:47205210`, { timeout: 4000 });
+      const stdout = res.stdout || '';
+      // If Disabled, the tweak is ON
+      const applied = stdout.includes('State           : Disabled (1)');
+      return { applied, value: stdout };
+    } catch (e) {
+      return { applied: false, error: e.message || String(e) };
+    }
+  });
+
+  ipcMain.handle('pref:apply-revert-startmenu', async (event, enable) => {
     const blocked = authSession.requirePro(); if (blocked) return blocked;
     try {
       const path = require('path');
       const fs = require('fs');
       const os = require('os');
       const fileName = 'WPFTweaksRevertStartMenu.ps1';
-      const candidates = [
+      
+      const scriptCandidates = [
         path.resolve(__dirname, '..', 'scripts', fileName),
-        path.resolve(process.resourcesPath || '', 'app.asar.unpacked', 'scripts', fileName),
         path.resolve(process.resourcesPath || '', 'scripts', fileName),
-        path.resolve(process.resourcesPath || '', 'app.asar', 'scripts', fileName),
         path.resolve(process.cwd(), 'scripts', fileName),
       ];
+      const vivetoolCandidates = [
+        path.resolve(__dirname, '..', 'scripts', 'vivetool', 'vivetool.exe'),
+        path.resolve(process.resourcesPath || '', 'scripts', 'vivetool', 'vivetool.exe'),
+        path.resolve(process.cwd(), 'scripts', 'vivetool', 'vivetool.exe'),
+      ];
+
       let scriptPath = null;
-      for (const p of candidates) {
-        try { if (fs.existsSync(p)) { scriptPath = p; break; } } catch (e) { }
+      for (const p of scriptCandidates) {
+        if (fs.existsSync(p)) { scriptPath = p; break; }
       }
-      if (!scriptPath) {
-        return { success: false, message: `Script not found in expected locations. Place ${fileName} in the repo 'scripts' folder or add it to the installer (app.asar.unpacked). Searched: ${candidates.join(', ')}` };
+      let viveToolPath = null;
+      for (const p of vivetoolCandidates) {
+        if (fs.existsSync(p)) { viveToolPath = p; break; }
       }
 
-      // If the script is inside an asar archive, extract to a temp file so PowerShell can run it.
+      if (!scriptPath || !viveToolPath) {
+        return { success: false, message: 'Script or ViVeTool not found in expected locations.' };
+      }
+
       let tmpFileToCleanup = null;
+      let finalScriptPath = scriptPath;
       try {
         if (scriptPath.includes('.asar') && !scriptPath.includes('.asar.unpacked')) {
           const tmpFile = path.join(os.tmpdir(), `gs_wpftweaks_${process.pid}_${Date.now()}.ps1`);
           const content = fs.readFileSync(scriptPath, 'utf8');
           fs.writeFileSync(tmpFile, content, 'utf8');
           tmpFileToCleanup = tmpFile;
-          scriptPath = tmpFile;
+          finalScriptPath = tmpFile;
         }
-        await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -File "${scriptPath}"`, { shell: true, timeout: 0 });
+        
+        // If enable = true, we apply the tweak (disable new start menu => don't pass Undo).
+        // If enable = false, we reset it (Undo => enable new start menu).
+        const undoArg = enable ? '' : ' -Undo';
+        
+        const cmd = `powershell -NoProfile -ExecutionPolicy Bypass -File "${finalScriptPath}"${undoArg} -ViVeToolPath "${viveToolPath}"`;
+        await execAsync(cmd, { shell: true, timeout: 0 });
       } finally {
         if (tmpFileToCleanup) {
           try { fs.unlinkSync(tmpFileToCleanup); } catch (_) { }
         }
       }
-      _tweakCheckCache = null;
-      return { success: true, message: 'WPFTweaksRevertStartMenu script executed (apply).' };
-    } catch (error) {
-      return { success: false, message: `Error: ${error.message}` };
-    }
-  });
-
-  ipcMain.handle('tweak:reset-revert-startmenu', async () => {
-    const blocked = authSession.requirePro(); if (blocked) return blocked;
-    try {
-      const path = require('path');
-      const fs = require('fs');
-      const os = require('os');
-      const fileName = 'WPFTweaksRevertStartMenu.ps1';
-      const undoFileName = 'WPFTweaksRevertStartMenuUndo.ps1';
-      const candidates = [
-        path.resolve(__dirname, '..', 'scripts', undoFileName),
-        path.resolve(__dirname, '..', 'scripts', fileName),
-        path.resolve(process.resourcesPath || '', 'app.asar.unpacked', 'scripts', undoFileName),
-        path.resolve(process.resourcesPath || '', 'app.asar.unpacked', 'scripts', fileName),
-        path.resolve(process.resourcesPath || '', 'scripts', undoFileName),
-        path.resolve(process.resourcesPath || '', 'scripts', fileName),
-        path.resolve(process.cwd(), 'scripts', undoFileName),
-        path.resolve(process.cwd(), 'scripts', fileName),
-      ];
-
-      let execPath = null;
-      let execArgs = null;
-      // prefer explicit undo script if present
-      for (const p of candidates) {
-        try { if (fs.existsSync(p)) {
-          if (p.toLowerCase().endsWith(undoFileName.toLowerCase())) {
-            execPath = p; execArgs = [];
-            break;
-          }
-          if (!execPath && p.toLowerCase().endsWith(fileName.toLowerCase())) {
-            execPath = p; execArgs = ['-Undo'];
-          }
-        } } catch (e) { }
-      }
-      if (!execPath) {
-        return { success: false, message: 'No undo script found. Add WPFTweaksRevertStartMenuUndo.ps1 or ensure WPFTweaksRevertStartMenu.ps1 supports -Undo and is available in scripts.' };
-      }
-
-      let tmpFileToCleanup = null;
-      try {
-        if (execPath.includes('.asar') && !execPath.includes('.asar.unpacked')) {
-          const tmpFile = path.join(os.tmpdir(), `gs_wpftweaks_${process.pid}_${Date.now()}.ps1`);
-          const content = fs.readFileSync(execPath, 'utf8');
-          fs.writeFileSync(tmpFile, content, 'utf8');
-          tmpFileToCleanup = tmpFile;
-          execPath = tmpFile;
-        }
-        const argStr = execArgs && execArgs.length ? ` ${execArgs.join(' ')}` : '';
-        await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -File "${execPath}"${argStr}`, { shell: true, timeout: 0 });
-      } finally {
-        if (tmpFileToCleanup) {
-          try { fs.unlinkSync(tmpFileToCleanup); } catch (_) { }
-        }
-      }
-      _tweakCheckCache = null;
-      return { success: true, message: 'WPFTweaksRevertStartMenu undo executed (reset).' };
+      return { success: true, message: `Classic Start Menu ${enable ? 'Enabled' : 'Disabled'}`, applied: !!enable };
     } catch (error) {
       return { success: false, message: `Error: ${error.message}` };
     }

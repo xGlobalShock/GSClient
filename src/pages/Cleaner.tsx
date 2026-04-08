@@ -24,7 +24,7 @@ interface CleanResult {
 
 const Cleaner: React.FC = () => {
   const [cleaningId, setCleaningId] = useState<string | null>(null);
-  const [activeCategory, setActiveCategory] = useState<'windows' | 'games' | 'nvidia' | 'repair' | 'essential' | 'preferences'>('windows');
+  const [activeCategory, setActiveCategory] = useState<'windows' | 'games' | 'nvidia' | 'repair' | 'preferences'>('windows');
   const { addToast } = useToast();
   const { isPro } = useAuth();
 
@@ -58,7 +58,6 @@ const Cleaner: React.FC = () => {
     'error-reports': 'cleaner:clear-error-reports',
     'delivery-optimization': 'cleaner:clear-delivery-optimization',
     'recent-files': 'cleaner:clear-recent-files',
-    'revert-startmenu': 'tweak:apply-revert-startmenu',
   };
 
   // Categorize utilities by category
@@ -66,7 +65,6 @@ const Cleaner: React.FC = () => {
     windows: cleanerUtilities.filter(u => ['windows-temp', 'thumbnail-cache', 'windows-logs', 'crash-dumps', 'error-reports', 'delivery-optimization', 'recent-files', 'temp-files', 'update-cache', 'dns-cache', 'ram-cache', 'recycle-bin'].includes(u.id)),
     games: cleanerUtilities.filter(u => ['forza-shaders', 'apex-shaders', 'cod-shaders', 'cs2-shaders', 'fortnite-shaders', 'lol-shaders', 'overwatch-shaders', 'r6-shaders', 'rocket-league-shaders', 'valorant-shaders'].includes(u.id)),
     nvidia: cleanerUtilities.filter(u => ['nvidia-cache'].includes(u.id)),
-    essential: cleanerUtilities.filter(u => ['revert-startmenu'].includes(u.id)),
     preferences: [],
   };
 
@@ -78,15 +76,6 @@ const Cleaner: React.FC = () => {
       count: utilityTabs.windows.length,
       description: 'Clear temp files, DNS cache, logs, crash dumps and system junk.',
       accent: '#00F2FF',
-    },
-    {
-      id: 'essential' as const,
-      label: 'Essential Tweaks',
-      icon: <Sparkles size={18} />,
-      count: utilityTabs.essential.length,
-      description: 'Important small tweaks and fixes for common Windows annoyances.',
-      accent: '#8B5CF6',
-      premium: true,
     },
     {
       id: 'preferences' as const,
@@ -228,6 +217,8 @@ const Cleaner: React.FC = () => {
   const [bingLoading, setBingLoading] = useState(false);
   const [darkEnabled, setDarkEnabled] = useState<boolean | null>(null);
   const [darkLoading, setDarkLoading] = useState(false);
+  const [revertStartMenuEnabled, setRevertStartMenuEnabled] = useState<boolean | null>(null);
+  const [revertLoading, setRevertLoading] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -235,12 +226,13 @@ const Cleaner: React.FC = () => {
       setPrefsLoading(true);
       try {
         if (!window.electron?.ipcRenderer) return;
-        const [mouseRes, startRes, settingsRes, bingRes, darkRes] = await Promise.all([
+        const [mouseRes, startRes, settingsRes, bingRes, darkRes, revertRes] = await Promise.all([
           window.electron.ipcRenderer.invoke('pref:check-mouse-acceleration'),
           window.electron.ipcRenderer.invoke('pref:check-startmenu-recommendations'),
           window.electron.ipcRenderer.invoke('pref:check-settings-home'),
           window.electron.ipcRenderer.invoke('pref:check-bing-search'),
           window.electron.ipcRenderer.invoke('pref:check-dark-theme'),
+          window.electron.ipcRenderer.invoke('pref:check-revert-startmenu'),
         ]);
         if (!mounted) return;
         setMouseEnabled(!!(mouseRes && mouseRes.applied));
@@ -248,6 +240,7 @@ const Cleaner: React.FC = () => {
         setSettingsHomeEnabled(!!(settingsRes && settingsRes.value === 'show:home'));
         setBingEnabled(!!(bingRes && bingRes.value === 0));
         setDarkEnabled(!!(darkRes && darkRes.applied));
+        setRevertStartMenuEnabled(!!(revertRes && revertRes.applied));
       } catch (e) {
         addToast('Failed to load preferences', 'error');
       } finally {
@@ -396,6 +389,15 @@ const Cleaner: React.FC = () => {
                       enabled: darkEnabled,
                       loading: darkLoading,
                       icon: <Sparkles size={28} />,
+                    },
+                    {
+                      id: 'revert-startmenu',
+                      title: 'Prioritize Classic Start Menu',
+                      desc: 'Disable the newly styled Windows Start Menu and enforce classic layout style if applicable.',
+                      onClick: () => applyPref('pref:apply-revert-startmenu', !revertStartMenuEnabled, setRevertLoading, setRevertStartMenuEnabled, `Classic Start Menu ${!revertStartMenuEnabled ? 'Enabled' : 'Disabled'}`),
+                      enabled: revertStartMenuEnabled,
+                      loading: revertLoading,
+                      icon: <Wrench size={28} />,
                     },
                   ].map((pref, index) => (
                     <motion.div
