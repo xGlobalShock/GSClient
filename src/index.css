@@ -14,6 +14,15 @@
   --text-muted: rgba(255, 255, 255, 0.35);
 }
 
+/* ── Shared PRO crown icon (used by nav sidebars across pages) ── */
+.nav-pro-crown {
+  color: #ffd700;
+  filter: drop-shadow(0 0 5px rgba(255, 215, 0, 0.55));
+  flex-shrink: 0;
+  position: relative;
+  top: -2px;
+}
+
 /* ── Shared corner bracket breathing (used by multiple components) ── */
 @keyframes cornerBreathe {
   0%, 100% { transform: scale(1);   opacity: 0.45; }

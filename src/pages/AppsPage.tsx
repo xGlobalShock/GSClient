@@ -79,14 +79,14 @@ const AppsPage: React.FC<AppsPageProps> = ({ isActive = false }) => {
             >
               <span className="apps-navitem-icon">{item.icon}</span>
               <span className="apps-navitem-body">
-                <span className="apps-navitem-label">
-                  {item.label}
-                  {item.premium && !isPro && (
-                    <span className="nav-pro-pill"><Crown size={8} />PRO</span>
-                  )}
-                </span>
+                <span className="apps-navitem-label">{item.label}</span>
                 <span className="apps-navitem-desc">{item.desc}</span>
               </span>
+              {item.premium && !isPro && (
+                <span className="apps-navitem-right">
+                  <Crown size={12} className="nav-pro-crown" />
+                </span>
+              )}
             </button>
           ))}
         </nav>

@@ -8,14 +8,14 @@ const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 
 let _psTempCounter = 0;
-function runPSScript(script, timeoutMs = 8000) {
+async function runPSScript(script, timeoutMs = 8000) {
   const tmpFile = path.join(os.tmpdir(), `gs_ps_${process.pid}_${++_psTempCounter}.ps1`);
   const cultureHeader =
     '[System.Threading.Thread]::CurrentThread.CurrentCulture = [System.Globalization.CultureInfo]::GetCultureInfo(\'en-US\');\n' +
     '[System.Threading.Thread]::CurrentThread.CurrentUICulture = [System.Globalization.CultureInfo]::GetCultureInfo(\'en-US\');\n';
   const wrappedScript = cultureHeader + '$ErrorActionPreference = "SilentlyContinue"\n' + script + '\nexit 0';
   try {
-    fs.writeFileSync(tmpFile, wrappedScript, 'utf8');
+    await fs.promises.writeFile(tmpFile, wrappedScript, 'utf8');
   } catch (writeErr) {
     return Promise.reject(writeErr);
   }

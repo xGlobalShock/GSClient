@@ -174,7 +174,7 @@ function _spawnSidecar(exePath) {
   if (_sidecarProcess) return;
 
   _sidecarLogPath = path.join(os.tmpdir(), 'gs_monitor_diag.log');
-  try { fs.writeFileSync(_sidecarLogPath, `Sidecar started at ${new Date().toISOString()}\nPath: ${exePath}\n`, 'utf8'); } catch { }
+  fs.writeFile(_sidecarLogPath, `Sidecar started at ${new Date().toISOString()}\nPath: ${exePath}\n`, 'utf8', () => {});
 
   _sidecarProcess = spawn(exePath, [], {
     windowsHide: true,
@@ -236,10 +236,22 @@ function _spawnSidecar(exePath) {
     }
   });
 
+  // Buffer stderr lines and flush async to avoid blocking the event loop
+  // every time the sidecar emits a diagnostic message.
+  let _stderrBuf = '';
+  let _stderrTimer = null;
   _sidecarProcess.stderr.on('data', (data) => {
     const msg = data.toString().trim();
     if (!msg) return;
-    try { fs.appendFileSync(_sidecarLogPath, `${msg}\n`, 'utf8'); } catch { }
+    _stderrBuf += msg + '\n';
+    if (!_stderrTimer) {
+      _stderrTimer = setTimeout(() => {
+        _stderrTimer = null;
+        const toWrite = _stderrBuf;
+        _stderrBuf = '';
+        fs.appendFile(_sidecarLogPath, toWrite, 'utf8', () => {});
+      }, 250);
+    }
   });
 
   _sidecarProcess.on('exit', (code) => {

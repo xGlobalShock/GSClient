@@ -461,6 +461,7 @@ const Cleaner: React.FC = () => {
       count: utilityTabs.essential.length,
       description: 'System-level tweaks and modifications.',
       accent: '#3b82f6',
+      premium: true,
     },
     {
       id: 'preferences' as const,
@@ -469,6 +470,7 @@ const Cleaner: React.FC = () => {
       count: preferenceItems.length,
       description: 'Quick preference toggles for common system settings.',
       accent: '#00F2FF',
+      premium: true,
     },
   ];
 
@@ -592,15 +594,15 @@ const Cleaner: React.FC = () => {
             >
               <span className="cleaner-navitem-icon">{cat.icon}</span>
               <span className="cleaner-navitem-body">
-                <span className="cleaner-navitem-label">
-                  {cat.label}
-                  {(cat as any).premium && !isPro && (
-                    <span className="nav-pro-pill"><Crown size={8} />PRO</span>
-                  )}
-                </span>
+                <span className="cleaner-navitem-label">{cat.label}</span>
                 <span className="cleaner-navitem-desc">{cat.description}</span>
               </span>
-              <span className="cleaner-navitem-count">{cat.count}</span>
+              <span className="cleaner-navitem-right">
+                {(cat as any).premium && !isPro && (
+                  <Crown size={12} className="nav-pro-crown" />
+                )}
+                <span className="cleaner-navitem-count">{cat.count}</span>
+              </span>
             </button>
           ))}
 

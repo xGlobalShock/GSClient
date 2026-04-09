@@ -130,13 +130,19 @@ function matchCatalogToRegistry(apps, regNames) {
   return installed;
 }
 
-function getAvailableDrives() {
-  const drives = [];
+// Probe all drive letters in parallel using non-blocking fs.promises.access
+async function getAvailableDrives() {
+  const checks = [];
   for (let code = 65; code <= 90; code++) {
     const letter = String.fromCharCode(code);
-    try { if (fs.existsSync(`${letter}:\\`)) drives.push(`${letter}:`); } catch { }
+    checks.push(
+      fs.promises.access(`${letter}:\\`, fs.constants.F_OK)
+        .then(() => `${letter}:`)
+        .catch(() => null)
+    );
   }
-  return drives;
+  const results = await Promise.all(checks);
+  return results.filter(Boolean);
 }
 
 const KNOWN_APP_DIRS = {
@@ -205,8 +211,8 @@ function dirHasExe(dirPath) {
   } catch { return false; }
 }
 
-function scanFilesystemForApps(undetectedApps) {
-  const drives = getAvailableDrives();
+async function scanFilesystemForApps(undetectedApps) {
+  const drives = await getAvailableDrives();
   const localAppData = process.env.LOCALAPPDATA || '';
   const appData = process.env.APPDATA || '';
   const userPrograms = localAppData ? path.join(localAppData, 'Programs') : '';
@@ -398,7 +404,7 @@ async function _checkInstalledImpl(catalogApps) {
     const undetected = apps.filter(a => !installed[a.id]);
     if (undetected.length > 0) {
       const [fsMatches, appxNames] = await Promise.all([
-        Promise.resolve().then(() => { try { return scanFilesystemForApps(undetected); } catch { return {}; } }),
+        scanFilesystemForApps(undetected).catch(() => ({})),
         getAppxPackageNames().catch(() => new Set())
       ]);
       for (const [id, ok] of Object.entries(fsMatches)) { if (ok) installed[id] = true; }
@@ -419,7 +425,7 @@ async function _checkInstalledImpl(catalogApps) {
       const installed = matchCatalogToRegistry(apps, regNames);
       const undetected = apps.filter(a => !installed[a.id]);
       if (undetected.length > 0) {
-        try { const fsm = scanFilesystemForApps(undetected); for (const [id, ok] of Object.entries(fsm)) { if (ok) installed[id] = true; } } catch { }
+        try { const fsm = await scanFilesystemForApps(undetected); for (const [id, ok] of Object.entries(fsm)) { if (ok) installed[id] = true; } } catch { }
         const stillUn = apps.filter(a => !installed[a.id]);
         if (stillUn.length > 0) {
           try { const ax = await getAppxPackageNames(); if (ax.size > 0) { const m = matchAppxPackages(stillUn, ax); for (const [id, ok] of Object.entries(m)) { if (ok) installed[id] = true; } } } catch { }

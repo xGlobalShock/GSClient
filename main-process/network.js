@@ -83,9 +83,9 @@ function registerIPC() {
   ipcMain.handle('preset:save-video-settings', async (event, filename, content) => {
     try {
       const dir = path.join(app.getPath('userData'), 'videosettings-presets');
-      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      await fs.promises.mkdir(dir, { recursive: true });
       const filePath = path.join(dir, filename);
-      fs.writeFileSync(filePath, content, 'utf-8');
+      await fs.promises.writeFile(filePath, content, 'utf-8');
       return { success: true, path: filePath };
     } catch (err) {
       return { success: false, error: err.message };
