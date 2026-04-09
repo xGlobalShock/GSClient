@@ -184,7 +184,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setUserWithProfile(session.user);
           // One-time fetch to hydrate the latest profile from DB.
           // After this, the realtime subscription handles all updates.
-          const p = await _fetchProfile(session.user.id);
+          let p = await _fetchProfile(session.user.id);
+          // If fetch failed (e.g. stale JWT after app update), force a
+          // token refresh and retry once.
+          if (!p && mounted) {
+            try {
+              const { data: refreshed } = await supabase.auth.refreshSession();
+              if (refreshed?.session?.user && mounted) {
+                setUserWithProfile(refreshed.session.user);
+                p = await _fetchProfile(refreshed.session.user.id);
+              }
+            } catch {}
+          }
           if (p && mounted) { setProfile(p); _cacheProfile(p); setProfileReady(true); }
         } else if (hasCached) {
           // getSession() returned null but we had cached state.
