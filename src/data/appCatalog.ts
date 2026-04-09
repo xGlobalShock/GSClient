@@ -45,7 +45,6 @@ export const APP_CATALOG: CatalogApp[] = [
   { name: 'EA App',                       id: 'ElectronicArts.EADesktop',                  category: 'Gaming',            iconUrl: SI('ea') },
   { name: 'Ubisoft Connect',              id: 'Ubisoft.Connect',                           category: 'Gaming',            iconUrl: SI('ubisoft') },
   { name: 'Battle.net',                   id: 'Blizzard.BattleNet',                        category: 'Gaming',            iconUrl: SI('battledotnet') },
-  { name: 'GeForce NOW',                  id: 'Nvidia.GeForceNow',                         category: 'Gaming',            iconUrl: SI('nvidia') },
   { name: 'Parsec',                       id: 'Parsec.Parsec',                             category: 'Gaming',            iconUrl: 'https://www.google.com/s2/favicons?domain=parsec.app&sz=64' },
   // Gaming Tools
   { name: 'MSI Afterburner',              id: 'Guru3D.Afterburner',                        category: 'Gaming Tools',      iconUrl: SI('msi') },
