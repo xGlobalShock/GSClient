@@ -343,10 +343,8 @@ public static class Program
         {
             foreach (var hw in computer.Hardware)
             {
-                // Collect all sensors including sub-hardware
-                var allSensors = new List<ISensor>(hw.Sensors);
-                foreach (var sub in hw.SubHardware)
-                    allSensors.AddRange(sub.Sensors);
+                // Collect all sensors recursively (handles nested sub-hardware on Intel hybrid/chiplet CPUs)
+                var allSensors = CollectSensorsRecursive(hw);
 
                 switch (hw.HardwareType)
                 {
@@ -424,9 +422,10 @@ public static class Program
         // Use motherboard CPU sensor if LHM couldn't read a valid CPU temp (>10°C)
         if (cpuTemp < 10 && mbCpuTemp > 10) cpuTemp = mbCpuTemp;
 
-        // Last resort: WMI ACPI thermal zone (works on many AMD systems where LHM can't read temps)
+        // Last resort: WMI ACPI thermal zone — try two sources for broad hardware support
         if (cpuTemp < 10)
         {
+            // Source 1: MSAcpi_ThermalZoneTemperature (AMD-friendly, older boards)
             try
             {
                 using var tz = new ManagementObjectSearcher(@"root\WMI",
@@ -443,7 +442,32 @@ public static class Program
                     }
                 }
             }
-            catch { /* WMI thermal zone not available — estimation will kick in on JS side */ }
+            catch { }
+        }
+
+        if (cpuTemp < 10)
+        {
+            // Source 2: Win32_PerfFormattedData_Counters_ThermalZoneInformation (Intel-friendly, no ring0 needed)
+            try
+            {
+                using var tz = new ManagementObjectSearcher("root\\cimv2",
+                    "SELECT Temperature FROM Win32_PerfFormattedData_Counters_ThermalZoneInformation");
+                double maxC = -1;
+                foreach (ManagementObject obj in tz.Get())
+                {
+                    // Reports in tenths of Kelvin
+                    var kelvinTenths = Convert.ToDouble(obj["Temperature"]);
+                    var celsius = (kelvinTenths / 10.0) - 273.15;
+                    if (celsius > 10 && celsius < 120 && celsius > maxC)
+                        maxC = celsius;
+                }
+                if (maxC > 10)
+                {
+                    cpuTemp = Math.Round(maxC, 1);
+                    Log($"ACPI_THERMAL2:{cpuTemp}C");
+                }
+            }
+            catch { }
         }
 
         // Process pending GPU fan control command
@@ -597,6 +621,15 @@ public static class Program
 
     #region Sensor Extractors
 
+    /// <summary>Recursively collect all sensors from hardware and its sub-hardware at any depth.</summary>
+    private static List<ISensor> CollectSensorsRecursive(IHardware hw)
+    {
+        var result = new List<ISensor>(hw.Sensors);
+        foreach (var sub in hw.SubHardware)
+            result.AddRange(CollectSensorsRecursive(sub));
+        return result;
+    }
+
     private static void ExtractCpuMetrics(List<ISensor> sensors, ref double cpuTotal,
         ref double cpuTemp, ref double cpuClock,
         ref double cpuPower, ref double cpuVoltage, List<double> perCoreCpu)
@@ -620,11 +653,12 @@ public static class Program
             if (s.SensorType == SensorType.Temperature)
             {
                 var name = s.Name;
-                // Priority: CPU Package > Tctl/Tdie > Core (AMD) > Core Average > Core Max > first Core # > any
-                // Validity: any real CPU temp must be > 10°C and < 150°C; 0 = sensor not readable
-                if ((name == "CPU Package" || name.Contains("Tctl") || name.Contains("Tdie")) && v > 10 && v < 150)
+                // Priority: CPU Package / Intel hybrid names > Tctl/Tdie (AMD) > Core > Core Average > Core Max > Core # / CCD > any valid
+                // Validity: real CPU temp must be > 10°C and < 150°C
+                if ((name == "CPU Package" || name == "Package" ||
+                     name == "CPU IA Cores" || name == "CPU GT Cores" || name == "CPU Ring" ||
+                     name.Contains("Tctl") || name.Contains("Tdie")) && v > 10 && v < 150)
                 {
-                    // Prefer the highest priority reading; only overwrite with another top-priority sensor if current is invalid
                     if (cpuTemp < 10)
                         cpuTemp = Math.Round(v, 1);
                 }
