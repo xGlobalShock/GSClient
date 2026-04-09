@@ -3,7 +3,6 @@
 // No .NET runtime needed on target machine (self-contained single-file publish).
 
 using System.Diagnostics;
-using System.Management;
 using System.Net.NetworkInformation;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
@@ -421,29 +420,11 @@ public static class Program
         if (diskTemp < 0 && _lastDiskTemp > 0) diskTemp = _lastDiskTemp;
 
         // Fallback chain for CPU temperature
+        // Use motherboard CPU sensor if LHM couldn't read the CPU directly
         if (cpuTemp < 0 && mbCpuTemp > 0) cpuTemp = mbCpuTemp;
-
-        // Last resort: WMI ACPI thermal zone (works on many AMD systems where LHM can't read temps)
-        if (cpuTemp < 0)
-        {
-            try
-            {
-                using var tz = new ManagementObjectSearcher(@"root\WMI",
-                    "SELECT CurrentTemperature FROM MSAcpi_ThermalZoneTemperature");
-                foreach (ManagementObject obj in tz.Get())
-                {
-                    var kelvinTenths = Convert.ToDouble(obj["CurrentTemperature"]);
-                    var celsius = (kelvinTenths / 10.0) - 273.15;
-                    if (celsius > 10 && celsius < 120)
-                    {
-                        cpuTemp = Math.Round(celsius, 1);
-                        Log($"ACPI_THERMAL:{cpuTemp}C");
-                        break;
-                    }
-                }
-            }
-            catch { /* WMI thermal zone not available — estimation will kick in on JS side */ }
-        }
+        // NOTE: ACPI WMI thermal zone fallback intentionally removed — many BIOSes return
+        // a static stub value of 300K (26.85°C) which causes a frozen display.
+        // JS-side estimation handles the no-temp case cleanly.
 
         // Process pending GPU fan control command
         int fanCmd;
