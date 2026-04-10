@@ -221,6 +221,17 @@ function _spawnSidecar(exePath) {
             _hwInfoSidecarResolve(obj);
             _hwInfoSidecarResolve = null;
           }
+          // Also resolve the splash hardware-names promise early using WMI data
+          // from the hwinfo message (arrives in ~1-2s, well before LHM init finishes)
+          if (_hwNamesResolve && (obj.cpuName || obj.gpuName)) {
+            _hwNames = {
+              cpuName: obj.cpuName || '',
+              gpuName: obj.gpuName || '',
+              ramTotalGB: obj.ramTotalGB || Math.round(os.totalmem() / (1024 * 1024 * 1024)),
+            };
+            _hwNamesResolve(_hwNames);
+            _hwNamesResolve = null;
+          }
         } else if (obj.type === 'hwinfo-update') {
           // Merge partial updates into the existing hwinfo
           if (_hwInfoFromSidecar) {

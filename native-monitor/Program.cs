@@ -776,11 +776,23 @@ public static class Program
                     cpuPower = Math.Round(v, 1);
                 else if (s.Name.Contains("Package") && cpuPower < 0 && v > 0)
                     cpuPower = Math.Round(v, 1);
+                // AMD fallback: report total core power if package is unavailable
+                else if ((s.Name == "CPU Cores" || s.Name == "Core Power") && cpuPower < 0 && v > 0)
+                    cpuPower = Math.Round(v, 1);
             }
             else if (s.SensorType == SensorType.Voltage)
             {
-                if ((s.Name == "CPU Core" || s.Name == "Core #1") && cpuVoltage < 0 && v > 0)
-                    cpuVoltage = Math.Round(v, 3);
+                // Intel: "CPU Core" | AMD Zen: "Core #1 VID" per-core VID sensors |
+                // SuperIO fallback: "CPU VCore" / "Vcore"
+                if (cpuVoltage < 0 && v > 0 && v < 3.0)
+                {
+                    var vname = s.Name;
+                    if (vname == "CPU Core" || vname == "Core #1" ||
+                        vname == "CPU VCore" || vname == "Vcore" ||
+                        vname == "CPU Core Voltage" ||
+                        (vname.StartsWith("Core #") && vname.Contains("VID")))
+                        cpuVoltage = Math.Round(v, 3);
+                }
             }
         }
     }
