@@ -1,15 +1,15 @@
-# GS Control Center
+# GS Center
 
 **Set up your gaming or streaming PC in minutes — not hours.**
 
-**GS Control Center** is a powerful desktop utility designed for **gamers, streamers, and PC enthusiasts**. It helps you quickly configure fresh Windows installations, improve performance, monitor system health, and troubleshoot issues — all from a single application.
+**GS Center** is a powerful desktop utility designed for **gamers, streamers, and PC enthusiasts**. It helps you quickly configure fresh Windows installations, improve performance, monitor system health, and troubleshoot issues — all from a single application.
 
 Whether you're setting up a **new gaming rig**, optimizing your **streaming setup**, or simply keeping your PC running smoothly, GS Control Center provides the tools you need.
 
 **Real-time monitoring • Smart optimizations • One-click setup • No bloat**
 
 ![Status](https://img.shields.io/badge/Status-BETA-orange)
-![Version](https://img.shields.io/badge/Version-2.0.0-blue)
+![Version](https://img.shields.io/badge/Version-2.1.0-blue)
 ![Platform](https://img.shields.io/badge/Platform-Windows%2010%2F11%20x64-blue)
 ![Electron](https://img.shields.io/badge/Electron-27-blueviolet)
 ![React](https://img.shields.io/badge/React-18-61dafb)
@@ -23,14 +23,14 @@ Download the latest installer from the newest release:
 
 ➡️ **[Download Latest Release](https://github.com/xGlobalShock/GS-Control-Center/releases/latest)**
 
-<img width="1476" height="857" alt="image" src="https://github.com/user-attachments/assets/773e38d9-0e79-4419-9bd3-b661cdfd61e6" />
+<img width="1919" height="1031" alt="image" src="https://github.com/user-attachments/assets/68ae4f7a-1557-43ae-b010-bb26823388af" />
 
 ---
 
 # Installation
 
 1. Download the latest installer from **[GitHub Releases](https://github.com/xGlobalShock/GS-Control-Center/releases)**
-2. Run: ```GS-Control-Center-Setup-x.x.x.exe```
+2. Run: ```GS-Center-Setup-x.x.x.exe```
 
 ---
 
