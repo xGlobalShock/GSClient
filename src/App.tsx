@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import LightRays from './components/LightRays';
@@ -129,6 +129,12 @@ function AppInner() {
   const { user, loading: authLoading, appReady } = useAuth();
   const [raysColor, setRaysColor] = useState<string>(() => loadSettings().raysColor ?? '#00F2FF');
   const [currentPage, setCurrentPage] = useState('dashboard');
+  const pageContentRef = useRef<HTMLDivElement>(null);
+
+  // Reset scroll to top on every page navigation
+  useEffect(() => {
+    if (pageContentRef.current) pageContentRef.current.scrollTop = 0;
+  }, [currentPage]);
   const [hardwareInfo, setHardwareInfo] = useState<HardwareInfo | undefined>(undefined);
   const shouldStream = appReady && user && (!hardwareReady || currentPage === 'dashboard' || currentPage === 'performance');
   const { systemStats, extendedStats, connected } = useRealtimeHardware({ enabled: !!shouldStream });
@@ -287,7 +293,7 @@ function AppInner() {
             <Sidebar currentPage={currentPage} setCurrentPage={setCurrentPage} />
             <div className="main-content">
               <Header />
-              <div className="page-content">
+              <div className="page-content" ref={pageContentRef}>
                 {renderPage()}
               </div>
             </div>

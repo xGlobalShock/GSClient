@@ -294,7 +294,6 @@ export default function SpaceAnalyzer({ isActive }: { isActive: boolean }) {
 
   return (
     <div className="sa-page" onContextMenu={(e) => e.preventDefault()}>
-      <ProPreviewBanner pageName="Disk Analyzer" />
       <ProLockedWrapper featureName="Disk Analyzer" message="PRO Feature">
       
       {/* ── CONTEXT MENU ── */}

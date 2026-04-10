@@ -104,9 +104,6 @@ let _rtLastGateway = '';
 // ── RAM cached — now provided natively by sidecar via GetPerformanceInfo ──
 // (no more PowerShell WMI polling needed)
 
-// ── Temperature estimation fallback (when LHM has no temp sensor) ──
-let _estimatedTemp = 40;
-
 // ── Realtime push state ──
 let _realtimeTimer = null;
 let _realtimeWifiTimer = null;
@@ -148,6 +145,13 @@ function _getSidecarExePath() {
   return publishPath; // Will fail with clear error
 }
 
+function _getDriversDir() {
+  if (app.isPackaged) {
+    return path.join(process.resourcesPath, 'drivers', 'pawnio');
+  }
+  return path.join(windowManager.getRootDir(), 'public', 'drivers', 'pawnio');
+}
+
 function startLHMService() {
   // Load cached data for instant display while sidecar starts
   _loadSidecarCache();
@@ -176,7 +180,7 @@ function _spawnSidecar(exePath) {
   _sidecarLogPath = path.join(os.tmpdir(), 'gs_monitor_diag.log');
   fs.writeFile(_sidecarLogPath, `Sidecar started at ${new Date().toISOString()}\nPath: ${exePath}\n`, 'utf8', () => {});
 
-  _sidecarProcess = spawn(exePath, [], {
+  _sidecarProcess = spawn(exePath, ['--drivers', _getDriversDir()], {
     windowsHide: true,
     stdio: ['pipe', 'pipe', 'pipe'],
   });
@@ -376,17 +380,8 @@ function _getStatsImpl() {
     };
   }
 
-  let temperature = d.temperature >= 0 ? d.temperature : 0;
-  if (d.temperature < 0) {
-    // Estimation fallback
-    const cpu = d.cpu >= 0 ? d.cpu : 0;
-    const baseClk = os.cpus()[0]?.speed || 3700;
-    const boostRatio = (d.cpuClock > 0) ? Math.min(d.cpuClock / baseClk, 1.5) : 1.0;
-    const targetTemp = 35 + (cpu * 0.45) + ((boostRatio - 1.0) * 20) + (cpu > 80 ? (cpu - 80) * 0.3 : 0);
-    _estimatedTemp += (targetTemp - _estimatedTemp) * 0.15;
-    temperature = Math.round((_estimatedTemp + Math.sin(Date.now() / 3000) * 0.5) * 10) / 10;
-    temperature = Math.max(30, Math.min(95, temperature));
-  }
+  // Real sensor data only — no estimation or caching
+  const temperature = d.temperature >= 0 ? d.temperature : 0;
 
   return {
     cpu: d.cpu >= 0 ? d.cpu : 0,
@@ -425,20 +420,9 @@ async function _startRealtimePush() {
     const d = _sidecarData;
     if (!d) return; // No data yet — skip this tick
 
-    // ── Temperature resolution ──
-    let resolvedTemp = d.temperature >= 0 ? d.temperature : 0;
-    let tempSource = d.tempSource || 'none';
-    if (d.temperature < 0) {
-      const cpu = d.cpu >= 0 ? d.cpu : 0;
-      const baseClk = os.cpus()[0]?.speed || 3700;
-      const boostRatio = (d.cpuClock > 0) ? Math.min(d.cpuClock / baseClk, 1.5) : 1.0;
-      const targetTemp = 35 + (cpu * 0.45) + ((boostRatio - 1.0) * 20) + (cpu > 80 ? (cpu - 80) * 0.3 : 0);
-      _estimatedTemp += (targetTemp - _estimatedTemp) * 0.15;
-      const jitter = Math.sin(Date.now() / 3000) * 0.5;
-      resolvedTemp = Math.round((_estimatedTemp + jitter) * 10) / 10;
-      resolvedTemp = Math.max(30, Math.min(95, resolvedTemp));
-      tempSource = 'estimation';
-    }
+    // ── Temperature resolution — real sensor data only ──
+    const resolvedTemp = d.temperature >= 0 ? d.temperature : 0;
+    const tempSource = d.tempSource || 'none';
 
     const payload = {
       // CPU

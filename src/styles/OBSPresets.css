@@ -21,7 +21,7 @@
 
 
 /* Make the OG header span full width */
-.aur>.page-header {
+.aur>.ph-root {
   width: 100%;
   align-self: stretch;
 }

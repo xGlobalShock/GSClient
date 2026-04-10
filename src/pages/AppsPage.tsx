@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import ProPreviewBanner from '../components/ProPreviewBanner';
+import ProLineBadge from '../components/ProLineBadge';
 import AppInstaller from './AppInstaller';
 import AppUninstaller from './AppUninstaller';
 import WindowsDebloat from './WindowsDebloat';
@@ -57,6 +58,7 @@ const AppsPage: React.FC<AppsPageProps> = ({ isActive = false }) => {
       <PageHeader
         icon={<LayoutGrid size={16} />}
         title="Apps Manager"
+        lineContent={(activeTab === 'debloat' || activeTab === 'disk') ? <ProLineBadge pageName={activeTab === 'debloat' ? 'Windows Debloat' : 'Disk Analyzer'} /> : undefined}
         actions={
           <button className="apps-page-header-btn" onClick={handleRefresh}>
             <RefreshCw size={14} />
@@ -64,8 +66,6 @@ const AppsPage: React.FC<AppsPageProps> = ({ isActive = false }) => {
           </button>
         }
       />
-
-      {activeTab === 'debloat' && <ProPreviewBanner pageName="Windows Debloat" />}
 
       <div className="apps-split">
         {/* ── Left: vertical nav ── */}

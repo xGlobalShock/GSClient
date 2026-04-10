@@ -13,7 +13,9 @@
     <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>true</SelfContained>
     <PublishReadyToRun>true</PublishReadyToRun>
-    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <!-- MUST extract ALL content so LHM can find its own assembly and extract
+         the embedded WinRing0/Inpx64 kernel driver for CPU temp MSR access -->
+    <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
 
     <!-- Partial trim: only trims opt-in assemblies (safe with LHM) -->
@@ -28,18 +30,24 @@
 
     <!-- Suppress warnings for LHM's internal reflection use -->
     <NoWarn>IL2026;IL2104;IL3050</NoWarn>
+
+    <!-- Exclude TempTest subdirectory from compilation -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);TempTest\**</DefaultItemExcludes>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.*" />
-    <PackageReference Include="System.Management" Version="10.0.*" />
     <PackageReference Include="System.Diagnostics.PerformanceCounter" Version="9.0.*" />
+    <PackageReference Include="System.Management" Version="10.0.*" />
+    <PackageReference Include="System.ServiceProcess.ServiceController" Version="9.0.*" />
   </ItemGroup>
 
-  <!-- Prevent trimmer from stripping WMI/perf counter internals -->
+  <!-- Prevent trimmer from stripping LHM internals (embedded driver resources, reflection) -->
   <ItemGroup>
-    <TrimmerRootAssembly Include="System.Management" />
+    <TrimmerRootAssembly Include="LibreHardwareMonitorLib" />
+    <TrimmerRootAssembly Include="HidSharp" />
     <TrimmerRootAssembly Include="System.Diagnostics.PerformanceCounter" />
+    <TrimmerRootAssembly Include="System.Management" />
   </ItemGroup>
 
 </Project>

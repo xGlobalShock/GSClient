@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import CleanerCard from '../components/CleanerCard';
 import { cleanerUtilities } from '../data/cleanerUtilities';
@@ -12,6 +13,7 @@ import '../styles/Cleaner.css';
 import '../styles/AppInstaller.css';
 import ProPreviewBanner from '../components/ProPreviewBanner';
 import ProLockedWrapper from '../components/ProLockedWrapper';
+import ProLineBadge from '../components/ProLineBadge';
 import { useAuth } from '../contexts/AuthContext';
 
 interface CleanResult {
@@ -27,6 +29,7 @@ interface CleanResult {
 const Cleaner: React.FC = () => {
   const [cleaningId, setCleaningId] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState<'windows' | 'games' | 'nvidia' | 'repair' | 'preferences' | 'essential'>('windows');
+  const [showRestartPopup, setShowRestartPopup] = useState(false);
   const { addToast } = useToast();
   const { isPro } = useAuth();
 
@@ -94,6 +97,8 @@ const Cleaner: React.FC = () => {
     
     // Convert to array of IDs
     const queue = Array.from(selectedTweaks);
+
+    const servicesId = 'ct-tweak:WPFTweaksServices';
     
     for (const id of queue) {
       if (cancelBatchRef.current) break; // User closed modal or cancelled
@@ -110,6 +115,11 @@ const Cleaner: React.FC = () => {
       setCleaningId(null);
       // Remove it from selected exactly as it finishes so UI updates live
       setSelectedTweaks(prev => { const n = new Set(prev); n.delete(id); return n; });
+
+      // If this was the Services tweak, show restart popup
+      if (id === servicesId) {
+        setShowRestartPopup(true);
+      }
       
       // Pause so user can see "Done!" log
       if (!cancelBatchRef.current) {
@@ -130,12 +140,18 @@ const Cleaner: React.FC = () => {
     if (id.startsWith('ct-tweak:')) {
       setActiveTweakModalId(id.replace('ct-tweak:', ''));
       cancelBatchRef.current = false;
+
       try {
         await window.electron?.ipcRenderer.invoke(id);
       } catch (error) {
         addToast(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
       } finally {
         setTimeout(() => setCleaningId(null), 1000);
+      }
+
+      // Show restart popup after Services tweak
+      if (id === 'ct-tweak:WPFTweaksServices') {
+        setShowRestartPopup(true);
       }
       return;
     }
@@ -584,16 +600,40 @@ const Cleaner: React.FC = () => {
       animate={{ opacity: 1 }}
       transition={{ duration: 0.15 }}
     >
-      <PageHeader icon={<SlidersHorizontal size={16} strokeWidth={3} />} title="Utilities" />
-
-      {activeCategory !== 'windows' && <ProPreviewBanner pageName="Utilities" />}
-
-      {isPro && activeCategory === 'windows' && (
-        <button className="cleaner-clearall-btn" onClick={handleShowClearAllToast}>
-          <Sparkles size={13} fill="currentColor" strokeWidth={0} />
-          Full Cache Cleanup
-        </button>
-      )}
+      <PageHeader
+        icon={<SlidersHorizontal size={16} strokeWidth={3} />}
+        title="Utilities"
+        lineContent={(!isPro && activeCategory !== 'windows') ? <ProLineBadge pageName="Utilities" /> : undefined}
+        actions={
+          activeCategory === 'essential' && selectedTweaks.size > 0 ? (
+            <div className="wt-header-actions">
+              <span className="wt-header-count">
+                <Sparkles size={12} />
+                <strong>{selectedTweaks.size}</strong> tweak{selectedTweaks.size > 1 ? 's' : ''} selected
+              </span>
+              {isBatchTweaking ? (
+                <button className="wt-header-btn wt-header-btn--cancel" onClick={() => { cancelBatchRef.current = true; setIsBatchTweaking(false); setActiveTweakModalId(null); }}>
+                  <X size={12} /> Cancel
+                </button>
+              ) : (
+                <>
+                  <button className="wt-header-btn wt-header-btn--clear" onClick={() => setSelectedTweaks(new Set())}>
+                    <X size={12} /> Clear
+                  </button>
+                  <button className="wt-header-btn wt-header-btn--apply" onClick={handleApplySelectedTweaks}>
+                    <Download size={12} /> Apply Selected
+                  </button>
+                </>
+              )}
+            </div>
+          ) : isPro && activeCategory === 'windows' ? (
+            <button className="cleaner-clearall-btn" onClick={handleShowClearAllToast}>
+              <Sparkles size={13} fill="currentColor" strokeWidth={0} />
+              Full Cache Cleanup
+            </button>
+          ) : undefined
+        }
+      />
 
       <div className="cleaner-split">
         {/* ── LEFT: Vertical nav ── */}
@@ -656,34 +696,51 @@ const Cleaner: React.FC = () => {
                 </div>
               ) : activeCategory === 'preferences' ? (
                 <ProLockedWrapper featureName="Win Preferences" message="PRO Feature">
-                <div className="ai-grid" style={{ gap: '12px', gridAutoRows: 'auto', gridTemplateColumns: 'repeat(auto-fill, minmax(310px, 1fr))' }}>
+                <div className="wt-grid">
                   {preferenceItems.map((pref, index) => (
                     <motion.div
                       key={pref.id}
                       initial={{ y: 20, opacity: 0, scale: 0.97 }}
                       animate={{ y: 0, opacity: 1, scale: 1 }}
-                      transition={{ delay: index * 0.05, type: 'spring', stiffness: 200, damping: 22 }}
+                      transition={{ delay: index * 0.04, type: 'spring', stiffness: 200, damping: 22 }}
                     >
-                      <div className={`ai-card${pref.loading ? ' ai-card--busy' : ''}`} style={{ padding: '12px 14px', height: '76px', cursor: 'default' }}>
-                        <div className="ai-card-icon" style={{ background: 'transparent', color: '#00F2FF' }}>
-                          {pref.loading ? <Loader2 size={16} className="ai-spin" /> : (
-                            <div style={{ opacity: 0.8 }}>{pref.icon && React.isValidElement(pref.icon) ? React.cloneElement(pref.icon as React.ReactElement, { size: 18 }) : pref.icon}</div>
-                          )}
-                        </div>
-                        <div className="ai-card-info" style={{ justifyContent: 'center' }}>
-                          <span className="ai-card-name" style={{ fontSize: '13px', lineHeight: '1.2', color: '#F8FAFC', fontWeight: 600 }}>{pref.title}</span>
-                          <span className="ai-card-cat" style={{ fontSize: '11.5px', marginTop: '3px', lineHeight: '1.4', color: '#94A3B8', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }} title={pref.desc}>{pref.desc}</span>
-                        </div>
-                        <div className="ai-card-actions" style={{ marginLeft: 'auto' }}>
-                          <button
-                            className={`futuristic-toggle gl-profile__preset-toggle ${pref.enabled ? 'gl-profile__preset-toggle--on' : ''}`}
-                            onClick={pref.onClick}
-                            disabled={pref.loading || prefsLoading}
-                            aria-pressed={pref.enabled ? 'true' : 'false'}
-                          >
-                            <div className="gl-profile__preset-toggle-track"><div className="gl-profile__preset-toggle-thumb" /></div>
-                            <span className="gl-profile__preset-toggle-label">{pref.enabled ? 'ON' : 'OFF'}</span>
-                          </button>
+                      <div className={`wt-card${pref.enabled ? ' wt-card--on' : ''}${pref.loading ? ' wt-card--busy' : ''}`}>
+                        <div className="wt-accent-line" />
+                        <div className="wt-corner wt-corner--tl" />
+                        <div className="wt-corner wt-corner--tr" />
+                        <div className="wt-corner wt-corner--bl" />
+                        <div className="wt-corner wt-corner--br" />
+                        <div className="wt-inner">
+                          <div className="wt-top">
+                            <div className="wt-icon">
+                              {pref.loading
+                                ? <Loader2 size={15} className="ai-spin" />
+                                : (pref.icon && React.isValidElement(pref.icon)
+                                    ? React.cloneElement(pref.icon as React.ReactElement, { size: 16 })
+                                    : pref.icon)
+                              }
+                            </div>
+                            <div className={`wt-status-pill${pref.enabled ? ' wt-status-pill--on' : ' wt-status-pill--off'}`}>
+                              <div className="wt-status-dot" />
+                              {pref.enabled ? 'ACTIVE' : 'IDLE'}
+                            </div>
+                          </div>
+                          <h3 className="wt-title">{pref.title}</h3>
+                          <p className="wt-desc">{pref.desc}</p>
+                          <div className="wt-divider" />
+                          <div className="wt-foot">
+                            <button
+                              className={`wt-toggle${pref.enabled ? ' wt-toggle--on' : ''}`}
+                              onClick={pref.onClick}
+                              disabled={pref.loading || prefsLoading}
+                              aria-pressed={pref.enabled ? 'true' : 'false'}
+                            >
+                              <span className="wt-toggle-label">{pref.enabled ? 'ON' : 'OFF'}</span>
+                              <div className="wt-toggle-track">
+                                <div className="wt-toggle-thumb" />
+                              </div>
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </motion.div>
@@ -696,52 +753,41 @@ const Cleaner: React.FC = () => {
                 </ProLockedWrapper>
               ) : activeCategory === 'essential' ? (
                 <ProLockedWrapper featureName="Win Tweaks" message="PRO Feature">
-                <div className="ai-grid" style={{ gap: '12px', gridAutoRows: 'auto', gridTemplateColumns: 'repeat(auto-fill, minmax(310px, 1fr))' }}>
+                <div className="et-grid">
                   {utilityTabs.essential.map((utility, index) => {
                     const busy = cleaningId === utility.id;
                     const sel = selectedTweaks.has(utility.id);
                     return (
                       <motion.div
                         key={utility.id}
-                        initial={{ y: 20, opacity: 0, scale: 0.97 }}
-                        animate={{ y: 0, opacity: 1, scale: 1 }}
-                        transition={{ delay: index * 0.02, type: 'spring', stiffness: 200, damping: 22 }}
-                        className={`ai-card${busy ? ' ai-card--busy' : ''}${sel ? ' ai-card--sel' : ''}`}
-                        onClick={() => !busy && !isBatchTweaking && toggleTweakSelection(utility.id)}
-                        style={{ cursor: busy ? 'default' : 'pointer', padding: '12px 14px', height: '76px' }}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.018, type: 'spring', stiffness: 300, damping: 26 }}
                       >
-                        <div className="ai-card-icon" style={{ background: 'transparent' }}>
-                          {busy ? <Loader2 size={16} className="ai-spin" /> : 
-                            sel ? (
-                              <span className="ai-card-sel-icon" style={{
-                                width: 24, height: 24, borderRadius: 6, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: utility.color
-                              }}>
-                                <CheckSquare size={18} />
-                              </span>
-                            ) : (
-                            <span style={{ 
-                               display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                               width: 24, height: 24, borderRadius: 6, flexShrink: 0,
-                               color: 'rgba(255,255,255,0.15)',
-                            }}>
-                              <Square size={18} />
+                        <div
+                          className={`et-row${sel ? ' et-row--sel' : ''}${busy ? ' et-row--busy' : ''}`}
+                          onClick={() => !busy && !isBatchTweaking && toggleTweakSelection(utility.id)}
+                        >
+                          <div className="et-left">
+                            <div className={`et-check${sel ? ' et-check--on' : ''}`}>
+                              {busy
+                                ? <Loader2 size={11} className="ai-spin" />
+                                : sel
+                                  ? <Check size={12} strokeWidth={3} />
+                                  : null
+                              }
+                            </div>
+                            <div className="et-text">
+                              <span className="et-name">{utility.title}</span>
+                              <span className="et-info">{utility.description}</span>
+                            </div>
+                          </div>
+                          <div className="et-right">
+                            <span className={`et-badge${sel ? ' et-badge--sel' : ''}`}>
+                              {sel ? 'QUEUED' : 'READY'}
                             </span>
-                          )}
+                          </div>
                         </div>
-                        <div className="ai-card-info" style={{ justifyContent: 'center' }}>
-                          <span className="ai-card-name" style={{ fontSize: '13px', lineHeight: '1.2', color: '#F8FAFC', fontWeight: 600 }}>{utility.title}</span>
-                          <span className="ai-card-cat" style={{ fontSize: '11.5px', marginTop: '3px', lineHeight: '1.4', color: '#94A3B8', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }} title={utility.description}>{utility.description}</span>
-                        </div>
-                        {!busy && !isBatchTweaking && !sel && (
-                          <button
-                            className="ai-card-dl"
-                            onClick={(e) => { e.stopPropagation(); handleClean(utility.id); }}
-                            title={`Run ${utility.title}`}
-                            style={{ opacity: 0.7 }}
-                          >
-                            <Zap size={14} />
-                          </button>
-                        )}
                       </motion.div>
                     );
                   })}
@@ -803,37 +849,6 @@ const Cleaner: React.FC = () => {
         </div>
       </div>
 
-      <AnimatePresence>
-        {selectedTweaks.size > 0 && activeCategory === 'essential' && (
-          <motion.div
-            className="ai-dock"
-            initial={{ y: 80, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 80, opacity: 0 }}
-            transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-          >
-            <div className="ai-dock-left">
-              <Sparkles size={15} />
-              <span><strong>{selectedTweaks.size}</strong> tweak{selectedTweaks.size > 1 ? 's' : ''} selected</span>
-            </div>
-            <div className="ai-dock-right">
-              {isBatchTweaking ? (
-                <button className="ai-dock-cancel" onClick={() => { cancelBatchRef.current = true; setIsBatchTweaking(false); setActiveTweakModalId(null); }}>
-                  <X size={13} /> Cancel Batch
-                </button>
-              ) : (
-                <>
-                  <button className="ai-dock-clear" onClick={() => setSelectedTweaks(new Set())}><X size={13} /> Clear</button>
-                  <button className="ai-dock-go" onClick={handleApplySelectedTweaks}>
-                    <Download size={14} /> Apply Selected
-                  </button>
-                </>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       <TweakExecutionModal
         tweakId={activeTweakModalId}
         onClose={() => {
@@ -841,6 +856,46 @@ const Cleaner: React.FC = () => {
           setActiveTweakModalId(null);
         }}
       />
+
+      {createPortal(
+      <AnimatePresence>
+        {showRestartPopup && (
+          <motion.div
+            className="et-restart-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            onClick={() => setShowRestartPopup(false)}
+          >
+            <motion.div
+              className="et-restart-popup"
+              initial={{ scale: 0.92, opacity: 0, y: 16 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 8 }}
+              transition={{ type: 'spring', stiffness: 350, damping: 28 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="et-restart-icon">
+                <Monitor size={28} />
+              </div>
+              <h3 className="et-restart-title">Restart Required</h3>
+              <p className="et-restart-desc">
+                The service changes have been applied successfully. Please restart your PC for them to take full effect.
+              </p>
+              <div className="et-restart-actions">
+                <button className="et-restart-btn et-restart-btn--later" onClick={() => setShowRestartPopup(false)}>
+                  Later
+                </button>
+                <button className="et-restart-btn et-restart-btn--now" onClick={() => { window.electron?.ipcRenderer.invoke('system:restart'); }}>
+                  Restart Now
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      , document.body)}
     </motion.div>
   );
 };

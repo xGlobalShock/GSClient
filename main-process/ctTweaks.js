@@ -55,6 +55,14 @@ if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdenti
 `;
       let stepCounter = 0;
 
+      // For Services tweak, prepend restore point creation into the same elevated session
+      if (tweakId === 'WPFTweaksServices') {
+        psScript += `Log-Progress "CTTWEAK_PROGRESS:1|Creating Restore Point...";\n`;
+        psScript += `if (-not (Get-ComputerRestorePoint)) { Enable-ComputerRestore -Drive $Env:SystemDrive }\n`;
+        psScript += `Checkpoint-Computer -Description "System Restore Point created by GC Center" -RestorePointType MODIFY_SETTINGS -ErrorAction SilentlyContinue\n`;
+        psScript += `Log-Progress "CTTWEAK_PROGRESS:2|Restore Point Created";\n`;
+      }
+
       if (tweak.service && tweak.service.length > 0) {
         for (const svc of tweak.service) {
           stepCounter++;

@@ -605,9 +605,8 @@ const DashboardHero: React.FC<DashboardHeroProps> = ({
   const gpuVramT = ext?.gpuVramTotal != null && ext.gpuVramTotal  > 0 ? ext.gpuVramTotal  : -1;
   const hasGpu   = ext?.gpuUsage != null && ext.gpuUsage >= 0;
 
-  const hasRealTemp = s?.tempSource === 'lhm'       && s?.temperature > 0;
-  const hasEstTemp  = s?.tempSource === 'estimation' && s?.temperature > 0;
-  const hasAnyTemp  = hasRealTemp || hasEstTemp;
+  const hasRealTemp = s?.temperature != null && s.temperature > 0 && s?.tempSource !== 'none';
+  const hasAnyTemp  = hasRealTemp;
 
   const cpuPct  = s?.cpu  ?? 0;
   const ramPct  = s?.ram  ?? 0;

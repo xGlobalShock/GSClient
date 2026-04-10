@@ -1,78 +1,168 @@
-/* ═══════════════════════════════════════════════════════════════
-   Page Header — Unified top bar for every page
-═══════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════════
+   PageHeader — GC Control Bar
+   Transparent row: icon + title | animated line | actions
+═══════════════════════════════════════════════════════════════════ */
 
-.page-header {
-  margin-bottom: -16px;
+
+
+/* ── Root: no background, just layout ───────────────────────────── */
+.ph-root {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 48px;
+  padding: 0;
 }
 
-/* ── Stat pill (e.g. "3/7 Active") ── */
-.page-header-stat {
+
+/* ── Title ───────────────────────────────────────────────────────── */
+.ph-title {
+  position: relative;
+  z-index: 2;
+  margin: 0;
+  line-height: 1;
+  font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif; 
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  white-space: nowrap;
+
+  /* Bright white core fading to pale blue — clean, high contrast */
+  background: linear-gradient(
+    90deg,
+    #ffffff          0%,
+    #e0f4ff         45%,
+    rgba(140, 210, 240, 0.75) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+
+  /* Faint text glow so it breathes on the dark bg */
+  filter: drop-shadow(0 0 8px rgba(0, 220, 255, 0.25));
+}
+
+/* ph-title::after removed — dot is now a real flex sibling (.ph-dot) */
+
+/* ── Cyan dot — flex child, perfectly centered with text and line ── */
+.ph-dot {
+  flex-shrink: 0;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #00F2FF;
+  box-shadow:
+    0 0 6px 2px rgba(0, 242, 255, 0.65),
+    0 0 14px rgba(0, 242, 255, 0.35);
+  z-index: 2;
+}
+
+/* ── Line spacer — THE animated line ────────────────────────────── */
+/* Spacer is literally 1px tall — flexbox centers it in the row,     */
+/* so the line is always at the exact same height as the title text. */
+.ph-spacer {
+  flex: 1;
+  min-width: 40px;
+  position: relative;
+  align-self: center;
+  height: 1px;
+  z-index: 1;
+}
+
+/* Base line layer */
+.ph-spacer::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(0, 242, 255, 0.22)   0%,
+    rgba(0, 242, 255, 0.36)  20%,
+    rgba(0, 242, 255, 0.18)  70%,
+    rgba(0, 242, 255, 0.04) 100%
+  );
+}
+
+/* Traveling glint — bright bead of light that sweeps the line */
+.ph-spacer::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -0.5px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent              0%,
+    rgba(180, 255, 255, 0.0) 30%,
+    rgba(180, 255, 255, 1.0) 50%,
+    rgba(180, 255, 255, 0.0) 70%,
+    transparent             100%
+  );
+  background-size: 22% 100%;
+  background-repeat: no-repeat;
+  animation: ph-glint 3.8s ease-in-out infinite;
+  filter: blur(0.4px);
+}
+
+@keyframes ph-glint {
+  0%   { background-position: -22% 0; opacity: 0;   }
+  6%   { opacity: 1; }
+  94%  { opacity: 1; }
+  100% { background-position: 122% 0; opacity: 0;   }
+}
+
+/* ── Stat slot ───────────────────────────────────────────────────── */
+.ph-stat {
+  position: relative;
+  z-index: 2;
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  margin-left: 8px;
+  padding-right: 12px;
+  margin-right: 4px;
+  border-right: 1px solid rgba(255, 255, 255, 0.07);
 }
 
-/* When the perf ring gauge is inside the header stat slot */
-.page-header-stat .perf-hero-stat {
-  flex-direction: row;
-  gap: 6px;
-  align-items: center;
-}
+/* Perf rings inside stat */
+.ph-stat .perf-hero-stat        { flex-direction: row; gap: 6px; align-items: center; }
+.ph-stat .perf-hero-stat-ring   { width: 34px; height: 34px; }
+.ph-stat .perf-ring-label       { font-size: 10px; }
+.ph-stat .perf-hero-stat-text   { font-size: 9px; letter-spacing: 1.5px; }
 
-.page-header-stat .perf-hero-stat-ring {
-  width: 36px;
-  height: 36px;
-}
-
-.page-header-stat .perf-ring-label {
-  font-size: 10px;
-}
-
-.page-header-stat .perf-hero-stat-text {
-  font-size: 9px;
-  letter-spacing: 1.5px;
-}
-
-/* ── Action buttons row ── */
-.page-header-actions {
+/* ── Action buttons ──────────────────────────────────────────────── */
+.ph-actions {
+  position: relative;
+  z-index: 2;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-left: 0;
-  padding-left: 26px;
-  border-left: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-/* ── Line-intercept layout (line pierces through lineContent) ── */
-.hud-section-line-wrap {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  min-width: 0;
+/* ── Badge — centered over the line, zero layout impact ──────────── */
+.ph-badge-center {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 99;
+  pointer-events: auto;
 }
 
-.hud-section-line--approach {
-  flex: 1;
-  background: linear-gradient(90deg, transparent, rgba(0, 242, 255, 0.26)) !important;
-}
-
-.hud-section-line--tail {
-  flex: 1;
-  background: linear-gradient(90deg, rgba(0, 242, 255, 0.26), transparent) !important;
-}
-
-/* ── HUD Section Header (Used by PageHeader) ── */
+/* ════════════════════════════════════════════════════════════════════
+   Backward-compat: DashboardHero and other hud-section-* usages
+════════════════════════════════════════════════════════════════════ */
 .hud-section-header {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 24px;
+  margin-bottom: 16px;
   position: relative;
 }
-
 .hud-section-icon {
   display: flex;
   align-items: center;
@@ -80,20 +170,15 @@
   color: #00F2FF;
   filter: drop-shadow(0 0 4px rgba(0, 242, 255, 0.4));
 }
-
 .hud-section-title {
   margin: 0;
   font-size: 13px;
   font-weight: 800;
   color: rgba(255, 255, 255, 0.6);
-  text-transform: none;
   letter-spacing: 2px;
 }
-
 .hud-section-line {
   flex: 1;
   height: 1px;
   background: linear-gradient(90deg, rgba(0, 242, 255, 0.25), transparent);
 }
-
-

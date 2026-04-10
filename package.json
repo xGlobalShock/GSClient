@@ -119,6 +119,13 @@
         "filter": [
           "**/*"
         ]
+      },
+      {
+        "from": "public/drivers/pawnio",
+        "to": "drivers/pawnio",
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "directories": {

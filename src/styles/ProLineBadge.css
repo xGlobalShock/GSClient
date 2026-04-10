@@ -1,0 +1,211 @@
+/* ══════════════════════════════════════════════════════════════════
+   ProLineBadge — Premium inline PRO upgrade pill
+   Floats over the header line (zero layout impact via absolute pos)
+   ══════════════════════════════════════════════════════════════════ */
+
+.pro-line-badge {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  padding: 0;
+  flex-shrink: 0;
+  overflow: visible;
+  background: none;
+  border: none;
+  cursor: pointer;
+  outline: none;
+}
+
+/* ── Glowing gradient border ── */
+.pro-line-badge::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: 22px;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 210, 40, 0.60) 0%,
+    rgba(255, 140, 0, 0.28) 50%,
+    rgba(255, 210, 40, 0.45) 100%
+  );
+  z-index: 0;
+  animation: plb-border-glow 3s ease-in-out infinite;
+}
+
+/* ── Dark inner body ── */
+.pro-line-badge::after {
+  content: '';
+  position: absolute;
+  inset: 1px;
+  border-radius: 20px;
+  background: linear-gradient(
+    135deg,
+    #0f1c11 0%,
+    #0a1208 60%,
+    #0f1c11 100%
+  );
+  z-index: 1;
+}
+
+/* ── All content sits above pseudo-elements ── */
+.pro-line-badge-chip,
+.pro-line-badge-sep,
+.pro-line-badge-cta,
+.pro-line-badge-glow,
+.pro-line-badge-shimmer {
+  position: relative;
+  z-index: 2;
+}
+
+/* ── Ambient radial under-glow ── */
+.pro-line-badge-glow {
+  position: absolute;
+  inset: -5px -8px;
+  border-radius: 30px;
+  background: radial-gradient(
+    ellipse 85% 65% at 50% 50%,
+    rgba(255, 185, 0, 0.20) 0%,
+    transparent 70%
+  );
+  pointer-events: none;
+  animation: plb-glow-pulse 3s ease-in-out infinite;
+  z-index: 0;
+}
+
+/* ── Shimmer sweep ── */
+.pro-line-badge-shimmer {
+  position: absolute;
+  inset: 1px;
+  border-radius: 20px;
+  background: linear-gradient(
+    108deg,
+    transparent 20%,
+    rgba(255, 240, 110, 0.22) 45%,
+    rgba(255, 255, 200, 0.10) 55%,
+    transparent 80%
+  );
+  background-size: 220% 100%;
+  animation: plb-shimmer 2.8s linear infinite;
+  pointer-events: none;
+}
+
+/* ── Left chip: Crown + PRO ── */
+.pro-line-badge-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 8px 5px 11px;
+}
+
+.pro-line-badge-crown {
+  color: #ffd700;
+  filter:
+    drop-shadow(0 0 4px rgba(255, 215, 0, 0.90))
+    drop-shadow(0 0 10px rgba(255, 185, 0, 0.55));
+  flex-shrink: 0;
+  animation: plb-crown-flicker 4.5s ease-in-out infinite;
+}
+
+.pro-line-badge-pro {
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 1.5px;
+  color: #ffe44d;
+  text-shadow:
+    0 0 6px rgba(255, 220, 0, 0.85),
+    0 0 18px rgba(255, 185, 0, 0.45);
+  text-transform: uppercase;
+}
+
+/* ── Separator ── */
+.pro-line-badge-sep {
+  width: 1px;
+  height: 16px;
+  flex-shrink: 0;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    rgba(255, 200, 0, 0.40) 30%,
+    rgba(255, 200, 0, 0.40) 70%,
+    transparent
+  );
+}
+
+/* ── Right CTA ── */
+.pro-line-badge-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 11px 5px 8px;
+  transition: gap 0.2s;
+}
+
+.pro-line-badge:hover .pro-line-badge-cta {
+  gap: 6px;
+}
+
+.pro-line-badge-action {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  color: rgba(255, 228, 150, 0.90);
+  transition: color 0.2s;
+}
+
+.pro-line-badge-arrow {
+  color: rgba(255, 210, 90, 0.70);
+  flex-shrink: 0;
+  transition: color 0.2s, transform 0.2s;
+}
+
+/* ── Hover states ── */
+.pro-line-badge:hover::before {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 220, 60, 0.80) 0%,
+    rgba(255, 150, 0, 0.45) 50%,
+    rgba(255, 220, 60, 0.65) 100%
+  );
+  animation: none;
+}
+
+.pro-line-badge:hover .pro-line-badge-glow {
+  background: radial-gradient(
+    ellipse 95% 75% at 50% 50%,
+    rgba(255, 200, 0, 0.32) 0%,
+    transparent 70%
+  );
+  animation: none;
+}
+
+.pro-line-badge:hover .pro-line-badge-action {
+  color: #fff;
+}
+
+.pro-line-badge:hover .pro-line-badge-arrow {
+  color: #ffd700;
+  transform: translateX(2px);
+}
+
+/* ── Keyframes ── */
+@keyframes plb-border-glow {
+  0%, 100% { opacity: 0.78; }
+  50%       { opacity: 1; }
+}
+
+@keyframes plb-glow-pulse {
+  0%, 100% { opacity: 0.65; }
+  50%       { opacity: 1; }
+}
+
+@keyframes plb-crown-flicker {
+  0%, 88%, 100% { opacity: 1; }
+  91%            { opacity: 0.55; }
+  94%            { opacity: 1; }
+}
+
+@keyframes plb-shimmer {
+  0%   { background-position: -220% 0; }
+  100% { background-position: 220% 0; }
+}

@@ -496,35 +496,83 @@ public static class HardwareInfoCollector
         int diskTotalGB = 0;
 
         // Try MSFT_PhysicalDisk first (equivalent to Get-PhysicalDisk)
+        // Prefer the boot disk; skip USB/removable (BusType 7=USB, 12=SD)
         bool found = false;
         try
         {
             using var searcher = new ManagementObjectSearcher(
                 @"root\microsoft\windows\storage",
-                "SELECT FriendlyName, MediaType, HealthStatus, Size FROM MSFT_PhysicalDisk");
+                "SELECT FriendlyName, MediaType, HealthStatus, Size, BusType, DeviceId FROM MSFT_PhysicalDisk");
+
+            string? fallbackName = null, fallbackType = null, fallbackHealth = null;
+            int fallbackTotalGB = 0;
+
+            // Find the boot disk's DeviceId via MSFT_Disk → BootFromDisk
+            int bootDiskNumber = -1;
+            try
+            {
+                using var bootSearcher = new ManagementObjectSearcher(
+                    @"root\microsoft\windows\storage",
+                    "SELECT Number FROM MSFT_Disk WHERE BootFromDisk=TRUE");
+                foreach (ManagementObject bd in bootSearcher.Get())
+                {
+                    bootDiskNumber = WmiInt(bd, "Number");
+                    break;
+                }
+            }
+            catch { }
+
             foreach (ManagementObject d in searcher.Get())
             {
-                diskName = WmiStr(d, "FriendlyName") ?? "Unknown Disk";
+                var busType = WmiInt(d, "BusType");
+                // Skip USB (7) and SD (12) drives
+                if (busType == 7 || busType == 12) continue;
+
+                var name = WmiStr(d, "FriendlyName") ?? "Unknown Disk";
                 var mt = WmiInt(d, "MediaType");
-                diskType = mt switch { 3 => "HDD", 4 => "SSD", _ => "Unknown" };
+                var type = mt switch { 3 => "HDD", 4 => "SSD", _ => "Unknown" };
                 var hs = WmiInt(d, "HealthStatus");
-                diskHealth = hs switch { 0 => "Healthy", 1 => "Warning", 2 => "Unhealthy", _ => WmiStr(d, "HealthStatus") ?? "Unknown" };
+                var health = hs switch { 0 => "Healthy", 1 => "Warning", 2 => "Unhealthy", _ => WmiStr(d, "HealthStatus") ?? "Unknown" };
                 var size = WmiLong(d, "Size");
-                diskTotalGB = (int)Math.Round(size / (1024.0 * 1024 * 1024));
+                var totalGB = (int)Math.Round(size / (1024.0 * 1024 * 1024));
+
+                // Check if this is the boot disk
+                var devId = WmiStr(d, "DeviceId") ?? "";
+                int.TryParse(devId, out var diskNum);
+
+                if (bootDiskNumber >= 0 && diskNum == bootDiskNumber)
+                {
+                    diskName = name; diskType = type; diskHealth = health; diskTotalGB = totalGB;
+                    found = true;
+                    break;
+                }
+
+                // Keep first non-USB disk as fallback
+                if (fallbackName == null)
+                {
+                    fallbackName = name; fallbackType = type; fallbackHealth = health; fallbackTotalGB = totalGB;
+                }
+            }
+
+            // Use fallback if boot disk wasn't identified
+            if (!found && fallbackName != null)
+            {
+                diskName = fallbackName; diskType = fallbackType!; diskHealth = fallbackHealth!; diskTotalGB = fallbackTotalGB;
                 found = true;
-                break;
             }
         }
         catch { }
 
-        // Fallback: Win32_DiskDrive
+        // Fallback: Win32_DiskDrive (skip USB)
         if (!found)
         {
             try
             {
-                using var searcher = new ManagementObjectSearcher("SELECT Model, MediaType, Size, Status FROM Win32_DiskDrive");
+                using var searcher = new ManagementObjectSearcher("SELECT Model, MediaType, Size, Status, InterfaceType FROM Win32_DiskDrive");
                 foreach (ManagementObject d in searcher.Get())
                 {
+                    var iface = (WmiStr(d, "InterfaceType") ?? "").ToUpperInvariant();
+                    if (iface == "USB") continue;
                     diskName = WmiStr(d, "Model") ?? "Unknown Disk";
                     diskType = WmiStr(d, "MediaType") ?? "Unknown";
                     var status = WmiStr(d, "Status") ?? "";

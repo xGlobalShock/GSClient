@@ -25,7 +25,7 @@ interface LiveMetricsProps {
   extendedStats?: ExtendedStats;
 }
 
-const MAX_HISTORY = 40;
+const MAX_HISTORY = 600; // 5 minutes @ 2 Hz (500 ms push interval)
 
 /* ── O(1) ring buffer — zero allocation per push, avoids GC pressure ── */
 class RingBuffer {

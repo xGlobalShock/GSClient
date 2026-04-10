@@ -10,6 +10,7 @@ import { Activity, Cpu, Layers, Server, Wifi, Monitor, Gamepad2, Usb } from 'luc
 import PageHeader from '../components/PageHeader';
 import ProPreviewBanner from '../components/ProPreviewBanner';
 import ProLockedWrapper from '../components/ProLockedWrapper';
+import ProLineBadge from '../components/ProLineBadge';
 
 /* ── IPC channel maps — constant, never need to be recreated ── */
 const TWEAK_MAP: Record<string, string> = {
@@ -244,6 +245,7 @@ const Performance: React.FC = () => {
       <PageHeader
         icon={<Activity size={16} />}
         title="PC Tweaks"
+        lineContent={<ProLineBadge pageName="PC Tweaks" />}
         stat={
           <div className="perf-hero-stat">
             <div className="perf-hero-stat-ring">
@@ -276,8 +278,6 @@ const Performance: React.FC = () => {
           </div>
         }
       />
-
-      <ProPreviewBanner pageName="PC Tweaks" />
 
       <ProLockedWrapper featureName="PC Tweaks" message="PRO Feature">
       <div className="cleaner-split">

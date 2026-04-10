@@ -59,8 +59,8 @@ function getDefaultHardwareInfo() {
     motherboardSerial: '',
     biosVersion: '',
     biosDate: '',
-    windowsVersion: os.type(),
-    windowsBuild: os.release(),
+    windowsVersion: '',
+    windowsBuild: '',
     systemUptime: `${Math.floor(os.uptime()/86400)}d ${Math.floor((os.uptime()%86400)/3600)}h ${Math.floor((os.uptime()%3600)/60)}m`,
     powerPlan: '',
     lastWindowsUpdate: '',
@@ -95,9 +95,9 @@ function getHwInfoPromise() {
 async function _fetchFromSidecar() {
   const defaults = getDefaultHardwareInfo();
 
-  // Wait up to 10 seconds for sidecar hwinfo data
+  // Wait up to 20 seconds for sidecar hwinfo data (extra headroom for PawnIO staging on first install)
   const sidecarPromise = hardwareMonitor.getHwInfoFromSidecarPromise();
-  const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 10000));
+  const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 20000));
   const raw = await Promise.race([sidecarPromise, timeoutPromise]);
 
   if (!raw) {
@@ -202,10 +202,14 @@ async function _siFallback(info) {
     }
 
     if ((!info.gpuName || info.gpuName === 'Unknown GPU') && graphics && graphics.controllers && graphics.controllers.length > 0) {
-      const gpu = graphics.controllers[0];
-      info.gpuName = gpu.vendor && gpu.model ? `${gpu.vendor} ${gpu.model}` : gpu.model || info.gpuName;
-      info.gpuVramTotal = info.gpuVramTotal || (gpu.vram ? `${gpu.vram} MB` : '');
-      info.gpuDriverVersion = info.gpuDriverVersion || gpu.driverVersion || '';
+      // Prefer real GPU — skip virtual/remote display adapters
+      const realGpu = graphics.controllers.find(g => {
+        const n = (g.model || g.vendor || '').toLowerCase();
+        return !/(virtual|dummy|parsec|remote|generic|display-only)/i.test(n);
+      }) || graphics.controllers[0];
+      info.gpuName = realGpu.vendor && realGpu.model ? `${realGpu.vendor} ${realGpu.model}` : realGpu.model || info.gpuName;
+      info.gpuVramTotal = info.gpuVramTotal || (realGpu.vram ? `${realGpu.vram} MB` : '');
+      info.gpuDriverVersion = info.gpuDriverVersion || realGpu.driverVersion || '';
     }
 
     if ((!info.ramInfo || info.ramInfo === 'Unknown') && mem) {
@@ -216,9 +220,11 @@ async function _siFallback(info) {
     }
 
     if ((!info.diskName || info.diskName === 'Unknown Disk') && Array.isArray(disks) && disks.length > 0) {
-      info.diskName = disks[0].name || disks[0].model || info.diskName;
-      info.diskType = info.diskType || disks[0].type || '';
-      info.diskTotalGB = info.diskTotalGB || Math.round((disks[0].size || 0) / (1024 * 1024 * 1024));
+      // Prefer non-USB internal disk
+      const internalDisk = disks.find(d => d.interfaceType !== 'USB') || disks[0];
+      info.diskName = internalDisk.name || internalDisk.model || info.diskName;
+      info.diskType = info.diskType || internalDisk.type || '';
+      info.diskTotalGB = info.diskTotalGB || Math.round((internalDisk.size || 0) / (1024 * 1024 * 1024));
     }
 
     if ((!info.windowsVersion || info.windowsVersion === 'Unknown') && osInfo) {

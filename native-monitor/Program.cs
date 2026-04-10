@@ -6,6 +6,7 @@ using System.Diagnostics;
 using System.Net.NetworkInformation;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
+using System.ServiceProcess;
 using System.Text.Json;
 using LibreHardwareMonitor.Hardware;
 
@@ -86,11 +87,16 @@ public static class Program
     // Stdout lock — prevents JSON line interleaving between main loop and hwinfo thread
     private static readonly object _stdoutLock = new();
 
-    // One-time diagnostics flag (logs all CPU temp sensor names on first tick)
-    private static bool _cpuTempDiagLogged = false;
-
     // Persist last valid disk temp so transient LHM null reads don't blank the UI
     private static double _lastDiskTemp = -1;
+
+    // LHM re-init state — if CPU temp stays null for too long, try reopening
+    private static int _cpuTempNullTicks = 0;
+    private static bool _lhmReinitAttempted = false;
+
+    // Periodic status logging — every 60 ticks (~30s)
+    private static int _statusLogCounter = 0;
+    private static bool _firstTempLogged = false;
 
     // Ping state (written by background thread, read by main loop)
     private static double _latencyMs;
@@ -154,9 +160,54 @@ public static class Program
         catch { /* non-critical */ }
         Log($"ADMIN={isAdmin}");
 
+        // Parse --drivers <path> argument (bundled PawnIO driver directory)
+        string? bundledDriverDir = null;
+        for (int i = 0; i < args.Length - 1; i++)
+        {
+            if (args[i] == "--drivers") { bundledDriverDir = args[i + 1]; break; }
+        }
+
+        // ── Start hwinfo collection immediately (WMI-only, no LHM needed) ──────────────
+        // This runs in parallel with PawnIO/LHM init so the 10s JS timeout is never hit.
+        // computer is passed as null; a follow-up hwinfo-update emits GPU VRAM from LHM.
+        var hwinfoThread = new Thread(() =>
+        {
+            try
+            {
+                var fastInfo = HardwareInfoCollector.CollectFast(null);
+                var json = JsonSerializer.Serialize(fastInfo);
+                lock (_stdoutLock) { Console.WriteLine(json); Console.Out.Flush(); }
+                Log("HWINFO_FAST_DONE");
+
+                // Slow fetch in background
+                try
+                {
+                    var slowUpdates = HardwareInfoCollector.CollectSlow(fastInfo);
+                    if (slowUpdates.Count > 1)
+                    {
+                        var slowJson = JsonSerializer.Serialize(slowUpdates);
+                        lock (_stdoutLock) { Console.WriteLine(slowJson); Console.Out.Flush(); }
+                        Log("HWINFO_SLOW_DONE");
+                    }
+                }
+                catch (Exception ex) { Log($"HWINFO_SLOW_ERR:{ex.Message}"); }
+            }
+            catch (Exception ex) { Log($"HWINFO_FAST_ERR:{ex.Message}"); }
+        })
+        {
+            IsBackground = true,
+            Priority = ThreadPriority.BelowNormal,
+            Name = "HWInfoCollector"
+        };
+        hwinfoThread.Start();
+
         // Initialize LibreHardwareMonitor
         Computer? computer = null;
         var visitor = new UpdateVisitor();
+
+        // Ensure PawnIO driver is ready (required by LHM 0.9.6+ for CPU temp MSR access)
+        try { PawnIoHelper.EnsureReady(Log, bundledDriverDir); }
+        catch (Exception ex) { Log($"PAWNIO_SETUP_ERR:{ex.Message}"); }
 
         try
         {
@@ -179,18 +230,76 @@ public static class Program
             // Continue — we can still provide RAM, ping, process count, uptime
         }
 
-        // First LHM update + emit hardware names
+        // First LHM update — warm-up loop until CPU temp sensor values populate.
+        // LHM's ring-0 driver (Inpx64/WinRing0) may need several passes to initialize.
         if (computer != null)
         {
             try
             {
-                computer.Accept(visitor);
+                bool tempFound = false;
+                for (int pass = 0; pass < 8 && !tempFound; pass++) // up to 4 seconds
+                {
+                    computer.Accept(visitor);
+                    if (pass > 0) Thread.Sleep(500);
+
+                    // Check if any CPU temp sensor has a value
+                    foreach (var hw in computer.Hardware)
+                    {
+                        if (hw.HardwareType != HardwareType.Cpu) continue;
+                        foreach (var s in hw.Sensors)
+                        {
+                            if (s.SensorType == SensorType.Temperature && s.Value.HasValue && s.Value.Value > 0)
+                            {
+                                tempFound = true;
+                                Log($"WARMUP_TEMP_OK:pass={pass} sensor={s.Name} val={s.Value.Value}");
+                                break;
+                            }
+                        }
+                        // Also check sub-hardware
+                        if (!tempFound)
+                        {
+                            foreach (var sub in hw.SubHardware)
+                            {
+                                foreach (var s in sub.Sensors)
+                                {
+                                    if (s.SensorType == SensorType.Temperature && s.Value.HasValue && s.Value.Value > 0)
+                                    {
+                                        tempFound = true;
+                                        Log($"WARMUP_TEMP_OK:pass={pass} sub={sub.Name} sensor={s.Name} val={s.Value.Value}");
+                                        break;
+                                    }
+                                }
+                                if (tempFound) break;
+                            }
+                        }
+                        break; // only check first CPU
+                    }
+                }
+                if (!tempFound)
+                    Log("WARMUP_TEMP_FAIL:no CPU temp value after 8 passes");
+
+                // Log driver file detection
+                try
+                {
+                    var tempDir = Path.GetTempPath();
+                    var driverFiles = Directory.GetFiles(tempDir, "*Ring0*", SearchOption.TopDirectoryOnly)
+                        .Concat(Directory.GetFiles(tempDir, "*Inpx*", SearchOption.TopDirectoryOnly))
+                        .ToArray();
+                    if (driverFiles.Length > 0)
+                        Log($"DRIVER_FILES:{string.Join(";", driverFiles.Select(Path.GetFileName))}");
+                    else
+                        Log("DRIVER_FILES:NONE_FOUND");
+                }
+                catch { Log("DRIVER_FILES:CHECK_ERROR"); }
+
                 EmitInitMessage(computer);
+                // Emit GPU VRAM from LHM sensors as a follow-up hwinfo-update
+                // (the hwinfo thread started before LHM, so it used computer=null)
+                EmitGpuVramUpdate(computer);
             }
             catch (Exception ex)
             {
                 Log($"INIT_ERR:{ex.Message}");
-                // Emit a minimal init so Electron isn't stuck waiting
                 EmitMinimalInit();
             }
         }
@@ -208,38 +317,6 @@ public static class Program
         };
         pingThread.Start();
 
-        // Start hardware info collection on background thread (fast ~1-2s, then slow ~5-10s)
-        var hwinfoThread = new Thread(() =>
-        {
-            try
-            {
-                var fastInfo = HardwareInfoCollector.CollectFast(computer);
-                var json = JsonSerializer.Serialize(fastInfo);
-                lock (_stdoutLock) { Console.WriteLine(json); Console.Out.Flush(); }
-                Log("HWINFO_FAST_DONE");
-
-                // Slow fetch in background
-                try
-                {
-                    var slowUpdates = HardwareInfoCollector.CollectSlow(fastInfo);
-                    if (slowUpdates.Count > 1) // more than just "type" key
-                    {
-                        var slowJson = JsonSerializer.Serialize(slowUpdates);
-                        lock (_stdoutLock) { Console.WriteLine(slowJson); Console.Out.Flush(); }
-                        Log("HWINFO_SLOW_DONE");
-                    }
-                }
-                catch (Exception ex) { Log($"HWINFO_SLOW_ERR:{ex.Message}"); }
-            }
-            catch (Exception ex) { Log($"HWINFO_FAST_ERR:{ex.Message}"); }
-        })
-        {
-            IsBackground = true,
-            Priority = ThreadPriority.BelowNormal,
-            Name = "HWInfoCollector"
-        };
-        hwinfoThread.Start();
-
         // Main polling loop — 500ms cycle
         while (_running)
         {
@@ -247,6 +324,9 @@ public static class Program
             {
                 if (computer != null)
                     computer.Accept(visitor);
+
+                // If CPU temp has been null too long, try re-initializing LHM
+                computer = TryReinitLhm(computer, visitor);
 
                 var snapshot = CollectSnapshot(computer);
                 lock (_stdoutLock) { Console.WriteLine(snapshot); Console.Out.Flush(); }
@@ -315,6 +395,45 @@ public static class Program
         });
 
         lock (_stdoutLock) { Console.WriteLine(json); Console.Out.Flush(); }
+    }
+
+    /// <summary>
+    /// Emits an hwinfo-update with GPU VRAM from LHM sensors.
+    /// Called after LHM is ready so the hwinfo thread (which ran before LHM) gets updated GPU data.
+    /// </summary>
+    private static void EmitGpuVramUpdate(Computer computer)
+    {
+        try
+        {
+            double vramTotal = -1;
+            foreach (var hw in computer.Hardware)
+            {
+                if (hw.HardwareType is not (HardwareType.GpuNvidia or HardwareType.GpuAmd or HardwareType.GpuIntel))
+                    continue;
+                foreach (var s in hw.Sensors)
+                {
+                    if (s.SensorType == SensorType.SmallData && s.Name == "GPU Memory Total" && s.Value.HasValue)
+                    {
+                        vramTotal = s.Value.Value; // MiB
+                        break;
+                    }
+                }
+                if (vramTotal > 0) break;
+            }
+
+            if (vramTotal > 0)
+            {
+                var gb = Math.Round(vramTotal / 1024.0, 1);
+                var update = JsonSerializer.Serialize(new Dictionary<string, object?>
+                {
+                    ["type"] = "hwinfo-update",
+                    ["gpuVramTotal"] = $"{gb} GB",
+                });
+                lock (_stdoutLock) { Console.WriteLine(update); Console.Out.Flush(); }
+                Log($"GPU_VRAM_UPDATE:{gb} GB");
+            }
+        }
+        catch (Exception ex) { Log($"GPU_VRAM_UPDATE_ERR:{ex.Message}"); }
     }
 
     private static string CollectSnapshot(Computer? computer)
@@ -419,12 +538,39 @@ public static class Program
         // Use last valid disk temp if LHM returned null this tick
         if (diskTemp < 0 && _lastDiskTemp > 0) diskTemp = _lastDiskTemp;
 
-        // Fallback chain for CPU temperature
-        // Use motherboard CPU sensor if LHM couldn't read the CPU directly
-        if (cpuTemp < 0 && mbCpuTemp > 0) cpuTemp = mbCpuTemp;
-        // NOTE: ACPI WMI thermal zone fallback intentionally removed — many BIOSes return
-        // a static stub value of 300K (26.85°C) which causes a frozen display.
-        // JS-side estimation handles the no-temp case cleanly.
+        // Fallback chain for CPU temperature — track source for diagnostics
+        string tempSource = "none";
+
+        if (cpuTemp > 0)
+        {
+            tempSource = "lhm";
+        }
+
+        // 1. Use motherboard CPU sensor if LHM couldn't read the CPU directly
+        if (cpuTemp < 0 && mbCpuTemp > 0)
+        {
+            cpuTemp = mbCpuTemp;
+            tempSource = "mobo";
+        }
+
+        // No cached/estimated/WMI fallback — only real hardware sensor data.
+        // If no source has a reading, cpuTemp stays -1 and JS shows 0.
+
+        // Track consecutive null ticks for LHM re-init logic
+        if (cpuTemp < 0) _cpuTempNullTicks++;
+        else _cpuTempNullTicks = 0;
+
+        // Periodic status logging for diagnostics
+        _statusLogCounter++;
+        if (!_firstTempLogged && cpuTemp > 0)
+        {
+            _firstTempLogged = true;
+            Log($"TEMP_FIRST_READING:{cpuTemp}°C source={tempSource} tick={_statusLogCounter}");
+        }
+        if (_statusLogCounter % 60 == 0) // every ~30 seconds
+        {
+            Log($"TEMP_STATUS:{cpuTemp}°C source={tempSource} nullTicks={_cpuTempNullTicks}");
+        }
 
         // Process pending GPU fan control command
         int fanCmd;
@@ -538,7 +684,7 @@ public static class Program
             ["cpuPower"] = cpuPower >= 0 ? cpuPower : -1,
             ["cpuVoltage"] = cpuVoltage >= 0 ? cpuVoltage : -1,
             ["temperature"] = cpuTemp >= 0 ? cpuTemp : -1,
-            ["tempSource"] = cpuTemp >= 0 ? "lhm" : "none",
+            ["tempSource"] = tempSource,
             ["gpuTemp"] = gpuTemp,
             ["gpuUsage"] = gpuUsage,
             ["gpuVramUsed"] = gpuVramUsed,
@@ -581,14 +727,13 @@ public static class Program
         ref double cpuTemp, ref double cpuClock,
         ref double cpuPower, ref double cpuVoltage, List<double> perCoreCpu)
     {
-        // One-time: log all CPU temperature sensor names for diagnostics
-        if (!_cpuTempDiagLogged)
+        // Log all CPU temperature sensor names+values on first tick, tick 20 (~10s), and tick 60 (~30s)
+        if (_statusLogCounter <= 1 || _statusLogCounter == 20 || _statusLogCounter == 60)
         {
-            _cpuTempDiagLogged = true;
             foreach (var s in sensors)
             {
                 if (s.SensorType == SensorType.Temperature)
-                    Log($"CPU_TEMP_SENSOR:{s.Name}={s.Value?.ToString() ?? "null"}");
+                    Log($"CPU_TEMP_SENSOR[t={_statusLogCounter}]:{s.Name}={s.Value?.ToString() ?? "null"}");
             }
         }
 
@@ -609,7 +754,7 @@ public static class Program
                     cpuTemp = Math.Round(v, 1);
                 else if (name == "Core Max" && cpuTemp < 0)
                     cpuTemp = Math.Round(v, 1);
-                else if ((name.StartsWith("Core #") || name.StartsWith("CCD")) && cpuTemp < 0 && v > 0 && v < 150)
+                else if ((name.StartsWith("Core #") || name.StartsWith("CPU Core #") || name.StartsWith("CCD")) && cpuTemp < 0 && v > 0 && v < 150)
                     cpuTemp = Math.Round(v, 1);
                 else if (cpuTemp < 0 && v > 0 && v < 150)
                     cpuTemp = Math.Round(v, 1);
@@ -792,9 +937,270 @@ public static class Program
 
     #endregion
 
+    /// <summary>
+    /// Attempt to re-initialize LHM if CPU temp has been null for too long.
+    /// Returns the (possibly new) Computer instance.
+    /// </summary>
+    private static Computer? TryReinitLhm(Computer? computer, UpdateVisitor visitor)
+    {
+        if (_lhmReinitAttempted || computer == null) return computer;
+        if (_cpuTempNullTicks < 20) return computer; // wait ~10 seconds before trying
+
+        _lhmReinitAttempted = true;
+        Log("LHM_REINIT_ATTEMPT");
+
+        try
+        {
+            computer.Close();
+            Thread.Sleep(500);
+
+            computer = new Computer
+            {
+                IsCpuEnabled = true,
+                IsGpuEnabled = true,
+                IsMemoryEnabled = true,
+                IsMotherboardEnabled = true,
+                IsNetworkEnabled = true,
+                IsStorageEnabled = true,
+                IsControllerEnabled = true,
+            };
+            computer.Open();
+
+            // Warm-up passes
+            computer.Accept(visitor);
+            Thread.Sleep(250);
+            computer.Accept(visitor);
+
+            Log("LHM_REINIT_OK");
+        }
+        catch (Exception ex)
+        {
+            Log($"LHM_REINIT_FAIL:{ex.Message}");
+        }
+
+        return computer;
+    }
+
     private static void Log(string msg)
     {
         try { Console.Error.WriteLine($"GCMON:{msg}"); }
         catch { /* stderr might be closed */ }
+    }
+}
+
+/// <summary>
+/// Ensures the PawnIO kernel driver (used by LHM 0.9.6+) is installed and running.
+/// PawnIO is a PnP software device — on some systems the driver package is in the
+/// DriverStore but the device node was never created, so LHM can't open \\.\PawnIO.
+/// This helper creates the Root\PawnIO device node and installs the driver on it.
+/// </summary>
+static class PawnIoHelper
+{
+    const int DICD_GENERATE_ID = 1;
+    const int SPDRP_HARDWAREID = 1;
+    const int DIF_REGISTERDEVICE = 0x19;
+    static readonly Guid GUID_DEVCLASS_SOFTWAREDEVICE = new("{62f9c741-b25a-46ce-b54c-9bccce08b6f2}");
+
+    [DllImport("setupapi.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    static extern IntPtr SetupDiCreateDeviceInfoList(ref Guid classGuid, IntPtr hwndParent);
+
+    [DllImport("setupapi.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    static extern bool SetupDiCreateDeviceInfoW(IntPtr devInfoSet, string deviceName,
+        ref Guid classGuid, string? description, IntPtr hwndParent, int creationFlags, ref SP_DEVINFO_DATA devInfoData);
+
+    [DllImport("setupapi.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    static extern bool SetupDiSetDeviceRegistryPropertyW(IntPtr devInfoSet,
+        ref SP_DEVINFO_DATA devInfoData, int property, byte[] propertyBuffer, int propertyBufferSize);
+
+    [DllImport("setupapi.dll", SetLastError = true)]
+    static extern bool SetupDiCallClassInstaller(int installFunction, IntPtr devInfoSet, ref SP_DEVINFO_DATA devInfoData);
+
+    [DllImport("setupapi.dll", SetLastError = true)]
+    static extern bool SetupDiDestroyDeviceInfoList(IntPtr devInfoSet);
+
+    [DllImport("newdev.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    static extern bool UpdateDriverForPlugAndPlayDevicesW(IntPtr hwndParent, string hardwareId,
+        string fullInfPath, uint installFlags, out bool rebootRequired);
+
+    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    static extern IntPtr CreateFileW(string lpFileName, uint dwDesiredAccess, uint dwShareMode,
+        IntPtr lpSecurityAttributes, uint dwCreationDisposition, uint dwFlagsAndAttributes, IntPtr hTemplateFile);
+
+    [DllImport("kernel32.dll")]
+    static extern bool CloseHandle(IntPtr hObject);
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct SP_DEVINFO_DATA
+    {
+        public int cbSize;
+        public Guid ClassGuid;
+        public int DevInst;
+        public IntPtr Reserved;
+    }
+
+    /// <summary>
+    /// Returns true if \\.\PawnIO device is accessible (driver is running and device node exists).
+    /// </summary>
+    static bool IsDeviceReady()
+    {
+        var h = CreateFileW(@"\\.\PawnIO", 0xC0000000, 3, IntPtr.Zero, 3, 0, IntPtr.Zero);
+        if (h != IntPtr.Zero && h != (IntPtr)(-1))
+        {
+            CloseHandle(h);
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Finds the PawnIO INF file in the DriverStore.
+    /// </summary>
+    static string? FindDriverStoreInf()
+    {
+        var driverStoreDir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.Windows),
+            "System32", "DriverStore", "FileRepository");
+
+        if (!Directory.Exists(driverStoreDir)) return null;
+
+        foreach (var dir in Directory.GetDirectories(driverStoreDir, "pawnio.inf_*"))
+        {
+            var inf = Path.Combine(dir, "pawnio.inf");
+            if (File.Exists(inf)) return inf;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Creates the Root\PawnIO PnP device node and installs the driver on it.
+    /// Requires admin privileges. Returns a status message for logging.
+    /// </summary>
+    static string CreateAndInstallDevice(string infPath)
+    {
+        var classGuid = GUID_DEVCLASS_SOFTWAREDEVICE;
+        var devInfoSet = SetupDiCreateDeviceInfoList(ref classGuid, IntPtr.Zero);
+        if (devInfoSet == (IntPtr)(-1))
+            return $"CreateDeviceInfoList failed: {Marshal.GetLastWin32Error()}";
+
+        try
+        {
+            var devInfoData = new SP_DEVINFO_DATA { cbSize = Marshal.SizeOf<SP_DEVINFO_DATA>() };
+
+            if (!SetupDiCreateDeviceInfoW(devInfoSet, "PawnIO", ref classGuid, "PawnIO",
+                IntPtr.Zero, DICD_GENERATE_ID, ref devInfoData))
+            {
+                var err = Marshal.GetLastWin32Error();
+                // If device already exists, try driver install anyway
+                if (err != unchecked((int)0xE0000203))
+                    return $"CreateDeviceInfo failed: {err}";
+            }
+
+            var hwid = System.Text.Encoding.Unicode.GetBytes("Root\\PawnIO\0\0");
+            if (!SetupDiSetDeviceRegistryPropertyW(devInfoSet, ref devInfoData, SPDRP_HARDWAREID, hwid, hwid.Length))
+            {
+                var err = Marshal.GetLastWin32Error();
+                if (err != 0) return $"SetHardwareId failed: {err}";
+            }
+
+            if (!SetupDiCallClassInstaller(DIF_REGISTERDEVICE, devInfoSet, ref devInfoData))
+                return $"RegisterDevice failed: {Marshal.GetLastWin32Error()}";
+
+            if (!UpdateDriverForPlugAndPlayDevicesW(IntPtr.Zero, "Root\\PawnIO", infPath,
+                0x1 /* INSTALLFLAG_FORCE */, out _))
+                return $"InstallDriver failed: {Marshal.GetLastWin32Error()}";
+
+            return "OK";
+        }
+        finally
+        {
+            SetupDiDestroyDeviceInfoList(devInfoSet);
+        }
+    }
+
+    /// <summary>
+    /// Ensures PawnIO is ready for LHM to use. Call before Computer.Open().
+    /// </summary>
+    public static void EnsureReady(Action<string> log, string? bundledDriverDir = null)
+    {
+        // 1. Already working
+        if (IsDeviceReady())
+        {
+            log("PAWNIO:DEVICE_OK");
+            return;
+        }
+
+        // 2. Check if driver package is in DriverStore
+        var infPath = FindDriverStoreInf();
+
+        // 3. If not in DriverStore, stage from bundled files
+        if (infPath == null && !string.IsNullOrEmpty(bundledDriverDir))
+        {
+            var bundledInf = Path.Combine(bundledDriverDir, "pawnio.inf");
+            if (File.Exists(bundledInf))
+            {
+                log($"PAWNIO:STAGING_FROM_BUNDLE:{bundledDriverDir}");
+                var staged = StageDriverFromBundle(bundledInf);
+                log($"PAWNIO:STAGE_RESULT:{staged}");
+                if (staged.StartsWith("OK"))
+                    infPath = FindDriverStoreInf(); // Re-check after staging
+            }
+            else
+            {
+                log($"PAWNIO:BUNDLE_NOT_FOUND:{bundledInf}");
+            }
+        }
+
+        if (infPath == null)
+        {
+            log("PAWNIO:NOT_INSTALLED");
+            return;
+        }
+
+        log($"PAWNIO:INF_FOUND:{infPath}");
+
+        // 4. Create device node and install driver
+        var result = CreateAndInstallDevice(infPath);
+        log($"PAWNIO:INSTALL_RESULT:{result}");
+
+        // 5. Give the driver a moment to initialize
+        Thread.Sleep(500);
+
+        // 6. Verify
+        if (IsDeviceReady())
+            log("PAWNIO:READY");
+        else
+            log("PAWNIO:STILL_NOT_READY");
+    }
+
+    /// <summary>
+    /// Stages the bundled PawnIO driver into the Windows DriverStore via pnputil.
+    /// Requires admin privileges.
+    /// </summary>
+    static string StageDriverFromBundle(string infPath)
+    {
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "System32", "pnputil.exe"),
+                Arguments = $"/add-driver \"{infPath}\" /install",
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true,
+            };
+            using var proc = Process.Start(psi);
+            if (proc == null) return "FAILED:could not start pnputil";
+            var stdout = proc.StandardOutput.ReadToEnd();
+            var stderr = proc.StandardError.ReadToEnd();
+            proc.WaitForExit(15000);
+            var exit = proc.ExitCode;
+            var output = (stdout + " " + stderr).Replace("\r", "").Replace("\n", " ").Trim();
+            return exit == 0 ? $"OK:{output}" : $"FAILED(exit={exit}):{output}";
+        }
+        catch (Exception ex)
+        {
+            return $"EXCEPTION:{ex.Message}";
+        }
     }
 }

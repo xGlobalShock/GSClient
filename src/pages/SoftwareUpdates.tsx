@@ -9,6 +9,7 @@ import '../styles/SoftwareUpdates.css';
 import { useAuth } from '../contexts/AuthContext';
 import ProPreviewBanner from '../components/ProPreviewBanner';
 import ProLockedWrapper from '../components/ProLockedWrapper';
+import ProLineBadge from '../components/ProLineBadge';
 
 /* ═══════════════════ Types ═══════════════════ */
 
@@ -197,6 +198,7 @@ const SoftwareUpdates: React.FC<SoftwareUpdatesProps> = ({ isActive = false }) =
       <PageHeader
         icon={<Package size={16} />}
         title="Software Updates"
+        lineContent={<ProLineBadge pageName="Software Updates" />}
         actions={isPro ? (
           <>
             {updatingAll ? (
@@ -217,8 +219,6 @@ const SoftwareUpdates: React.FC<SoftwareUpdatesProps> = ({ isActive = false }) =
           </>
         ) : undefined}
       />
-
-      <ProPreviewBanner pageName="Software Updates" />
 
       <ProLockedWrapper featureName="Software Updates" message="PRO Feature">
       {loading && (

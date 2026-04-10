@@ -92,22 +92,24 @@ function _checkExpired(profile: UserProfile | null): boolean {
 }
 
 /**
- * Build a temporary profile instantly from the Supabase User object.
- * Contains name + avatar so the header renders real data immediately.
- * The background DB fetch will replace this with the full profile (role, etc).
+ * Build a profile instantly from the Supabase User object.
+ * role & pro_expires_at come from app_metadata (synced by DB trigger into
+ * the JWT), so the real role is available with zero DB round-trip.
  */
 function _profileFromUser(u: User): UserProfile {
   const meta = u.user_metadata ?? {};
+  const appMeta = u.app_metadata ?? {};
+  const role = (['user', 'pro', 'admin', 'owner'].includes(appMeta.role) ? appMeta.role : 'user') as UserProfile['role'];
   return {
     id: u.id,
     email: u.email ?? '',
     username: meta.full_name || meta.name || meta.user_name || meta.preferred_username || u.email?.split('@')[0] || 'User',
     avatar_url: meta.avatar_url || meta.picture || null,
-    role: 'user',
+    role,
     pro_source: null,
-    pro_expires_at: null,
+    pro_expires_at: appMeta.pro_expires_at ?? null,
     subscription_status: null,
-    provider: (u.app_metadata?.provider as AuthProviderType) ?? null,
+    provider: (appMeta.provider as AuthProviderType) ?? null,
     created_at: u.created_at ?? '',
     updated_at: '',
   };
@@ -153,21 +155,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loginLockRef = useRef(false);
 
   /**
-   * Set user + instant profile (from cache or synthesized from metadata)
-   * so the header renders immediately without any skeleton.
+   * Set user + instant profile from JWT metadata.
+   * The DB trigger syncs role into app_metadata, so the JWT-derived
+   * profile already has the real role — no DB fetch needed for display.
    */
   const setUserWithProfile = useCallback((u: User) => {
     setUser(u);
     setCurrentProvider(_readProvider() || _providerFromUser(u));
-    // Prefer cached DB profile (has real role/plan) → fall back to synthesized
+    // Prefer cached DB profile (has extra fields like subscription_status)
     const cached = _readCachedProfile();
     if (cached && cached.id === u.id) {
       setProfile(cached);
-      setProfileReady(true);
     } else {
       setProfile(_profileFromUser(u));
-      setProfileReady(false);
     }
+    // Role is always authoritative from the JWT — mark ready immediately.
+    setProfileReady(true);
   }, []);
 
   /* ── Init: restore session + subscribe to auth changes ──────────── */
@@ -214,14 +217,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (event === 'INITIAL_SESSION') return;
         if (event === 'SIGNED_OUT') {
           setUser(null); setProfile(null); setCurrentProvider(null);
-          // Only clear our custom keys — Supabase already manages its own
-          // session token. Clearing it here caused lost sessions on restart
-          // when SIGNED_OUT fired during transient token-refresh failures.
+          setProfileReady(false);
           _clearCustomStorage();
           return;
         }
         if (session?.user) {
           setUserWithProfile(session.user);
+          // Fetch the real profile immediately — by the time onAuthStateChange
+          // fires the Supabase client has the session in memory, so RLS works.
+          const p = await _fetchProfile(session.user.id);
+          if (p && mounted) { setProfile(p); _cacheProfile(p); setProfileReady(true); }
         }
       },
     );
@@ -235,29 +240,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const ipc = (window as any).electron?.ipcRenderer;
     if (!ipc) return;
 
+    // Just establish the session — onAuthStateChange handles profile fetch.
     const unsubImplicit = ipc.on('auth:callback',
       async ({ access_token, refresh_token }: { access_token: string; refresh_token: string }) => {
-        try {
-          const { data } = await supabase.auth.setSession({ access_token, refresh_token });
-          // Session is now fully stored — fetch profile with valid token.
-          const uid = data?.session?.user?.id;
-          if (uid) {
-            const p = await _fetchProfile(uid);
-            if (p) { setProfile(p); _cacheProfile(p); setProfileReady(true); }
-          }
-        } catch {}
+        try { await supabase.auth.setSession({ access_token, refresh_token }); } catch {}
       },
     );
     const unsubPkce = ipc.on('auth:callback-code',
       async ({ code }: { code: string }) => {
-        try {
-          const { data } = await supabase.auth.exchangeCodeForSession(code);
-          const uid = data?.session?.user?.id;
-          if (uid) {
-            const p = await _fetchProfile(uid);
-            if (p) { setProfile(p); _cacheProfile(p); setProfileReady(true); }
-          }
-        } catch {}
+        try { await supabase.auth.exchangeCodeForSession(code); } catch {}
       },
     );
     return () => {
@@ -295,6 +286,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       supabase.removeChannel(channel);
     };
   }, [user?.id]);
+
+  /* ── Safety net: ensure profile is always hydrated ──────────────── */
+  // If we have a user but profileReady is still false (synthesized only),
+  // something failed (timeout, RLS race, etc). Retry with back-off.
+  useEffect(() => {
+    if (!isSupabaseConfigured || !user?.id || profileReady) return;
+
+    let cancelled = false;
+    const retryDelays = [500, 1500, 4000]; // ms
+
+    const attempt = async (idx: number) => {
+      if (cancelled || idx >= retryDelays.length) return;
+      const p = await _fetchProfile(user.id);
+      if (cancelled) return;
+      if (p) {
+        setProfile(p);
+        _cacheProfile(p);
+        setProfileReady(true);
+      } else if (idx + 1 < retryDelays.length) {
+        timerId = window.setTimeout(() => attempt(idx + 1), retryDelays[idx + 1]);
+      }
+    };
+
+    let timerId = window.setTimeout(() => attempt(0), retryDelays[0]);
+    return () => { cancelled = true; clearTimeout(timerId); };
+  }, [user?.id, profileReady]);
 
   /* ── Actions ─────────────────────────────────────────────────────── */
   const login = useCallback(async (provider: 'discord' | 'twitch') => {
