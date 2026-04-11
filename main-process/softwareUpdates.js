@@ -106,45 +106,10 @@ async function _checkSoftwareUpdatesImpl() {
   return { success: true, packages, count: packages.length };
 }
 
-// Check for outdated pip packages
-async function _checkPipUpdatesImpl() {
-  try {
-    const result = await execAsync(
-      'pip list --outdated --format=json 2>nul',
-      {
-        timeout: 30000,
-        windowsHide: true,
-        encoding: 'utf8',
-        shell: 'cmd.exe',
-        maxBuffer: 1024 * 1024 * 2,
-        env: process.env,
-      }
-    );
-    const stdout = (result.stdout || '').trim();
-    if (!stdout) return [];
-
-    const outdated = JSON.parse(stdout);
-    return outdated.map(pkg => ({
-      name: pkg.name,
-      id: `pip:${pkg.name}`,
-      version: pkg.version,
-      available: pkg.latest_version,
-      source: 'Pip',
-    }));
-  } catch {
-    return [];
-  }
-}
-
-// Combined check: winget + pip
+// Combined check: winget only
 async function _checkAllUpdatesImpl() {
-  const [wingetResult, pipPackages] = await Promise.all([
-    _checkSoftwareUpdatesImpl(),
-    _checkPipUpdatesImpl(),
-  ]);
-
-  const allPackages = [...wingetResult.packages, ...pipPackages];
-  return { success: true, packages: allPackages, count: allPackages.length };
+  const wingetResult = await _checkSoftwareUpdatesImpl();
+  return { success: true, packages: wingetResult.packages, count: wingetResult.packages.length };
 }
 
 function getSoftwareUpdatesCache() {
@@ -206,8 +171,6 @@ function registerIPC() {
 
   ipcMain.handle('software:get-package-size', async (_event, packageId) => {
     const cleanId = String(packageId).replace(/[^\x20-\x7E]/g, '').trim();
-    // Skip size lookup for pip packages (no installer URL)
-    if (cleanId.startsWith('pip:')) return { id: cleanId, size: '', bytes: 0 };
     try {
       const { stdout } = await execAsync(
         `chcp 65001 >nul && winget show --id ${cleanId} --accept-source-agreements 2>nul`,
@@ -271,40 +234,6 @@ function registerIPC() {
         win.webContents.send('software:update-progress', { packageId: cleanId, ...data });
       }
     };
-
-    /* ── Pip package path ── */
-    if (cleanId.startsWith('pip:')) {
-      const pipPkg = cleanId.slice(4);
-      // Validate package name (alphanumeric, hyphens, underscores, dots only)
-      if (!/^[a-zA-Z0-9._-]+$/.test(pipPkg)) {
-        sendProgress({ phase: 'error', status: 'Invalid package name', percent: 0 });
-        return { success: false, message: 'Invalid pip package name' };
-      }
-      sendProgress({ phase: 'preparing', status: 'Upgrading via pip...', percent: 0 });
-      try {
-        const pipResult = await execAsync(
-          `python -m pip install --upgrade ${pipPkg} 2>&1`,
-          { timeout: 120000, windowsHide: true, encoding: 'utf8', shell: 'cmd.exe', maxBuffer: 1024 * 1024 * 2 }
-        );
-        const output = (pipResult.stdout || '') + (pipResult.stderr || '');
-        if (/Successfully installed/i.test(output)) {
-          _invalidateCaches();
-          sendProgress({ phase: 'done', status: 'Update complete!', percent: 100 });
-          return { success: true, message: `${pipPkg} updated successfully` };
-        } else if (/already satisfied/i.test(output)) {
-          sendProgress({ phase: 'done', status: 'Already up to date', percent: 100 });
-          return { success: true, message: `${pipPkg} is already up to date` };
-        } else {
-          const lastLine = output.split(/[\r\n]/).map(s => s.trim()).filter(Boolean).pop() || 'Update failed';
-          sendProgress({ phase: 'error', status: lastLine.substring(0, 120), percent: 0 });
-          return { success: false, message: lastLine.substring(0, 120) };
-        }
-      } catch (err) {
-        const msg = (err.message || 'pip upgrade failed').substring(0, 120);
-        sendProgress({ phase: 'error', status: msg, percent: 0 });
-        return { success: false, message: msg };
-      }
-    }
 
     /* Shared chunk parser for winget output */
     const createChunkParser = () => {
