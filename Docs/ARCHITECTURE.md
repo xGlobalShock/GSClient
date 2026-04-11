@@ -1,374 +1,155 @@
-# GS Control Center - Architecture Overview
+# Architecture — GS Center v2.1.4
 
-## System Architecture
+## System Overview
+
+GS Center is a desktop application with three layers:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    Electron Main Process                         │
-│  ┌─────────────────────────────────────────────────────────────┐│
-│  │ electron.js                                                 ││
-│  │ - App lifecycle management                                  ││
-│  │ - BrowserWindow creation                                    ││
-│  │ - IPC channel setup                                         ││
-│  │ - System monitoring hooks                                   ││
-│  └─────────────────────────────────────────────────────────────┘│
-└────────────────────────┬──────────────────────────────────────────┘
-                         │ IPC Bridge
-┌────────────────────────▼──────────────────────────────────────────┐
-│         Preload Script (Security Sandbox)                         │
-│  ┌─────────────────────────────────────────────────────────────┐ │
-│  │ preload.js                                                   │ │
-│  │ - Context isolation                                          │ │
-│  │ - Safe IPC exposure                                          │ │
-│  │ - Window.electron API                                        │ │
-│  └─────────────────────────────────────────────────────────────┘ │
-└────────────────────────┬──────────────────────────────────────────┘
-                         │
-┌────────────────────────▼──────────────────────────────────────────┐
-│            React Application (Renderer Process)                    │
-│                                                                     │
-│  ┌──────────────────────────────────────────────────────────────┐ │
-│  │                     App.tsx                                  │ │
-│  │  ┌─────────────────────────────────────────────────────────┐ │ │
-│  │  │ Sidebar                │ Header                         │ │ │
-│  │  │ - Navigation           │ - Title                        │ │ │
-│  │  │ - Active State         │ - Notifications                │ │ │
-│  │  │ - Status Indicator     │ - Profile Menu                 │ │ │
-│  │  └─────────────────────────────────────────────────────────┘ │ │
-│  │  ┌─────────────────────────────────────────────────────────┐ │ │
-│  │  │             Page Content (Dynamic)                      │ │ │
-│  │  │                                                         │ │ │
-│  │  │  Dashboard  │  Performance  │  Cleaner  │  Games  │Settings │
-│  │  │  [Stats]    │   [Charts]    │  [List]   │ [Cards] │[Toggles]│
-│  │  │  [Buttons]  │  [Analytics]  │ [Progress]│[Tips]   │[Theme]  │
-│  │  └─────────────────────────────────────────────────────────┘ │ │
-│  └──────────────────────────────────────────────────────────────┘ │
-│                                                                     │
-│  ┌──────────────────────────────────────────────────────────────┐ │
-│  │ NotificationContext                                          │ │
-│  │ - Global notification state                                  │ │
-│  │ - Add/Remove notifications                                   │ │
-│  │ - Animated notification container                            │ │
-│  └──────────────────────────────────────────────────────────────┘ │
-└────────────────────────┬──────────────────────────────────────────┘
-                         │
-        ┌────────────────┼────────────────┐
-        │                │                │
-    ┌───▼───────┐   ┌───▼──────┐   ┌───▼──────┐
-    │ localStorage│   │ Services  │   │  Utils   │
-    │ - Settings   │   │ - Monitor │   │- Optimize│
-    │ - Profiles   │   │ - System  │   │- Settings│
-    └─────────────┘   └───────────┘   └──────────┘
+│                     Electron Shell (main.js)                     │
+│  ┌──────────────┐  ┌──────────────┐  ┌───────────────────────┐  │
+│  │  Window Mgr  │  │   Tray/IPC   │  │   Auto-Updater        │  │
+│  └──────────────┘  └──────────────┘  └───────────────────────┘  │
+├─────────────────────────────────────────────────────────────────┤
+│                  Main Process (main-process/)                    │
+│  26 IPC handler modules: tweaks, cleaners, overlay, auth, etc.  │
+│  ┌──────────────┐  ┌──────────────┐  ┌───────────────────────┐  │
+│  │ Registry Ops │  │ PowerShell   │  │   Winget / WMI        │  │
+│  └──────────────┘  └──────────────┘  └───────────────────────┘  │
+│  ┌──────────────┐  ┌──────────────┐  ┌───────────────────────┐  │
+│  │ GCMonitor.exe│  │ ResHelper.exe│  │   File System Ops     │  │
+│  │  (C# sidecar)│  │  (C# helper) │  │                       │  │
+│  └──────────────┘  └──────────────┘  └───────────────────────┘  │
+├─────────────────────────────────────────────────────────────────┤
+│                   Renderer Process (src/)                        │
+│  React 18 + TypeScript + Tailwind CSS                           │
+│  ┌──────────┐ ┌────────────┐ ┌─────────┐ ┌──────────────────┐  │
+│  │ 19 Pages │ │21 Components│ │2 Context│ │  1 Hook          │  │
+│  └──────────┘ └────────────┘ └─────────┘ └──────────────────┘  │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │ Data Layer: performanceTweaks, cleanerUtilities,         │   │
+│  │ gameRequirements, appCatalog, obsPresets, changelog      │   │
+│  └──────────────────────────────────────────────────────────┘   │
+├─────────────────────────────────────────────────────────────────┤
+│                   External Services                              │
+│  Supabase (Auth/DB) • PayPal (Payments) • winget (Packages)    │
+│  LibreHardwareMonitor (via GCMonitor) • OBS Studio              │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-## Component Hierarchy
+## Data Flow
 
+### Hardware Monitoring Pipeline
 ```
-App
-├── Sidebar
-│   ├── Logo
-│   ├── Navigation Items
-│   │   ├── Home (Dashboard)
-│   │   ├── Performance Monitor
-│   │   ├── Cleaner
-│   │   ├── Game Optimizer
-│   │   └── Settings
-│   └── Status Indicator
-├── Main Content
-│   ├── Header
-│   │   ├── Title & Subtitle
-│   │   ├── Notification Button
-│   │   └── Profile Button
-│   └── Page Container
-│       ├── Dashboard Page
-│       │   ├── StatCard x4
-│       │   ├── Action Buttons
-│       │   └── Info Panel
-│       ├── Performance Page
-│       │   ├── Chart Container
-│       │   └── Stats Grid
-│       ├── Cleaner Page
-│       │   ├── Summary Card
-│       │   ├── Cleaner Items
-│       │   └── Clean Button
-│       ├── GameOptimizer Page
-│       │   ├── Game Cards x4
-│       │   └── Tips Panel
-│       └── Settings Page
-│           ├── General Section
-│           ├── Appearance Section
-│           └── About Section
-└── NotificationContainer
-    └── Notification x N
+GCMonitor.exe (C# sidecar)
+  ↓ stdout JSON events (hwinfo, lhm-data)
+hardwareMonitor.js (main process)
+  ↓ IPC: hardware:realtime events
+useRealtimeHardware hook (renderer)
+  ↓ React state
+LiveMetrics / DashboardHero / HealthScore / AdvisorPanel
 ```
 
-## Data Flow Diagrams
-
-### System Monitoring Flow
+### Tweak Application Flow
 ```
-User opens Dashboard
-    ↓
-App mounts, calls effect
-    ↓
-setInterval updates systemStats state
-    ↓
-IPC invoke 'get-system-stats' (In real implementation)
-    ↓
-Electron process calls WMI commands
-    ↓
-Returns {cpu, ram, disk, temp}
-    ↓
-React state updates
-    ↓
-StatCards re-render with new values
-    ↓
-Progress bars animate
+User toggles tweak → Performance.tsx
+  ↓ ipcRenderer.invoke('tweak:apply-{name}')
+tweaks.js → PowerShell registry edit → success/fail
+  ↓ IPC response
+UI updates tweak card status (applied/default)
 ```
 
-### Navigation Flow
+### App Install Flow
 ```
-User clicks nav item
-    ↓
-setCurrentPage(pageId)
-    ↓
-currentPage state updates
-    ↓
-renderPage() switch statement
-    ↓
-Returns appropriate page component
-    ↓
-Page mounts with useEffect
-    ↓
-Page renders with data/animations
+User clicks Install → AppInstaller.tsx
+  ↓ ipcRenderer.invoke('app:install', { id, name })
+appInstaller.js → winget install --id {id}
+  ↓ IPC progress events (preparing → downloading → installing → done)
+UI shows progress bar per app
 ```
 
-### Notification Flow
+### Authentication Flow
 ```
-User action triggers event
-    ↓
-Component calls addNotification()
-    ↓
-NotificationContext adds notification
-    ↓
-NotificationContainer re-renders
-    ↓
-New notification animates in
-    ↓
-Auto-timeout or manual dismiss
-    ↓
-removeNotification()
-    ↓
-NotificationContainer updates
-    ↓
-Notification animates out
+User clicks Discord/Twitch → LoginPage.tsx
+  ↓ ipcRenderer.invoke('auth:login', provider)
+auth.js → Opens OAuth BrowserWindow → Redirect intercept
+  ↓ Access token extracted from URL hash
+AuthContext.tsx → Supabase session → Profile fetch
+  ↓ User state propagated to all components
+Pro features unlocked based on role/subscription
 ```
 
 ## State Management
 
-```
-Global State:
-├── currentPage (App.tsx)
-│   └── Updated by Sidebar clicks
-│
-├── systemStats (App.tsx)
-│   ├── cpu: number
-│   ├── ram: number
-│   ├── disk: number
-│   └── temperature: number
-│
-└── NotificationContext
-    ├── notifications: Notification[]
-    ├── addNotification: Function
-    └── removeNotification: Function
+| State | Location | Scope |
+|-------|----------|-------|
+| Auth/Profile | AuthContext (Supabase + localStorage cache) | Global |
+| Toasts | ToastContext | Global |
+| Hardware metrics | useRealtimeHardware hook | Dashboard/Performance |
+| Settings | localStorage via settings.ts | Persistent |
+| Page navigation | useState in App.tsx | App-wide |
+| Tweak status | Per-page fetch via IPC check handlers | Per-page |
 
-Component State:
-├── Dashboard
-│   └── systemStats (from props)
-│
-├── Settings
-│   └── settings: AppSettings
-│       ├── autoClean
-│       ├── notifications
-│       ├── autoOptimize
-│       ├── theme
-│       └── startupLaunch
-│
-├── Cleaner
-│   ├── items: CleanerItem[]
-│   └── isCleaning: boolean
-│
-└── GameOptimizer
-    └── games: GameCard[]
-```
+## IPC Communication Map
 
-## Styling Architecture
+The main process registers **100+ IPC handlers** across 26 modules:
 
-```
-Global Styles (index.css)
-├── CSS Variables
-│   ├── --color-primary: #c89b3c
-│   ├── --color-secondary: #00d4ff
-│   ├── --color-accent: #ff4444
-│   ├── --bg-dark: #0a0e27
-│   ├── --bg-card: rgba(15, 20, 45, 0.6)
-│   └── --border-color: rgba(200, 155, 60, 0.2)
-├── Base Styles
-│   ├── Box sizing reset
-│   ├── Font configuration
-│   └── Scrollbar styling
-└── Layout Container
-    ├── .app-container (flex)
-    └── .main-content (flex column)
+| Module | Handler Prefix | Count |
+|--------|---------------|-------|
+| tweaks.js | `tweak:apply-*`, `tweak:reset-*`, `tweak:check-*` | ~51 |
+| cleaners.js | `cleaner:clear-*` | ~30 |
+| hardwareMonitor.js | `hardware:*` | 5 |
+| hardwareInfo.js | `hardware:get-info` | 1 |
+| healthScore.js | `health:*` | 2 |
+| advisor.js | `advisor:*` | 2 |
+| overlay.js | `overlay:*` | 6 |
+| gameProfiles.js | `game:*`, `system:get-display-resolutions` | 5 |
+| appInstaller.js | `app:*` | 4 |
+| appUninstaller.js | `appuninstall:*` | 5 |
+| windowsDebloat.js | `wdebloat:*` | 4 |
+| startup.js | `startup:*` | 2 |
+| serviceTweaks.js | `service:*` | 5 |
+| softwareUpdates.js | `software:*` | 3 |
+| network.js | `network:*` | 1 |
+| obsPresets.js | `obs:*` | 4 |
+| spaceAnalyzer.js | `space:*` | 3 |
+| resolutionManager.js | `resolution:*` | 3 |
+| auth.js | `auth:*` | 2 |
+| paypal.js | `paypal:*` | 1 |
+| autoUpdater.js | `updater:*` | 2 |
+| ctTweaks.js | `ct:*` | 3 |
+| repairOverlay.js | `repair-overlay:*` | 3 |
+| windowManager.js | `window:*` | 4 |
 
-Component Styles:
-├── Sidebar.css - Navigation styling
-├── Header.css - Top bar styling
-├── StatCard.css - Reusable card styles
-├── Dashboard.css - Dashboard layout
-├── Performance.css - Charts and stats
-├── Cleaner.css - File list styles
-├── GameOptimizer.css - Game cards
-├── Settings.css - Form elements
-└── Notifications.css - Toast notifications
+## Native Sidecar Architecture
 
-Tailwind Integration:
-└── tailwind.config.js
-    └── Custom color extensions
-```
+### GCMonitor.exe (native-monitor/)
+- **Language**: C# (.NET 8.0)
+- **Purpose**: Real-time hardware metrics via LibreHardwareMonitor
+- **Communication**: stdout JSON events, one per line
+- **Events**: `hwinfo` (identity), `hwinfo-update`, `lhm-data` (metrics), `lhm-error`
+- **Lifecycle**: Spawned by hardwareMonitor.js, auto-restart on crash (max 5 attempts)
 
-## Service Architecture
-
-```
-Services
-├── systemMonitoring.ts
-│   ├── getCPUUsage() → Promise<number>
-│   ├── getRAMUsage() → Promise<number>
-│   ├── getDiskUsage() → Promise<number>
-│   ├── getSystemTemperature() → Promise<number>
-│   ├── getRunningProcesses() → Promise<Process[]>
-│   └── setupSystemMonitoring() → void (IPC setup)
-│
-└── Utils
-    ├── optimization.ts
-    │   ├── gameProfiles: Record<string, Profile>
-    │   ├── applyGenericOptimization() → Settings
-    │   ├── calculateCleanupSize() → number
-    │   └── formatBytes() → string
-    │
-    ├── settings.ts
-    │   ├── loadSettings() → AppSettings
-    │   ├── saveSettings() → void
-    │   ├── loadProfiles() → Profile[]
-    │   ├── saveProfile() → void
-    │   └── shouldRunCleanup() → boolean
-    │
-    └── NotificationContext.tsx
-        ├── addNotification() → void
-        ├── removeNotification() → void
-        └── NotificationProvider component
-```
-
-## File I/O & Storage Strategy
-
-```
-LocalStorage
-├── pc-controlcenter-settings
-│   └── {settings JSON}
-│
-└── pc-controlcenter-profiles
-    └── [{profile1}, {profile2}, ...]
-
-Electron Storage (Future)
-├── app-data/
-│   ├── stats.db (SQLite)
-│   ├── logs/
-│   └── cache/
-```
+### ResolutionHelper.exe (lib/)
+- **Language**: C#
+- **Purpose**: Win32 API wrapper for display resolution changes
+- **Communication**: CLI args → stdout JSON response
 
 ## Build & Packaging
 
 ```
-Development:
-src/ (TypeScript)
-  ↓
-react-scripts dev (Hot reload)
-  ↓
-src/ (JSX compiled)
-  ↓
-http://localhost:3000
-
-Production:
-src/ (TypeScript)
-  ↓
-react-scripts build
-  ↓
-build/ (Optimized React app)
-  ↓
-electron-builder
-  ↓
-dist/ (Electron app)
-  ↓
-Release/ (Windows .exe, .msi)
+npm run react-build    → build/ (React production bundle)
+npm run electron-build → dist/ (Electron installer via electron-builder)
+npm run build:monitor  → native-monitor/publish/ (GCMonitor.exe)
 ```
 
-## Performance Considerations
+Electron-builder config produces NSIS installer for Windows x64.
 
-### Optimizations Implemented
-- ✅ Memoized components (React.memo potential)
-- ✅ CSS custom properties for theming
-- ✅ Lazy loading pages via routing
-- ✅ Efficient state management
-- ✅ Hardware-accelerated animations (transform, opacity)
-- ✅ Virtualized lists (future enhancement)
+## Security Model
 
-### CSS Performance
-- ✅ Minimal repaints via transform animations
-- ✅ GPU acceleration with will-change (sparingly)
-- ✅ Efficient selectors
-- ✅ Grouped media queries
-
-## Security Considerations
-
-```
-Electron Security:
-├── Context Isolation: Enabled
-├── Preload Script: Sandboxed
-├── IPC: White-listed channels
-├── Node Integration: Disabled
-├── Remote Module: Disabled
-└── Sandbox: Enabled
-
-Data Security:
-├── LocalStorage: Client-side only
-├── No sensitive data in localStorage
-├── Settings encrypted in future
-└── Profile data validated
-```
-
-## Scalability Plan
-
-```
-Current Architecture → Future Enhancements
-│
-├── Component Extraction
-│   └── Split StatCard into smaller components
-│
-├── State Management
-│   └── Redux/Zustand for complex state
-│
-├── Data Persistence
-│   └── SQLite for historical data
-│
-├── Backend Integration
-│   └── Node.js server for cloud sync
-│
-├── Module Splitting
-│   └── Separate optimization modules
-│
-└── Plugin System
-    └── Allow third-party extensions
-```
-
----
-
-This architecture provides a scalable, maintainable foundation for the PC Optimizer Elite application with clear separation of concerns and modern React patterns.
+- **Admin elevation**: Detected at launch via admin-check.js; UAC prompt if needed
+- **Protected paths**: Space Analyzer excludes Windows, Program Files, etc.
+- **Protected startup items**: Windows Defender, Security Health cannot be disabled
+- **Protected services**: Critical system services excluded from optimization
+- **OAuth**: Implicit flow with BrowserWindow partition isolation
+- **Registry writes**: Only specific, documented keys; restore point recommended

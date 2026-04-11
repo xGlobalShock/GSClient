@@ -1,468 +1,236 @@
-# GS Control Center - Complete Feature Documentation
+# Feature Documentation — GS Center v2.1.4
 
-## 🎯 Project Overview
-
-GS Control Center is a professional League of Legends-inspired desktop client for Windows PC optimization. It provides gaming tweaks, game profiles, system cleanup, and performance monitoring with a modern, animated UI.
-
-**Tech Stack:**
-- Frontend: React 18.2.0 + TypeScript 4.9.5
-- Desktop: Electron 27.0.0
-- Animations: Framer Motion 10.16.4
-- Styling: Tailwind CSS 3.3.5 + Custom CSS
-- Charts: Recharts 2.10.3
-- Icons: Lucide React 0.292.0
+Complete reference for all features in GS Center.
 
 ---
 
-## 📋 Feature Breakdown
+## 1. Dashboard & Live Metrics
 
-### 1. **Dashboard** (`src/pages/Dashboard.tsx`)
-Real-time system monitoring with animated widgets:
-- **CPU Usage** - Real-time processor load tracking
-- **Memory (RAM)** - Available and used memory percentage
-- **Disk Usage** - Storage space utilization
-- **GPU Temperature** - Thermal monitoring with color coding
-- **System Stats Card** - Overview of key metrics
-- **Performance Chart** - 24-hour performance history graph
-- **Uptime Tracker** - System runtime counter
+**Page**: `LiveMetrics.tsx` | **Nav**: Home
 
-**Features:**
-- Live stat updates every 1 second
-- Color-coded health indicators (Red/Yellow/Green)
-- Animated counters with framer-motion
-- Responsive grid layout
+Real-time system monitoring dashboard powered by GCMonitor.exe (C# sidecar using LibreHardwareMonitor).
 
----
+**Metrics displayed**:
+- CPU: usage %, per-core load, clock speed (MHz), power draw (W), voltage, temperature
+- GPU: usage %, VRAM used/total, core clock, memory clock, fan speed/RPM, power, temperature, hotspot temp, memory temp
+- RAM: used/total GB, available, cached, standby, modified, non-paged pool, page file, top processes by RAM
+- Disk: read/write speed (MB/s), temperature, health/lifespan %, all drives with capacity
+- Network: upload/download speed, latency (ms), packet loss %, SSID, signal strength, adapter info
+- System: process count, uptime, Windows version/build, power plan
 
-### 2. **Performance Monitor** (`src/pages/Performance.tsx`)
-Detailed performance analysis and process management:
-- **Top Processes** - List of CPU/RAM intensive applications
-- **Network Activity** - Download/Upload speeds
-- **Disk I/O** - Read/Write performance metrics
-- **System Load** - CPU thread utilization
-- **Memory Breakdown** - Used/Available/Virtual memory
+**Components**:
+- `DashboardHero.tsx` — Metric card grid with Recharts area charts, trend arrows, 600-point ring buffer history
+- `HealthScore.tsx` — 0–100 composite score from 7 weighted factors (CPU temp 20%, CPU usage 15%, RAM 15%, disk free 15%, GPU temp 15%, latency 10%, disk health 10%)
+- `AdvisorPanel.tsx` — AI-driven insights: critical/warning/good status per factor, hardware upgrade recommendations with priority scoring, constraint-aware (laptop, thermal throttling)
 
-**Features:**
-- Sortable process list with icons
-- Real-time network bandwidth monitoring
-- Disk I/O performance visualization
-- Memory detailed breakdown
+**Backend**: `hardwareMonitor.js`, `hardwareInfo.js`, `healthScore.js`, `advisor.js`
 
 ---
 
-### 3. **Gaming Tweaks** (`src/pages/GamingTweaks.tsx`)
-Advanced Windows registry optimizations for gaming:
+## 2. Performance Tweaks
 
-#### Available Tweaks:
-1. **IRQ Priority** - System timer responsiveness optimization
-2. **Network Optimization** - Reduce network throttling
-3. **GPU Hardware Scheduling** - Lower GPU latency
-4. **CPU Priority** - CPU resource allocation optimization
-5. **USB Optimization** - Reduce input device latency
-6. **HPET Optimization** - High precision event timer tweaks
-7. **Disable Game DVR** - FPS improvement (removes recording overhead)
-8. **Fullscreen Optimization** - Exclusive fullscreen mode tweaks
+**Page**: `Performance.tsx` | **Nav**: Tweaks
 
-**Features:**
-- Toggle switches for each optimization
-- Individual apply/revert buttons
-- Impact badges (High/Medium/Low)
-- Success/Error message display
-- Batch apply multiple tweaks
-- Registry backup for reverting changes
-- Admin privilege detection
+17 registry-level gaming performance tweaks organized in 7 categories.
 
-**Implementation:**
-- Backend: `src/services/registryTweaks.ts` (280+ lines)
-- Uses Windows `reg` commands for safe modifications
-- Try-catch error handling with status reporting
-- Functions: `applyIRQTweak()`, `applyNETTweak()`, etc.
+| # | Tweak | Category | Registry Path |
+|---|-------|----------|---------------|
+| 1 | IRQ Priority | CPU | `HKLM\SYSTEM\CurrentControlSet\Control\PriorityControl` |
+| 2 | Win32 Priority Separation | CPU | `HKLM\SYSTEM\CurrentControlSet\Control\PriorityControl` |
+| 3 | Hardware GPU Scheduling | GPU | `HKLM\SYSTEM\CurrentControlSet\Control\GraphicsDrivers` |
+| 4 | TDR Level (GPU Timeout) | GPU | `HKLM\SYSTEM\CurrentControlSet\Control\GraphicsDrivers` |
+| 5 | Disable Memory Compression | Memory | PowerShell command |
+| 6 | Large System Cache | Memory | `HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management` |
+| 7 | Network Interrupt Priority | Network | `HKLM\SYSTEM\CurrentControlSet\Control\PriorityControl` |
+| 8 | Disable Network Throttling | Network | `HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile` |
+| 9 | Disable Fullscreen Optimization | Display | `HKCU\System\GameConfigStore` |
+| 10 | DWM Overlay Test Mode | Display | `HKLM\SOFTWARE\Microsoft\Windows\Dwm` |
+| 11 | FSE Behavior Mode | Display | `HKCU\System\GameConfigStore` |
+| 12 | Disable Game DVR | Game DVR | `HKCU\System\GameConfigStore` |
+| 13 | Disable App Capture | Game DVR | `HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\GameDVR` |
+| 14 | GDRV Policy | Game DVR | `HKLM\SOFTWARE\Microsoft\PolicyManager\default\ApplicationManagement` |
+| 15 | Disable USB Selective Suspend | Hardware | Power scheme via PowerShell |
+| 16 | Game Priority | Hardware | `HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile\Tasks\Games` |
+| 17 | Games Priority (GPU) | Hardware | Same path, GPU Priority value |
 
----
+**Features**: Individual apply/reset, batch apply, status check (applied/default), system restore point creation (Pro).
 
-### 4. **Game Profiles** (`src/pages/GameProfiles.tsx`)
-One-click optimization profiles for popular games:
-
-#### Supported Games:
-1. **Valorant** 🎯 - GPU Scheduling, IRQ Priority, CPU Optimization, Game DVR Disabled
-2. **League of Legends** 🗡️ - GPU Scheduling, Network Optimization, CPU Priority
-3. **Apex Legends** 🎮 - GPU Scheduling, USB Optimization, CPU Priority, Fullscreen
-4. **Counter-Strike 2** 💥 - IRQ Priority, GPU Scheduling, Network Optimization
-5. **Overwatch 2** ⚔️ - GPU Scheduling, Network Optimization, CPU Priority, USB
-6. **Rainbow Six Siege** 🛡️ - GPU Scheduling, Network Optimization, IRQ Priority
-7. **Fortnite** 🎪 - GPU Scheduling, CPU Priority, USB Optimization, Fullscreen
-8. **Rocket League** ⚽ - GPU Scheduling, Network Optimization, CPU Priority, USB
-
-**Features:**
-- Animated profile cards with game icons
-- Custom optimization list per game
-- One-click apply/remove buttons
-- Applied status indicator with pulse animation
-- Game detection (expandable feature)
-- Quick profile switching
-
-**Implementation:**
-- Backend: Game optimization definitions in data structure
-- Frontend: `src/pages/GameProfiles.tsx` (240+ lines)
-- Each profile triggers specific tweaks from registry service
+**Backend**: `tweaks.js` — Consolidated PowerShell check script for O(1) status checking.
 
 ---
 
-### 5. **System Cleanup** (`src/pages/SystemCleanup.tsx`)
-Comprehensive system cleanup utilities:
+## 3. Cleanup Toolkit
 
-#### Cleanup Operations:
-1. **Temporary Files** - Remove Windows temp files and cache
-2. **Prefetch Cache** - Clear Windows prefetch optimization data
-3. **DNS Cache** - Flush DNS resolver cache (`ipconfig /flushdns`)
-4. **DirectX Shader Cache** - Clear DirectX compilation cache
-5. **Windows Update Cache** - Remove update installation files
-6. **Memory Dumps** - Delete Windows crash dump files
-7. **Recycle Bin** - Empty recycle bin completely
-8. **Event Logs** - Clear Windows system event logs
+**Page**: `Cleaner.tsx` | **Nav**: Utilities
 
-**Features:**
-- Multi-select cleanup tasks
-- Real-time progress indicator
-- Space freed estimation
-- Safety tips and information
-- Error handling with retry logic
-- Cleanup completion status per task
+30+ cleaners in 6 categories plus essential tweaks and system repair.
 
-**Implementation:**
-- Backend: `src/services/cleanupUtilities.ts` (200+ lines)
-- Functions: `clearTempFiles()`, `clearPrefetchCache()`, etc.
-- Returns: CleanupResult with success status and file counts
-- Uses: PowerShell + native Windows utilities
+**Windows cleaners**: Temp files, Windows Update cache, DNS cache, RAM cache, Recycle Bin, thumbnails, logs, crash dumps, error reports, delivery optimization, recent files, prefetch.
+
+**Game shader caches**: Apex Legends, Forza Horizon, Call of Duty, CS2, Fortnite, League of Legends, Overwatch, Rainbow Six Siege, Rocket League, Valorant.
+
+**NVIDIA**: DXCache, GLCache driver caches.
+
+**Essential Tweaks** (via `ctEssentialTweaks.js`): 30+ Windows preference tweaks including disable Store search, enable End Task on taskbar, disable location tracking, remove widgets, services optimization, Start Menu revert.
+
+**System Repair** (`SystemRepairPanel.tsx`): SFC, DISM, ChkDsk with real-time progress bars and floating repair overlay.
+
+**Backend**: `cleaners.js` — Returns `{ success, message, spaceSaved, filesDeleted, filesBefore, filesAfter }` per cleaner. `ctTweaks.js` for essential tweaks.
 
 ---
 
-### 6. **Settings** (`src/pages/Settings.tsx`)
-Application configuration and preferences:
-- **General Settings**
-  - Auto-optimize on startup toggle
-  - Launch on Windows boot option
-  - Theme selection (Dark/Light)
-  
-- **Optimization Settings**
-  - Default optimization profile
-  - Auto-cleanup scheduling
-  - Notification preferences
-  
-- **System Settings**
-  - Admin privilege verification
-  - Registry backup location
-  - Log file management
+## 4. Game Library
 
-**Features:**
-- Settings persistence (localStorage ready)
-- Real-time preference updates
-- Visual toggle/radio controls
-- Info cards with explanations
+**Page**: `GameLibrary.tsx` | **Nav**: Games
+
+Game profile editor and hardware comparison for 8 competitive games.
+
+**Supported games**: Apex Legends, Valorant, CS2, Fortnite, League of Legends, Rocket League, Overwatch, Call of Duty.
+
+**Features**:
+- Pro-player config editor: resolution, graphics quality, FOV, launch options
+- Per-game config file read/write (paths: Saved Games/Apex, AppData/VALORANT, AppData/cs2)
+- File lock/unlock for read-only protection
+- Hardware vs game requirements comparison with FPS prediction
+- Resolution builder: 16:9, 16:10, 4:3 aspect ratios + custom resolution
+
+**Backend**: `gameProfiles.js` | **Data**: `gameRequirements.ts`, `hardwareCompare.ts`
 
 ---
 
-## 🎨 UI/UX Features
+## 5. OBS Presets
 
-### Visual Design
-- **Color Scheme:**
-  - Primary Blue: `#00A3FF` (LoL/GSTweaks inspired)
-  - Secondary Cyan: `#00D4FF`
-  - Accent Orange: `#FF6B35`
-  - Dark Background: `#0F111A` (Navy/Black)
-  
-- **Typography:**
-  - Headings: Bold, large font (24-32px)
-  - Body: Light gray text on dark background
-  - Emphasis: Cyan accent color
+**Page**: `OBSPresets.tsx` | **Nav**: Stream
 
-- **Components:**
-  - Smooth animations (Framer Motion)
-  - Gradient backgrounds
-  - Hover effects and transitions
-  - Loading spinners
-  - Status indicators
+One-click OBS configuration deployment for streamers.
 
-### Navigation
-- **Sidebar Navigation:**
-  - Dashboard
-  - Performance
-  - Gaming Tweaks
-  - Game Profiles
-  - Cleanup
-  - Game Optimizer
-  - Settings
-  - Status indicator (Online/Offline)
+**Gaming preset includes**:
+- Pre-built scenes: Gaming, Starting Soon, BRB, Ending
+- Game capture source optimized for performance
+- Twitch-optimized video/audio output settings
+- Performance-friendly encoder configuration
 
-- **Header:**
-  - App title and branding
-  - Search functionality (expandable)
-  - User profile/settings access
-  - System tray integration ready
+**Flow**: Detect OBS → Get config path → Deploy preset files → Auto-launch OBS.
+
+**Backend**: `obsPresets.js` | **Service**: `obsPresetsService.ts` | **Configs**: `src/data/obsPresetConfigs/`
 
 ---
 
-## 🔧 Backend Services
+## 6. Resolution Manager
 
-### Registry Tweaks Service (`src/services/registryTweaks.ts`)
-```typescript
-// Core Functions:
-- applyIRQTweak() - Modify IRQ registry values
-- applyNETTweak() - Network registry optimization
-- applyGPUTweak() - GPU hardware scheduling registry
-- applyCPUTweak() - CPU resource allocation
-- applyUSBTweak() - USB latency registry changes
-- applyHPETTweak() - HPET registry modifications
-- applyGameDVRTweak() - Disable Game DVR
-- applyFullscreenOptTweak() - Fullscreen mode tweaks
-- revertAllTweaks() - Remove all modifications
-- applyMultipleTweaks() - Batch operation
-```
+**Page**: `ResolutionManager.tsx` | **Nav**: Display
 
-**Implementation Details:**
-- Uses Node.js `child_process.exec()` for Windows reg commands
-- Safe registry modification with try-catch error handling
-- Returns TweakStatus interface with success/message/tweakName
-- Registry paths properly escaped for safety
-- Admin privilege checking built-in
+Display resolution and refresh rate management via native C# helper.
 
-### Cleanup Utilities Service (`src/services/cleanupUtilities.ts`)
-```typescript
-// Core Functions:
-- clearTempFiles() - Temp directory cleanup
-- clearPrefetchCache() - Prefetch folder clearing
-- clearDNSCache() - DNS cache flush
-- clearDirectXCache() - DirectX shader cache
-- clearUpdateCache() - Windows update cache
-- clearMemoryDumps() - Memory dump file removal
-- clearRecycleBin() - Recycle bin emptying
-- clearEventLogs() - Event log clearing
-- runFullCleanup() - Execute all cleanup operations
-```
+**Features**:
+- List active displays with adapter name, current resolution, refresh rate
+- Enumerate all supported modes per display (W × H × Hz)
+- Apply any supported resolution + refresh rate
+- Real-time display status
 
-**Implementation Details:**
-- Mix of PowerShell commands and native Windows utilities
-- Error handling for permission issues
-- File count and space tracking
-- Returns CleanupResult array with detailed status
-- Safe operation with backup capabilities
+**Backend**: `resolutionManager.js` → `ResolutionHelper.exe` (Win32 ChangeDisplaySettingsEx)
 
 ---
 
-## 🚀 Getting Started
+## 7. Network Diagnostics
 
-### Installation & Setup
-```bash
-# Install dependencies
-npm install
+**Page**: `Network.tsx` | **Nav**: Network
 
-# Development mode (hot reload)
-npm run dev
+Network latency testing and speed tests for gamers.
 
-# Desktop-only client (Electron)
-npm run client
+**Ping tests**: 10 regional gaming servers — NA East, NA West, EU West, EU Central, Asia, Southeast Asia, South America, Middle East, Oceania, Africa.
 
-# Production build
-npm run build
+**Speed tests**: Fast.com, Ookla Speedtest, testmy.net — loaded in isolated webview to prevent interference.
 
-# React development server only
-npm run start
+**Display**: Color-coded latency (green < 50ms, yellow < 100ms, red > 100ms).
 
-# React production build
-npm run react-build
-```
-
-### First Run
-1. Launch with `npm run client`
-2. App requests admin privileges (for registry tweaks)
-3. View real-time stats on Dashboard
-4. Choose a game profile or individual tweaks
-5. Apply optimizations
-6. Monitor performance improvements
+**Backend**: `network.js` — Caches results for 900ms per host.
 
 ---
 
-## ⚙️ Advanced Configuration
+## 8. App Management
 
-### Environment Variables
-```
-REACT_APP_VERSION=1.0.0
-REACT_APP_AUTO_UPDATE=true
-ELECTRON_START_URL=http://localhost:3000 (dev only)
-```
+**Page**: `AppsPage.tsx` | **Nav**: Apps (tabbed interface)
 
-### Registry Paths
-All registry modifications use standard Windows paths:
-- `HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\...`
-- `HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\...`
-- Safe handles with error recovery
+### App Installer (`AppInstaller.tsx`)
+40+ curated applications via winget. Categories: Browsers, Communications, Gaming, Gaming Tools, Streaming & Audio, Development, Utilities, Media. One-click install with progress tracking, bulk install, icon fetching.
 
-### Backup System
-- Registry modifications can be reverted
-- Backup stored in: `%APPDATA%\PCOptimizerElite\backups\`
-- Automatic backup before modifications
-- One-click restore capability
+### App Uninstaller (`AppUninstaller.tsx`)
+Detects installed apps from registry, WMI, AppX packages. Leftover cleanup: files, folders, registry keys, services, scheduled tasks. 3 scan modes: Safe, Moderate, Advanced. Pre/post snapshots for orphan detection.
+
+### Windows Debloat (`WindowsDebloat.tsx`) — Pro
+100+ pre-installed Windows apps removal. Sources: AppX packages, Capabilities, Features. Batch removal, reinstall support, protected system exclusions.
+
+### Startup Manager (`Startup.tsx`)
+Startup items from 4 sources: HKCU/HKLM Run keys, User/Common Startup folders. Enable/disable toggles, protected entries, running process status, search/filter.
+
+### Space Analyzer (`SpaceAnalyzer.tsx`) — Pro
+Recursive directory scanning with drive selector, context menu, LRU caching, protected paths.
 
 ---
 
-## 🛡️ Safety Features
+## 9. Software Updates (Pro)
 
-### Admin Privilege Management
-- Admin check on startup
-- Elevation prompt for protected operations
-- Clear warning messages
-- Operations fail safely if admin unavailable
+**Page**: `SoftwareUpdates.tsx` | **Nav**: Updates
 
-### Error Handling
-- Try-catch blocks on all registry operations
-- User-friendly error messages
-- Log file tracking
-- Graceful degradation
+Detect and update installed software via `winget upgrade`.
 
-### Data Protection
-- Registry backup before modifications
-- Revert capability for all tweaks
-- No data deletion without confirmation
-- Safe PowerShell script execution
+**Features**: Batch update all, per-package progress (preparing → downloading → verifying → installing → done/error), cancellation support, update history.
+
+**Backend**: `softwareUpdates.js`
 
 ---
 
-## 📊 Performance Metrics
+## 10. Service Optimizer (Pro)
 
-### Optimization Impact
-- **IRQ Priority**: 5-15% CPU latency reduction
-- **GPU Scheduling**: 10-20% GPU latency reduction
-- **Network Opt**: 5-10% network consistency improvement
-- **Fullscreen Mode**: 5-30% FPS improvement (game dependent)
+**Page**: `ServiceOptimizer.tsx` | **Nav**: (accessible via code, not in bottom nav)
 
-### System Requirements
-- **OS**: Windows 10 / Windows 11 (x64)
-- **RAM**: 4GB minimum (8GB recommended)
-- **Disk**: 500MB free space
-- **GPU**: Dedicated GPU recommended for monitoring
+60+ Windows services across 10 categories: Xbox, Telemetry, Remote Access, Media, Hyper-V, Networking, Security, System, Hardware, Misc.
+
+**Modes**: Safe (low-risk only), Balanced (low + medium), Aggressive (all).
+
+**Features**: Risk level indicators, backup/restore per service, reset to Windows defaults, search, custom selection.
+
+**Backend**: `serviceTweaks.js`
 
 ---
 
-## 🐛 Debugging & Troubleshooting
+## 11. Overlay HUD
 
-### Common Issues
+**Window**: `overlay.html` | **Toggle**: `Ctrl+Shift+F`
 
-**1. Admin Privileges Not Granted**
-- Solution: Run Electron app as administrator
-- Check: Settings > Verify Admin Status
+Frameless, always-on-top, click-through gaming overlay.
 
-**2. Registry Modifications Not Taking Effect**
-- Solution: Restart the application or system
-- Check: Registry backup and try manual revert
+**Metrics**: FPS, CPU %, GPU %, CPU temp, GPU temp, RAM %, latency, packet loss, network speed.
 
-**3. Cleanup Operations Fail**
-- Solution: Check disk space and file permissions
-- Try: Individual cleanup items instead of bulk
+**Customization**: Position (4 corners), opacity, accent color (8 presets), font, per-metric sensor toggles.
 
-**4. Performance Stats Show 0%**
-- Solution: Wait 5 seconds for first data collection
-- Check: System Admin permissions
+**Backend**: `overlay.js` — Creates persistent BrowserWindow with transparent, click-through properties.
 
 ---
 
-## 📝 File Structure
+## 12. Settings
 
-```
-src/
-├── pages/
-│   ├── Dashboard.tsx              (System monitoring)
-│   ├── Performance.tsx            (Process manager)
-│   ├── GamingTweaks.tsx          (Registry tweaks UI)
-│   ├── GameProfiles.tsx          (Game profiles UI)
-│   ├── SystemCleanup.tsx         (Cleanup UI)
-│   ├── GameOptimizer.tsx         (Game detection)
-│   ├── Cleaner.tsx               (Alternative cleanup)
-│   └── Settings.tsx              (Configuration)
-├── components/
-│   ├── Sidebar.tsx               (Navigation)
-│   ├── Header.tsx                (Top bar)
-│   └── StatCard.tsx              (Dashboard widgets)
-├── services/
-│   ├── registryTweaks.ts         (Registry modifications)
-│   ├── cleanupUtilities.ts       (Cleanup operations)
-│   └── systemStats.ts            (Monitoring service - future)
-├── styles/
-│   ├── Dashboard.css
-│   ├── Performance.css
-│   ├── GamingTweaks.css
-│   ├── GameProfiles.css
-│   ├── SystemCleanup.css
-│   └── (12+ CSS files total)
-├── App.tsx                        (Main component with routing)
-├── App.css                        (Global styles)
-└── index.tsx                      (Entry point)
+**Page**: `Settings.tsx` | **Access**: Header gear icon
 
-public/
-├── index.html
-└── favicon.ico
+- **Startup**: Auto-cleanup on launch
+- **Appearance**: Light rays color (11 presets), app background gradient (12 presets), font family, font size
+- **Overlay**: FPS HUD position, opacity, color, font, sensor toggles
+- **System**: GPU acceleration, minimize-to-tray, check for updates
+- **About**: Version, changelog
 
-electron/
-└── main.js                        (Electron entry point)
-```
+**Persistence**: localStorage via `settings.ts`
 
 ---
 
-## 🔮 Future Enhancements
+## 13. Auth & Subscription
 
-1. **System Monitoring**
-   - Real CPU/RAM/Disk stats from WMI
-   - Temperature monitoring
-   - Network bandwidth graphs
+**Login** (`LoginPage.tsx`): Discord/Twitch OAuth implicit flow via BrowserWindow partition.
 
-2. **Advanced Features**
-   - GPU overclocking profiles
-   - Process priority management
-   - Network optimization details
-   - Event log viewer
+**Profile**: Stored in Supabase. Roles: Free, Pro, Admin, Owner/Lifetime.
 
-3. **Game Detection**
-   - Auto-detect running games
-   - Apply game profiles automatically
-   - Per-game FPS counter overlay
+**Pro access**: Time-limited or lifetime grants. PayPal checkout integration.
 
-4. **Performance Benchmarking**
-   - Before/after benchmark
-   - FPS counter in games
-   - Frame time analysis
+**Admin Panel** (`AdminPanel.tsx`): User search, role assignment, Pro grants/revocation.
 
-5. **Cloud Sync**
-   - Profile synchronization
-   - Cross-device settings
-   - Cloud backup/restore
-
----
-
-## 📄 License & Credits
-
-PC Optimizer Elite integrates optimizations based on:
-- GSTweaks project (PowerShell/XAML original)
-- League of Legends design inspiration
-- Community gaming optimization techniques
-
-**Built with:**
-- React ecosystem
-- Electron framework
-- Node.js for system integration
-- Windows Registry API
-
----
-
-## 📧 Support & Feedback
-
-For issues or feature requests:
-1. Check existing known issues (see above)
-2. Review registry backup location
-3. Try reverting all tweaks
-4. Check system admin privileges
-5. Verify Windows version compatibility
-
----
-
-**Version:** 1.0.0
-**Last Updated:** 2024
-**Status:** Feature Complete with Full GSTweaks Integration
+**Manage Subscription** (`ManageSubscription.tsx`): Status display, countdown timer, cancel/upgrade options.

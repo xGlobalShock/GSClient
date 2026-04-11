@@ -1,507 +1,198 @@
-# GS Control Center - Complete Project Tree
-
-## 📁 Directory Structure
+# Project Tree — GS Center v2.1.4
 
 ```
-c:\Users\xSGCo\Desktop\Client\
+GC Center/
 │
-├── 📄 CONFIGURATION FILES
-│   ├── package.json ........................ (Dependencies & scripts)
-│   ├── tsconfig.json ....................... (TypeScript config)
-│   ├── tsconfig.node.json .................. (Node config)
-│   ├── tailwind.config.js .................. (Tailwind setup)
-│   ├── postcss.config.js ................... (CSS processing)
-│   └── .gitignore .......................... (Git rules)
+├── package.json                    # Dependencies, scripts, electron-builder config
+├── tsconfig.json                   # TypeScript configuration
+├── tailwind.config.js              # Tailwind CSS configuration
+├── postcss.config.js               # PostCSS configuration
+├── index.html                      # Vite entry (dev only)
+├── README.md                       # Project overview & feature documentation
+├── ToDoList.md                     # Task tracking
 │
-├── 📚 DOCUMENTATION (START HERE!)
-│   ├── START_HERE.md ....................... ⭐ READ FIRST
-│   ├── GETTING_STARTED.md .................. Quick setup guide
-│   ├── FINAL_SUMMARY.md .................... Project completion
-│   └── Docs/
-│       ├── README.md ....................... Overview
-│       ├── DEVELOPMENT.md .................. Dev workflow
-│       ├── ARCHITECTURE.md ................. System design
-│       ├── UI_UX_GUIDE.md .................. Design specs
-│       ├── FILE_MAP.md ..................... File organization
-│       ├── PROJECT_SUMMARY.md .............. Complete listing
-│       └── COMPLETION_REPORT.md ............ Delivery report
+├── electron/                       # ── Electron Main Process Entry ──
+│   ├── main.js                     # Window, tray, IPC registration, auto-updater
+│   ├── admin-check.js              # UAC elevation detection
+│   ├── dev-launcher.js             # Dev mode: React + Electron concurrent start
+│   └── launcher.js                 # Production entry point
 │
-├── 🌐 PUBLIC ASSETS
-│   ├── public/
-│   │   ├── electron.js ..................... Electron main process
-│   │   ├── preload.js ...................... IPC preload script
-│   │   └── index.html ...................... HTML template
+├── main-process/                   # ── IPC Handler Modules (26 files) ──
+│   ├── tweaks.js                   # 17 registry performance tweaks
+│   ├── cleaners.js                 # 30+ cache/file cleaners
+│   ├── hardwareMonitor.js          # GCMonitor.exe sidecar management
+│   ├── hardwareInfo.js             # Static hardware identity collection
+│   ├── healthScore.js              # Weighted health score calculation
+│   ├── advisor.js                  # System insights & upgrade recommendations
+│   ├── overlay.js                  # FPS HUD overlay window
+│   ├── gameProfiles.js             # Game config read/write
+│   ├── appInstaller.js             # Winget app installation
+│   ├── appUninstaller.js           # App removal + leftover cleanup
+│   ├── windowsDebloat.js           # AppX bloatware removal
+│   ├── startup.js                  # Startup item management
+│   ├── serviceTweaks.js            # Windows service optimization
+│   ├── softwareUpdates.js          # Winget software updates
+│   ├── network.js                  # Ping/latency testing
+│   ├── obsPresets.js               # OBS config deployment
+│   ├── spaceAnalyzer.js            # Disk usage analysis
+│   ├── resolutionManager.js        # Display resolution control
+│   ├── auth.js                     # OAuth flow (Discord/Twitch)
+│   ├── authSession.js              # Session/token management
+│   ├── paypal.js                   # PayPal checkout flow
+│   ├── autoUpdater.js              # electron-updater integration
+│   ├── ctTweaks.js                 # Essential tweaks batch runner
+│   ├── ctEssentialTweaks.js        # 30+ essential tweak definitions
+│   ├── repairOverlay.js            # Floating repair progress window
+│   ├── windowManager.js            # Window lifecycle management
+│   └── utils.js                    # execAsync, runPSScript helpers
+│
+├── native-monitor/                 # ── C# Hardware Monitor Sidecar ──
+│   ├── Program.cs                  # Entry point
+│   ├── HardwareInfoCollector.cs    # LibreHardwareMonitor data collector
+│   ├── GCMonitor.csproj            # .NET 8 project
+│   ├── bin/                        # Build output
+│   ├── obj/                        # Build intermediates
+│   └── publish/                    # Published sidecar executable
+│
+├── lib/                            # ── Native Helpers ──
+│   └── ResolutionHelper.cs         # Win32 display resolution API wrapper
+│
+├── src/                            # ── React Frontend ──
+│   ├── App.tsx                     # Root component, routing, state management
+│   ├── index.tsx                   # React DOM entry
+│   ├── index.css                   # Global CSS + Tailwind imports
+│   ├── custom.d.ts                 # TypeScript declarations
+│   ├── react-app-env.d.ts         # CRA environment types
 │   │
-│   └── build/ (generated after build)
-│       └── [React production build]
-│
-├── 🧩 SOURCE CODE - src/
+│   ├── pages/                      # ── 19 Page Components ──
+│   │   ├── LiveMetrics.tsx         # Dashboard with real-time hardware charts
+│   │   ├── Performance.tsx         # 17 gaming tweaks in 7 categories
+│   │   ├── GameLibrary.tsx         # Game profiles & hardware comparison
+│   │   ├── OBSPresets.tsx          # OBS preset deployment & launch
+│   │   ├── ResolutionManager.tsx   # Monitor resolution management
+│   │   ├── Network.tsx             # Regional ping tests + speed tests
+│   │   ├── AppsPage.tsx            # Tab container (Install/Uninstall/Debloat/Startup/Space)
+│   │   ├── AppInstaller.tsx        # 40+ winget app installer
+│   │   ├── AppUninstaller.tsx      # App uninstaller + leftover cleanup
+│   │   ├── WindowsDebloat.tsx      # 100+ bloatware removal (Pro)
+│   │   ├── Startup.tsx             # Startup item management
+│   │   ├── SpaceAnalyzer.tsx       # Disk usage analyzer (Pro)
+│   │   ├── SoftwareUpdates.tsx     # Software update manager (Pro)
+│   │   ├── Cleaner.tsx             # 30+ cleaners + essential tweaks + repair
+│   │   ├── ServiceOptimizer.tsx    # 60+ service optimizer (Pro)
+│   │   ├── Settings.tsx            # App settings & overlay config
+│   │   ├── AdminPanel.tsx          # User management (Owner/Admin)
+│   │   ├── ManageSubscription.tsx  # Pro subscription management
+│   │   └── LoginPage.tsx           # Discord/Twitch OAuth login
 │   │
-│   ├── 🏗️ CORE APPLICATION
-│   │   ├── App.tsx ......................... Main component (50 lines)
-│   │   ├── App.jsx ......................... React entry (10 lines)
-│   │   ├── App.css ......................... App styles (20 lines)
-│   │   ├── index.tsx ....................... React DOM render (10 lines)
-│   │   └── index.css ....................... Global styles (80 lines)
+│   ├── components/                 # ── 21 UI Components ──
+│   │   ├── Header.tsx              # Top bar with profile, What's New, version
+│   │   ├── Sidebar.tsx             # Bottom nav bar (9 items)
+│   │   ├── ToastContainer.tsx      # Toast notification display
+│   │   ├── DashboardHero.tsx       # Dashboard metric cards + charts
+│   │   ├── HealthScore.tsx         # Health score with 7 factors
+│   │   ├── AdvisorPanel.tsx        # System insights panel
+│   │   ├── PageHeader.tsx          # Page title + stats + badges
+│   │   ├── PerformanceTweakCard.tsx # Tweak card with apply/reset
+│   │   ├── CleanerCard.tsx         # Cleaner card with action button
+│   │   ├── SystemRepairPanel.tsx   # SFC/DISM/ChkDsk tools
+│   │   ├── TweakExecutionModal.tsx # Essential tweaks progress modal
+│   │   ├── CacheCleanupToast.tsx   # Batch cleanup overlay
+│   │   ├── AutoCleanupRunner.tsx   # Startup auto-cleanup
+│   │   ├── LightRays.tsx           # WebGL light ray animation
+│   │   ├── Loader.tsx              # Skeleton loading state
+│   │   ├── PaywallModal.tsx        # PRO upgrade modal + ProGuard HOC
+│   │   ├── UpgradeModal.tsx        # Simplified upgrade prompt
+│   │   ├── ProPreviewBanner.tsx    # PRO feature info banner
+│   │   ├── ProLockedWrapper.tsx    # PRO content disabled wrapper
+│   │   ├── ProLineBadge.tsx        # Inline upgrade button
+│   │   └── ProfileDropdown.tsx     # User menu dropdown
 │   │
-│   ├── 🧩 COMPONENTS (src/components/)
-│   │   ├── Sidebar.tsx ..................... Navigation sidebar (60 lines)
-│   │   ├── Header.tsx ...................... Top header bar (30 lines)
-│   │   └── StatCard.tsx .................... Stat display card (50 lines)
+│   ├── contexts/                   # ── Global State ──
+│   │   ├── AuthContext.tsx         # Auth, profile, Pro/Admin state
+│   │   └── ToastContext.tsx        # Toast notification queue
 │   │
-│   ├── 📄 PAGES (src/pages/)
-│   │   ├── Dashboard.tsx ................... Dashboard (60 lines)
-│   │   ├── Performance.tsx ................. Charts & analytics (80 lines)
-│   │   ├── Cleaner.tsx ..................... System cleaner (80 lines)
-│   │   ├── GameOptimizer.tsx ............... Game optimizer (85 lines)
-│   │   └── Settings.tsx .................... Settings panel (100 lines)
+│   ├── hooks/                      # ── Custom Hooks ──
+│   │   └── useRealtimeHardware.ts  # Real-time hardware metric subscription
 │   │
-│   ├── 🎨 STYLES (src/styles/)
-│   │   ├── Sidebar.css ..................... Sidebar styling (150 lines)
-│   │   ├── Header.css ...................... Header styling (100 lines)
-│   │   ├── StatCard.css .................... Card styling (100 lines)
-│   │   ├── Dashboard.css ................... Dashboard layout (100 lines)
-│   │   ├── Performance.css ................. Charts styling (80 lines)
-│   │   ├── Cleaner.css ..................... Cleaner styling (120 lines)
-│   │   ├── GameOptimizer.css ............... Games styling (140 lines)
-│   │   ├── Settings.css .................... Settings styling (130 lines)
-│   │   └── Notifications.css ............... Notifications styling (60 lines)
+│   ├── data/                       # ── Static Data ──
+│   │   ├── performanceTweaks.ts    # 17 tweak definitions
+│   │   ├── cleanerUtilities.ts     # 30 cleaner definitions
+│   │   ├── gameRequirements.ts     # 8 game hardware specs
+│   │   ├── appCatalog.ts           # 40+ app catalog (winget IDs)
+│   │   ├── obsPresets.ts           # OBS preset metadata
+│   │   ├── obsPresetConfigs/       # OBS config files
+│   │   ├── changelog.ts            # Version changelog
+│   │   └── devUpdates.ts           # Dev update notes
 │   │
-│   ├── 🔌 SERVICES (src/services/)
-│   │   └── systemMonitoring.ts ............ System integration (100 lines)
-│   │       ├── getCPUUsage()
-│   │       ├── getRAMUsage()
-│   │       ├── getDiskUsage()
-│   │       ├── getSystemTemperature()
-│   │       ├── getRunningProcesses()
-│   │       └── setupSystemMonitoring()
+│   ├── services/                   # ── Service Layer ──
+│   │   └── obsPresetsService.ts    # OBS apply/launch via IPC
 │   │
-│   ├── 🛠️ UTILITIES (src/utils/)
-│   │   ├── optimization.ts ................ Optimization logic (80 lines)
-│   │   │   ├── gameProfiles
-│   │   │   ├── OptimizationProfile interface
-│   │   │   ├── calculateCleanupSize()
-│   │   │   └── formatBytes()
-│   │   │
-│   │   └── settings.ts .................... Settings management (120 lines)
-│   │       ├── loadSettings()
-│   │       ├── saveSettings()
-│   │       ├── loadProfiles()
-│   │       ├── saveProfile()
-│   │       └── shouldRunCleanup()
+│   ├── utils/                      # ── Utilities ──
+│   │   ├── settings.ts             # localStorage settings persistence
+│   │   └── hardwareCompare.ts      # Hardware benchmark + FPS prediction
 │   │
-│   └── 📋 CONTEXT (src/context/)
-│       └── NotificationContext.tsx ......... Global notifications (75 lines)
-│           ├── addNotification()
-│           ├── removeNotification()
-│           └── NotificationContainer
+│   ├── lib/                        # ── Library Config ──
+│   │   └── supabase.ts             # Supabase client + Pro page IDs
+│   │
+│   ├── styles/                     # ── 37 CSS Files ──
+│   │   ├── Dashboard.css, DashboardHero.css, HealthScore.css
+│   │   ├── Performance.css, PerformanceTweakCard.css
+│   │   ├── Cleaner.css, CleanerCard.css, CacheCleanupToast.css
+│   │   ├── GameLibrary.css, Network.css, OBSPresets.css
+│   │   ├── AppInstaller.css, AppsPage.css, AppUninstaller.css
+│   │   ├── WindowsDebloat.css, Startup.css, SpaceAnalyzer.css
+│   │   ├── ServiceOptimizer.css, SoftwareUpdates.css
+│   │   ├── ResolutionManager.css, Settings.css
+│   │   ├── AdminPanel.css, ManageSubscription.css
+│   │   ├── Sidebar.css, Header.css, PageHeader.css
+│   │   ├── LoginPage.css, Auth.css, LightRays.css
+│   │   ├── Loader.css, Toast.css, SystemRepairPanel.css
+│   │   ├── AdvisorPanel.css, DevUpdates.css, WhatsNew.css
+│   │   └── ProLineBadge.css, ProLock.css
+│   │
+│   └── assets/                     # Static images & icons
 │
-├── 📦 BUILD OUTPUT (generated)
-│   ├── dist/ ............................ Build artifacts
-│   ├── build/ ........................... React production build
-│   ├── release/ ......................... Electron installer
-│   └── node_modules/ .................... Dependencies (auto-generated)
+├── public/                         # ── Electron HTML Shells ──
+│   ├── index.html                  # Main app shell
+│   ├── preload.js                  # Main window IPC bridge
+│   ├── overlay.html                # FPS HUD overlay
+│   ├── overlay-preload.js          # Overlay IPC bridge
+│   ├── splash.html                 # App splash screen
+│   ├── splash-preload.js           # Splash IPC bridge
+│   ├── repair-overlay.html         # Floating repair progress
+│   ├── repair-overlay-preload.js   # Repair overlay IPC bridge
+│   ├── installer.nsh               # NSIS installer customization
+│   ├── app.manifest                # Windows app manifest
+│   ├── app-icons/                  # Application icons
+│   ├── drivers/                    # Bundled drivers
+│   └── native-monitor/             # Bundled GCMonitor.exe
 │
-└── 📊 PROJECT METADATA
-    ├── .git/ ............................ Version control
-    └── package-lock.json ................ Dependency lock
-```
-
----
-
-## 📊 FILE COUNT BY CATEGORY
-
-| Category | Count | Purpose |
-|----------|-------|---------|
-| Configuration | 6 | Setup & build |
-| Documentation | 9 | Guides & reference |
-| Components | 3 | Reusable UI |
-| Pages | 5 | Feature screens |
-| Styles | 12 | CSS styling |
-| Services | 1 | System integration |
-| Utilities | 2 | Helper functions |
-| Context | 1 | Global state |
-| Public Assets | 3 | Static files |
-| **TOTAL** | **42+** | **Production code** |
-
----
-
-## 🔄 DATA FLOW DIAGRAM
-
-```
-User Interface (React Components)
-    │
-    ├─ Sidebar.tsx (Navigation)
-    │   └─> Updates currentPage state
-    │
-    ├─ Dashboard.tsx (Page)
-    │   ├─> Calls systemMonitoring service
-    │   ├─> Displays StatCard components
-    │   └─> Triggers notifications
-    │
-    ├─ Performance.tsx (Page)
-    │   ├─> Displays Recharts
-    │   └─> Shows analytics
-    │
-    ├─ Cleaner.tsx (Page)
-    │   ├─> Lists cleanup items
-    │   └─> Saves state to localStorage
-    │
-    ├─ GameOptimizer.tsx (Page)
-    │   ├─> Uses optimization.ts logic
-    │   └─> Shows game profiles
-    │
-    └─ Settings.tsx (Page)
-        ├─> Uses settings.ts utilities
-        ├─> Saves to localStorage
-        └─> Triggers notifications
-            │
-            └─> NotificationContext (Global)
-                └─> Shows toast notifications
-                    
-Services Layer:
-    ├─ systemMonitoring.ts
-    │   └─> Windows WMI calls
-    │
-    └─ Utils:
-        ├─ optimization.ts (Game/cleanup logic)
-        └─ settings.ts (Data persistence)
-
-Data Storage:
-    └─ localStorage
-        ├─ pc-controlcenter-settings
-        └─ pc-controlcenter-profiles
-```
-
----
-
-## 🎯 COMPONENT HIERARCHY
-
-```
-<App>
-├─ <Sidebar>
-│  ├─ Logo
-│  ├─ Nav Items (5)
-│  └─ Status Indicator
+├── build/                          # ── Production Build Output ──
+│   └── static/                     # Compiled JS/CSS/media
 │
-├─ <Header>
-│  ├─ Title & Subtitle
-│  └─ Buttons (Notification, Profile)
+├── scripts/                        # ── Build & Utility Scripts ──
+│   ├── enum_resolutions.ps1        # PowerShell resolution enumeration
+│   ├── rename-output.js            # Build rename utility
+│   ├── WPFTweaksRevertStartMenu.ps1 # Start menu revert
+│   └── vivetool/                   # Windows feature flag tool
 │
-└─ Main Content Area
-   └─ Dynamic Page:
-      │
-      ├─ <Dashboard>
-      │  ├─ <StatCard> (CPU)
-      │  ├─ <StatCard> (RAM)
-      │  ├─ <StatCard> (Disk)
-      │  ├─ <StatCard> (Temperature)
-      │  ├─ Action Buttons
-      │  └─ Info Panel
-      │
-      ├─ <Performance>
-      │  ├─ <LineChart> (Recharts)
-      │  └─ Stats Grid
-      │
-      ├─ <Cleaner>
-      │  ├─ Summary Card
-      │  ├─ Cleaner Items (List)
-      │  └─ Clean Button
-      │
-      ├─ <GameOptimizer>
-      │  ├─ Game Cards (4)
-      │  └─ Tips Panel
-      │
-      └─ <Settings>
-         ├─ General Toggles
-         ├─ Appearance Options
-         └─ About Section
-
-Global Components:
-└─ <NotificationContainer>
-   └─ <Notification> x N (Animated)
-```
-
----
-
-## 🎨 STYLING ARCHITECTURE
-
-```
-Global Styles (index.css)
-    ├─ CSS Variables
-    │  ├─ Colors (Primary, Secondary, Accent, etc.)
-    │  ├─ Typography (Font sizes, weights)
-    │  └─ Spacing (Gaps, padding)
-    │
-    ├─ Reset Styles
-    │  ├─ Box sizing
-    │  ├─ Margins/Padding
-    │  └─ Defaults
-    │
-    ├─ Animation Keyframes
-    │  ├─ @keyframes float
-    │  ├─ @keyframes pulse
-    │  ├─ @keyframes pulse-glow
-    │  └─ @keyframes gradient-shift
-    │
-    └─ Utility Classes
-       ├─ .app-container
-       ├─ .main-content
-       ├─ .page-content
-       └─ .loading-screen
-
-Component Styles (*.css):
-├─ Sidebar.css (150 lines)
-│  ├─ Navigation layout
-│  ├─ Icon styling
-│  ├─ Hover/Active states
-│  └─ Animations
+├── supabase/                       # ── Database ──
+│   ├── schema.sql                  # Tables: users, profiles, subscriptions
+│   └── functions/                  # Database functions
 │
-├─ Header.css (100 lines)
-├─ StatCard.css (100 lines)
-├─ Dashboard.css (100 lines)
-├─ Performance.css (80 lines)
-├─ Cleaner.css (120 lines)
-├─ GameOptimizer.css (140 lines)
-├─ Settings.css (130 lines)
-└─ Notifications.css (60 lines)
-```
-
----
-
-## 💾 STATE MANAGEMENT
-
-```
-App Component State:
-├─ currentPage: string
-│  └─ Determines which page to render
+├── V-Config/                       # ── Game Config Templates ──
+│   └── apex-legends/               # Apex Legends configs
 │
-└─ systemStats: {
-   ├─ cpu: number (0-100)
-   ├─ ram: number (0-100)
-   ├─ disk: number (0-100)
-   └─ temperature: number (°C)
-   }
-
-Component State:
-├─ Sidebar
-│  └─ None (props-driven)
-│
-├─ Header
-│  └─ None (stateless)
-│
-├─ Settings
-│  └─ settings: AppSettings {
-│     ├─ autoClean: boolean
-│     ├─ notifications: boolean
-│     ├─ autoOptimize: boolean
-│     ├─ theme: 'dark' | 'light'
-│     └─ startupLaunch: boolean
-│     }
-│
-├─ Cleaner
-│  ├─ items: CleanerItem[]
-│  └─ isCleaning: boolean
-│
-└─ GameOptimizer
-   └─ games: GameCard[]
-
-Global Context State (NotificationContext):
-└─ notifications: Notification[]
-   └─ {
-      ├─ id: string
-      ├─ title: string
-      ├─ message: string
-      ├─ type: 'success' | 'warning' | 'error' | 'info'
-      └─ duration?: number
-      }
-
-LocalStorage:
-├─ pc-controlcenter-settings (AppSettings JSON)
-└─ pc-controlcenter-profiles (OptimizationProfile[] JSON)
+└── Docs/                           # ── Documentation ──
+    ├── ARCHITECTURE.md
+    ├── FILE_MAP.md
+    ├── PROJECT_TREE.md
+    ├── QUICK_START.md
+    ├── DEVELOPMENT.md
+    ├── FEATURE_DOCUMENTATION.md
+    ├── NPM_COMMANDS.md
+    ├── UI_UX_GUIDE.md
+    ├── PC_Tweaks.md
+    └── ... (additional docs)
 ```
-
----
-
-## 🚀 BUILD PIPELINE
-
-```
-Development:
-src/ (TypeScript/JSX)
-  ↓
-React Scripts Dev Server (Hot Reload)
-  ↓
-http://localhost:3000
-  ↓
-Electron loads React app
-  ↓
-DevTools available (F12)
-
-Production:
-src/ (TypeScript/JSX)
-  ↓
-React Scripts Build (Minification)
-  ↓
-build/ folder (Optimized)
-  ↓
-Electron Builder
-  ↓
-release/ folder
-  ↓
-GS Control Center Setup.exe (Installer)
-```
-
----
-
-## 📋 KEY FILE RELATIONSHIPS
-
-```
-App.tsx
-├─ Imports: Sidebar, Header, all pages
-├─ Imports: styles/App.css
-├─ Imports: utilities, services
-└─ Manages: currentPage, systemStats
-
-Sidebar.tsx
-├─ Imports: lucide-react icons
-├─ Imports: styles/Sidebar.css
-└─ Called by: App.tsx
-
-Header.tsx
-├─ Imports: lucide-react icons
-├─ Imports: styles/Header.css
-└─ Called by: App.tsx
-
-Dashboard.tsx
-├─ Imports: StatCard component
-├─ Imports: styles/Dashboard.css
-├─ Imports: systemStats from props
-└─ Called by: App.tsx (renderPage)
-
-StatCard.tsx
-├─ Imports: framer-motion
-├─ Imports: styles/StatCard.css
-└─ Used by: Dashboard.tsx
-
-Performance.tsx
-├─ Imports: recharts
-├─ Imports: styles/Performance.css
-└─ Called by: App.tsx (renderPage)
-
-Cleaner.tsx
-├─ Imports: framer-motion
-├─ Imports: styles/Cleaner.css
-└─ Called by: App.tsx (renderPage)
-
-GameOptimizer.tsx
-├─ Imports: framer-motion
-├─ Imports: styles/GameOptimizer.css
-├─ Imports: optimization.ts utils
-└─ Called by: App.tsx (renderPage)
-
-Settings.tsx
-├─ Imports: framer-motion
-├─ Imports: styles/Settings.css
-├─ Imports: settings.ts utils
-└─ Called by: App.tsx (renderPage)
-
-NotificationContext.tsx
-├─ Imports: framer-motion
-├─ Imports: styles/Notifications.css
-└─ Wraps: App component (context provider)
-
-systemMonitoring.ts
-├─ Imported by: Services in production
-├─ Called from: App.tsx (in effect)
-└─ Uses: Child process, exec command
-
-optimization.ts
-├─ Imported by: GameOptimizer.tsx
-├─ Imported by: Cleaner.tsx
-├─ Defines: gameProfiles, utilities
-└─ Used for: Game optimization logic
-
-settings.ts
-├─ Imported by: Settings.tsx
-├─ Imported by: All pages (optional)
-├─ Defines: storage operations
-└─ Used for: Persistence & scheduling
-```
-
----
-
-## ✅ COMPLETE FILE MANIFEST
-
-### Configuration (6 files)
-```
-✓ package.json
-✓ tsconfig.json
-✓ tsconfig.node.json
-✓ tailwind.config.js
-✓ postcss.config.js
-✓ .gitignore
-```
-
-### Documentation (9 files)
-```
-✓ START_HERE.md
-✓ GETTING_STARTED.md
-✓ FINAL_SUMMARY.md
-✓ Docs/README.md
-✓ Docs/DEVELOPMENT.md
-✓ Docs/ARCHITECTURE.md
-✓ Docs/UI_UX_GUIDE.md
-✓ Docs/FILE_MAP.md
-✓ Docs/PROJECT_SUMMARY.md
-✓ Docs/COMPLETION_REPORT.md
-```
-
-### Source Code (17 files)
-```
-React Components (13):
-✓ src/App.tsx
-✓ src/App.jsx
-✓ src/index.tsx
-✓ src/components/Sidebar.tsx
-✓ src/components/Header.tsx
-✓ src/components/StatCard.tsx
-✓ src/pages/Dashboard.tsx
-✓ src/pages/Performance.tsx
-✓ src/pages/Cleaner.tsx
-✓ src/pages/GameOptimizer.tsx
-✓ src/pages/Settings.tsx
-✓ src/context/NotificationContext.tsx
-
-Services (3):
-✓ src/services/systemMonitoring.ts
-✓ src/utils/optimization.ts
-✓ src/utils/settings.ts
-```
-
-### Styles (13 files)
-```
-✓ src/index.css
-✓ src/App.css
-✓ src/styles/Sidebar.css
-✓ src/styles/Header.css
-✓ src/styles/StatCard.css
-✓ src/styles/Dashboard.css
-✓ src/styles/Performance.css
-✓ src/styles/Cleaner.css
-✓ src/styles/GameOptimizer.css
-✓ src/styles/Settings.css
-✓ src/styles/Notifications.css
-```
-
-### Public Assets (3 files)
-```
-✓ public/electron.js
-✓ public/preload.js
-✓ public/index.html
-```
-
-### Total: 42+ Production Files + Generated Build Files
-
----
-
-**This tree represents a fully structured, production-ready application ready for development and deployment!**

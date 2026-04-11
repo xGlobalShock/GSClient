@@ -1,186 +1,110 @@
-# GS Control Center - Quick Start Guide
+# Development Guide — GS Center v2.1.4
 
-## Project Complete! ✨
+## Prerequisites
 
-All 5 phases have been successfully implemented:
+- **Node.js** 18+ (LTS recommended)
+- **npm** 9+
+- **.NET 8.0 SDK** (for building GCMonitor sidecar)
+- **Windows 10/11 x64** (target platform)
+- **Administrator privileges** (for registry tweaks, service management)
+- **winget** (Windows Package Manager — comes with App Installer from Microsoft Store)
 
-### ✅ Phase 1: Setup & Foundation
-- Electron + React + TypeScript configuration
-- package.json with all dependencies
-- TypeScript configuration (tsconfig.json)
-- Basic project structure
-
-### ✅ Phase 2: UI/UX Design
-- **Sidebar Navigation**: Icon-based menu with hover effects
-- **Header**: Branding and notifications
-- **LoL-Inspired Styling**:
-  - Dark theme (#0a0e27 background)
-  - Gold accent (#c89b3c) - Primary
-  - Cyan accent (#00d4ff) - Secondary  
-  - Red accent (#ff4444) - Alert
-  - Glassmorphism effects
-  - Glowing borders and smooth animations
-
-### ✅ Phase 3: System Monitoring
-- CPU usage detection via WMI
-- RAM consumption tracking
-- Disk space monitoring
-- System temperature reading
-- Running process detection
-- IPC handlers for real-time data
-
-### ✅ Phase 4: Core Features
-- **Dashboard**: Real-time stats with progress indicators
-- **Performance Monitor**: Historical charts (Recharts integration)
-- **System Cleaner**: Junk file detection and removal UI
-- **Game Optimizer**: Game detection and optimization profiles
-- **Settings**: Configuration management with toggles
-
-### ✅ Phase 5: Polish
-- Notification system with animations
-- Settings persistence (localStorage)
-- Auto-cleanup scheduling
-- Optimization profiles storage
-- Framer Motion animations throughout
-- Status indicators and visual feedback
-
-## Installation & Running
+## Setup
 
 ```bash
-# 1. Install dependencies
+# Clone and install
+git clone <repo-url>
+cd "GC Center"
 npm install
 
-# 2. Start development mode (Electron + React dev server)
+# Build the native hardware monitor (first time)
+npm run build:monitor
+
+# Start development
 npm run dev
-
-# 3. Build for production
-npm run build
 ```
 
-## Project Structure
+## NPM Scripts
+
+| Script | Command | Purpose |
+|--------|---------|---------|
+| `dev` | `npm run dev` | Start Electron + React dev server with hot reload |
+| `client` | `npm run client` | Recommended desktop launch (via dev-launcher) |
+| `react-start` | `npm run react-start` | React dev server only (port 3000) |
+| `react-build` | `npm run react-build` | Production React build → `build/` |
+| `electron-only` | `npm run electron-only` | Electron only (expects pre-built React in `build/`) |
+| `electron-build` | `npm run electron-build` | Package Windows installer via electron-builder |
+| `build:monitor` | `npm run build:monitor` | Build GCMonitor.exe sidecar → `native-monitor/publish/` |
+| `react-test` | `npm run react-test` | Run Jest tests |
+
+## Development Workflow
+
+1. `npm run dev` — Opens Electron window pointing to `localhost:3000`
+2. Edit React code in `src/` — Hot reload updates the UI instantly
+3. Edit main process code in `main-process/` — Restart Electron (`Ctrl+C`, re-run)
+4. Edit C# sidecar in `native-monitor/` — Run `npm run build:monitor`, restart Electron
+
+## Project Architecture
 
 ```
-Client/
-├── public/
-│   ├── electron.js          # Main Electron process
-│   ├── preload.js           # Preload script for IPC
-│   └── index.html           # HTML template
-├── src/
-│   ├── components/
-│   │   ├── Sidebar.tsx      # Navigation sidebar
-│   │   ├── Header.tsx       # Top header bar
-│   │   └── StatCard.tsx     # Stat display component
-│   ├── pages/
-│   │   ├── Dashboard.tsx    # Main dashboard
-│   │   ├── Performance.tsx  # Performance charts
-│   │   ├── Cleaner.tsx      # System cleaner
-│   │   ├── GameOptimizer.tsx# Game profiles
-│   │   └── Settings.tsx     # Settings panel
-│   ├── context/
-│   │   └── NotificationContext.tsx  # Notification system
-│   ├── services/
-│   │   └── systemMonitoring.ts     # System integration
-│   ├── utils/
-│   │   ├── optimization.ts  # Optimization logic
-│   │   └── settings.ts      # Settings management
-│   ├── styles/              # Component-specific CSS
-│   ├── App.tsx              # Main app component
-│   └── index.tsx            # React entry point
-├── package.json
-├── tsconfig.json
-├── tailwind.config.js
-├── postcss.config.js
-└── README.md
+Renderer (src/)          ←→  IPC Bridge (preload.js)  ←→  Main Process (main-process/)
+React 18 + TypeScript         contextBridge                26 handler modules
+19 pages, 21 components       ipcRenderer.invoke           Registry, PowerShell, winget
+2 contexts, 1 hook            ipcRenderer.on               GCMonitor.exe sidecar
 ```
 
-## Color Scheme
+See [ARCHITECTURE.md](ARCHITECTURE.md) for full system design.
 
-```css
-Primary Gold:      #c89b3c
-Secondary Cyan:    #00d4ff
-Accent Red:        #ff4444
-Good (Green):      #00ff88
-Warning (Orange):  #ffaa00
-Critical (Red):    #ff4444
-Dark BG:           #0a0e27
-Card BG:           rgba(15, 20, 45, 0.6)
+## Adding a New Feature
+
+### New Page
+1. Create `src/pages/MyFeature.tsx`
+2. Create `src/styles/MyFeature.css`
+3. Import in `src/App.tsx` and add to the page router switch
+4. Add nav item in `src/components/Sidebar.tsx` (if visible in nav)
+
+### New IPC Handler
+1. Create `main-process/myFeature.js`
+2. Export a `register(ipcMain)` function with `ipcMain.handle()` calls
+3. Import and call `register()` in `electron/main.js`
+4. Call from renderer via `window.electronAPI.invoke('myfeature:action', args)`
+
+### New Data File
+1. Create `src/data/myData.ts` with typed exports
+2. Import in the page/component that needs it
+
+## Code Conventions
+
+- **React**: Functional components with hooks, TypeScript interfaces for all props
+- **Styling**: Tailwind CSS utility classes + component-specific CSS files
+- **IPC naming**: `module:action` (e.g., `tweak:apply-irqPriority`, `cleaner:clear-temp`)
+- **State**: AuthContext for global auth, ToastContext for notifications, local useState for page state
+- **Animations**: Framer Motion for transitions, OGL for WebGL effects
+- **Icons**: Lucide React throughout
+
+## Building for Distribution
+
+```bash
+# 1. Build React production bundle
+npm run react-build
+
+# 2. Package as Windows installer
+npm run electron-build
 ```
 
-## Key Features Implemented
+Output: `dist/GS-Center-Setup-x.x.x.exe` (NSIS installer)
 
-### Navigation
-- 5-item sidebar (Dashboard, Performance, Cleaner, Game Optimizer, Settings)
-- Active state highlighting with gold border glow
-- Hover tooltips with labels
-- Status indicator (Online/Offline)
+## Environment
 
-### Dashboard
-- 4 Real-time stat cards (CPU, RAM, Disk, Temperature)
-- Animated progress bars with status colors
-- Action buttons (Boost Performance, Advanced Settings)
-- System health status panel
+- React dev server: `http://localhost:3000`
+- PayPal callback server: `http://localhost:48245`
+- OAuth redirect: `http://localhost:3000/auth/callback`
+- Supabase: Configured in `src/lib/supabase.ts`
 
-### Performance Monitor
-- Historical data chart (CPU, RAM, Disk usage)
-- Average statistics display
-- Real-time updates
-- Interactive chart controls
+## Debugging
 
-### System Cleaner
-- Junk file categories (Temp, Cache, Recycle, Logs)
-- Selectable cleanup items
-- Total cleanup size calculation
-- Animated cleaning progress
-
-### Game Optimizer
-- Game detection (LoL, Valorant, Elden Ring, Cyberpunk)
-- Optimization status badges
-- FPS estimates
-- Optimization tips panel
-
-### Settings
-- Toggle switches (Auto Clean, Notifications, Auto Optimize, Startup)
-- Theme selection
-- About information
-- Settings persistence
-
-## Animations & Effects
-
-✨ **Implemented**:
-- Smooth page transitions (Framer Motion)
-- Card hover effects with elevation
-- Progress bar animations
-- Status indicator pulse glow
-- Button scale feedback
-- Notification slide-in/out
-- Floating logo animation
-- Badge pulse effect
-
-## Next Steps to Enhance
-
-1. **Real System Integration**: Replace mock data with actual WMI commands
-2. **Database**: Add SQLite for historical data storage
-3. **Auto-Updates**: Implement electron-updater
-4. **Tray Integration**: Add system tray icon and quick access
-5. **Advanced Profiles**: User-created optimization profiles
-6. **Cloud Sync**: Sync settings across devices
-7. **Mac/Linux Support**: Cross-platform compatibility
-
-## System Requirements
-
-- Node.js 16+
-- npm 7+
-- Windows 10+ (primary support)
-- 2GB RAM minimum
-
-## Support
-
-For issues or questions about the project structure, refer to:
-- [Electron Documentation](https://www.electronjs.org/docs)
-- [React TypeScript](https://react-typescript-cheatsheet.netlify.app/)
-- [Framer Motion](https://www.framer.com/motion/)
-- [Tailwind CSS](https://tailwindcss.com/docs)
-
----
-
-**GS Control Center v1.0.0** - Advanced System Optimization Tool with LoL-Inspired UI
+- **Renderer**: DevTools (Ctrl+Shift+I in Electron window)
+- **Main process**: `console.log` in main-process files → appears in terminal
+- **Sidecar**: GCMonitor.exe stdout → parsed in hardwareMonitor.js
+- **Registry tweaks**: Run PowerShell commands manually to test
+- **IPC issues**: Check preload.js exposes the channel, main-process registers the handler

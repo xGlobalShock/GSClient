@@ -1,364 +1,193 @@
-# GS Control Center - Complete File Map
+# File Map — GS Center v2.1.4
 
-```
-c:\Users\xSGCo\Desktop\Client\
-│
-├─ 📄 CONFIGURATION FILES
-│  ├─ package.json                 (Dependencies, scripts, build config)
-│  ├─ tsconfig.json                (TypeScript configuration)
-│  ├─ tsconfig.node.json          (Node TypeScript config)
-│  ├─ tailwind.config.js           (Tailwind CSS setup)
-│  ├─ postcss.config.js            (PostCSS plugins)
-│  └─ .gitignore                   (Git ignore rules)
-│
-├─ 📚 DOCUMENTATION
-│  ├─ README.md                    (Project overview)
-│  ├─ DEVELOPMENT.md               (Development guide)
-│  ├─ PROJECT_SUMMARY.md           (Complete file manifest)
-│  ├─ ARCHITECTURE.md              (System architecture)
-│  ├─ UI_UX_GUIDE.md              (Design specifications)
-│  └─ COMPLETION_REPORT.md         (Project completion report)
-│
-├─ 📁 public/
-│  ├─ electron.js                  (Electron main process)
-│  ├─ preload.js                   (IPC preload script)
-│  └─ index.html                   (HTML template)
-│
-├─ 📁 src/
-│  │
-│  ├─ 🏗️ APPLICATION CORE
-│  │  ├─ App.tsx                   (Main app component)
-│  │  ├─ App.jsx                   (React entry alternative)
-│  │  └─ index.tsx                 (React DOM render)
-│  │
-│  ├─ 🧩 COMPONENTS
-│  │  ├─ components/
-│  │  │  ├─ Sidebar.tsx            (Navigation sidebar)
-│  │  │  ├─ Header.tsx             (Top header bar)
-│  │  │  └─ StatCard.tsx           (Reusable stat card)
-│  │  │
-│  │  └─ pages/
-│  │     ├─ Dashboard.tsx          (Main dashboard page)
-│  │     ├─ Performance.tsx        (Performance monitoring page)
-│  │     ├─ Cleaner.tsx            (System cleaner page)
-│  │     ├─ GameOptimizer.tsx      (Game optimizer page)
-│  │     └─ Settings.tsx           (Settings page)
-│  │
-│  ├─ 🎨 STYLES
-│  │  ├─ index.css                 (Global styles & CSS vars)
-│  │  ├─ App.css                   (App container)
-│  │  └─ styles/
-│  │     ├─ Sidebar.css            (Sidebar styling)
-│  │     ├─ Header.css             (Header styling)
-│  │     ├─ StatCard.css           (Stat card styling)
-│  │     ├─ Dashboard.css          (Dashboard layout)
-│  │     ├─ Performance.css        (Charts & analytics)
-│  │     ├─ Cleaner.css            (File list styling)
-│  │     ├─ GameOptimizer.css      (Game cards)
-│  │     ├─ Settings.css           (Form elements)
-│  │     └─ Notifications.css      (Toast notifications)
-│  │
-│  ├─ 🔌 SERVICES
-│  │  └─ services/
-│  │     └─ systemMonitoring.ts    (System monitoring service)
-│  │
-│  ├─ 🛠️ UTILITIES
-│  │  └─ utils/
-│  │     ├─ optimization.ts        (Optimization logic)
-│  │     └─ settings.ts            (Settings management)
-│  │
-│  └─ 📋 CONTEXT
-│     └─ context/
-│        └─ NotificationContext.tsx (Global notification system)
-│
-└─ 📊 PROJECT METADATA
-   ├─ .git/                        (Git repository)
-   ├─ node_modules/                (Dependencies - generated)
-   └─ dist/                        (Build output - generated)
-```
+## Project Statistics
+
+- **Total files**: ~150+
+- **React pages**: 19
+- **React components**: 21
+- **CSS stylesheets**: 37
+- **Main process modules**: 26
+- **Data files**: 8
+- **Contexts**: 2
+- **Custom hooks**: 1
 
 ---
 
-## 📋 File Categories & Purposes
+## Electron Layer
 
-### 🔵 Configuration Files (6)
-| File | Purpose | Lines |
-|------|---------|-------|
-| package.json | Dependencies & scripts | 50 |
-| tsconfig.json | TypeScript config | 20 |
-| tailwind.config.js | Tailwind setup | 10 |
-| postcss.config.js | CSS processing | 6 |
-| tsconfig.node.json | Node config | 10 |
-| .gitignore | Version control | 20 |
+| File | Purpose |
+|------|---------|
+| `electron/main.js` | Main process entry: window creation, tray, IPC registration, auto-updater |
+| `electron/admin-check.js` | Detects admin privileges, prompts UAC elevation |
+| `electron/dev-launcher.js` | Dev mode: spawns React dev server + Electron concurrently |
+| `electron/launcher.js` | Production spawn entry point |
 
-### 📕 Documentation Files (6)
-| File | Purpose | Lines |
-|------|---------|-------|
-| README.md | Quick start & overview | 100 |
-| DEVELOPMENT.md | Developer guide | 150 |
-| PROJECT_SUMMARY.md | File manifest & stats | 200 |
-| ARCHITECTURE.md | System design | 250 |
-| UI_UX_GUIDE.md | Design specifications | 300 |
-| COMPLETION_REPORT.md | Project report | 300 |
+## Main Process — IPC Handler Modules
 
-### 🟢 React Components (13)
-| File | Type | Purpose | Lines |
-|------|------|---------|-------|
-| App.tsx | Main | Root component | 50 |
-| App.jsx | Alt | React entry | 10 |
-| index.tsx | Entry | DOM render | 10 |
-| Sidebar.tsx | Nav | Navigation menu | 60 |
-| Header.tsx | UI | Top bar | 30 |
-| StatCard.tsx | Card | Stat display | 50 |
-| Dashboard.tsx | Page | Dashboard view | 60 |
-| Performance.tsx | Page | Charts view | 80 |
-| Cleaner.tsx | Page | Cleaner view | 80 |
-| GameOptimizer.tsx | Page | Games view | 85 |
-| Settings.tsx | Page | Settings view | 100 |
-| NotificationContext.tsx | Context | Global notifications | 75 |
+| File | Purpose |
+|------|---------|
+| `main-process/tweaks.js` | 17 registry performance tweaks (apply/reset/check) + restore point |
+| `main-process/cleaners.js` | 30+ cache/file cleaners (Windows, games, NVIDIA) |
+| `main-process/hardwareMonitor.js` | GCMonitor.exe sidecar lifecycle + real-time metric streaming |
+| `main-process/hardwareInfo.js` | Static hardware identity (CPU, GPU, RAM, disk, network, mobo, BIOS) |
+| `main-process/healthScore.js` | 0–100 health score from 7 weighted factors |
+| `main-process/advisor.js` | AI-driven system insights + hardware upgrade recommendations |
+| `main-process/overlay.js` | FPS HUD overlay window (always-on-top, click-through) |
+| `main-process/gameProfiles.js` | Game config read/write (Apex, Valorant, CS2) + display resolutions |
+| `main-process/appInstaller.js` | Winget app installation with progress tracking |
+| `main-process/appUninstaller.js` | App removal + orphaned leftover scanning/cleanup |
+| `main-process/windowsDebloat.js` | AppX bloatware removal (100+ apps) |
+| `main-process/startup.js` | Startup item listing + enable/disable |
+| `main-process/serviceTweaks.js` | 60+ Windows service optimization with backup/restore |
+| `main-process/softwareUpdates.js` | Winget software update detection + batch update |
+| `main-process/network.js` | Ping tests to regional gaming servers |
+| `main-process/obsPresets.js` | OBS config deployment + launch |
+| `main-process/spaceAnalyzer.js` | Recursive disk usage analysis |
+| `main-process/resolutionManager.js` | Display resolution enumeration + apply via C# helper |
+| `main-process/auth.js` | OAuth flow (Discord/Twitch) via BrowserWindow |
+| `main-process/authSession.js` | Session/token management |
+| `main-process/paypal.js` | PayPal checkout flow with local HTTP callback |
+| `main-process/autoUpdater.js` | App auto-update via electron-updater |
+| `main-process/ctTweaks.js` | Essential Windows tweaks batch runner |
+| `main-process/ctEssentialTweaks.js` | 30+ essential tweak definitions (registry, services, scripts) |
+| `main-process/repairOverlay.js` | Floating always-on-top repair progress window |
+| `main-process/windowManager.js` | Window lifecycle (create, minimize, maximize, close) |
+| `main-process/utils.js` | Shared helpers (execAsync, runPSScript, isPermissionError) |
 
-### 🟡 Style Files (11)
-| File | Components | Lines |
-|------|-----------|-------|
-| index.css | Global | 80 |
-| App.css | Container | 20 |
-| Sidebar.css | Navigation | 150 |
-| Header.css | Header | 100 |
-| StatCard.css | Cards | 100 |
-| Dashboard.css | Dashboard | 100 |
-| Performance.css | Charts | 80 |
-| Cleaner.css | Cleaner | 120 |
-| GameOptimizer.css | Games | 140 |
-| Settings.css | Settings | 130 |
-| Notifications.css | Notifications | 60 |
-| **Total CSS** | | **1000+** |
+## Native Code
 
-### 🔧 Services & Utils (3)
-| File | Purpose | Lines |
-|------|---------|-------|
-| systemMonitoring.ts | System integration | 100 |
-| optimization.ts | Optimization logic | 80 |
-| settings.ts | Storage management | 120 |
+| File | Purpose |
+|------|---------|
+| `native-monitor/Program.cs` | GCMonitor sidecar entry point |
+| `native-monitor/HardwareInfoCollector.cs` | LibreHardwareMonitor data collection |
+| `native-monitor/GCMonitor.csproj` | .NET 8 project file |
+| `lib/ResolutionHelper.cs` | Win32 display resolution change helper |
 
-### 🌐 Public Files (3)
-| File | Purpose | Lines |
-|------|---------|-------|
-| electron.js | Main process | 40 |
-| preload.js | IPC bridge | 15 |
-| index.html | HTML template | 15 |
+## React Pages (src/pages/)
 
----
+| File | Nav Label | Purpose |
+|------|-----------|---------|
+| `LiveMetrics.tsx` | Home | Real-time dashboard with 600-point metric history |
+| `Performance.tsx` | Tweaks | 17 gaming tweaks in 7 categories |
+| `GameLibrary.tsx` | Games | Game profiles, config editor, hardware comparison |
+| `OBSPresets.tsx` | Stream | OBS preset deployment + launch |
+| `ResolutionManager.tsx` | Display | Monitor resolution & refresh rate management |
+| `Network.tsx` | Network | Regional ping tests + speed test webviews |
+| `AppsPage.tsx` | Apps | Tab container for Installer/Uninstaller/Debloat/Startup/Space |
+| `AppInstaller.tsx` | (tab) | 40+ curated app installation via winget |
+| `AppUninstaller.tsx` | (tab) | App removal with leftover cleanup |
+| `WindowsDebloat.tsx` | (tab) | 100+ bloatware removal (Pro) |
+| `Startup.tsx` | (tab) | Startup item management |
+| `SpaceAnalyzer.tsx` | (tab) | Disk usage analyzer (Pro) |
+| `SoftwareUpdates.tsx` | Updates | Winget software update management (Pro) |
+| `Cleaner.tsx` | Utilities | 30+ cache cleaners + essential tweaks + repair |
+| `ServiceOptimizer.tsx` | (hidden) | 60+ Windows service optimization (Pro) |
+| `Settings.tsx` | (header) | App settings (appearance, overlay, startup, about) |
+| `AdminPanel.tsx` | (header) | User management (Owner/Admin only) |
+| `ManageSubscription.tsx` | (header) | Pro subscription management |
+| `LoginPage.tsx` | — | Discord/Twitch OAuth login screen |
 
-## 📊 Code Statistics
+## React Components (src/components/)
 
-### Lines of Code Distribution
-```
-React Components:    600 lines (20%)
-CSS/Styling:      1000 lines (33%)
-Services/Utils:     300 lines (10%)
-Configuration:      100 lines (3%)
-Documentation:     1000+ lines (34%)
-─────────────────────────────
-TOTAL:            3000+ lines
-```
+| File | Purpose |
+|------|---------|
+| `Header.tsx` | Top bar: profile dropdown, What's New, version check |
+| `Sidebar.tsx` | Bottom navigation bar with 9 items + active indicator |
+| `ToastContainer.tsx` | Toast notification display with auto-dismiss |
+| `DashboardHero.tsx` | Dashboard metric cards with Recharts and trend arrows |
+| `HealthScore.tsx` | Compact/expanded health score with 7 factors |
+| `AdvisorPanel.tsx` | Collapsible system insights panel |
+| `PageHeader.tsx` | Consistent page title + stat buttons + badge center |
+| `PerformanceTweakCard.tsx` | Individual tweak card with apply/reset + status |
+| `CleanerCard.tsx` | Cleaner card with icon, description, clean button |
+| `SystemRepairPanel.tsx` | SFC/DISM/ChkDsk repair tools with progress overlay |
+| `TweakExecutionModal.tsx` | Essential tweaks batch progress modal |
+| `CacheCleanupToast.tsx` | Full-page batch cache cleanup overlay |
+| `AutoCleanupRunner.tsx` | Toast-based auto-cleanup on startup |
+| `LightRays.tsx` | WebGL animated light rays (OGL renderer) |
+| `Loader.tsx` | Skeleton loading state with animated bento grid |
+| `PaywallModal.tsx` | Upgrade-to-PRO modal with checkout |
+| `UpgradeModal.tsx` | Simplified upgrade prompt |
+| `ProPreviewBanner.tsx` | PRO-only feature info banner |
+| `ProLockedWrapper.tsx` | Wraps Pro content with disabled styling |
+| `ProLineBadge.tsx` | Inline "Upgrade" button with shimmer |
+| `ProfileDropdown.tsx` | User menu: role badge, logout, settings, subscription |
 
-### Component Breakdown
-```
-Pages:         5 components
-UI Components: 3 components
-Context:       1 component
-Services:      3 modules
-Utils:         2 modules
-─────────────
-Total:        14 component/module files
-```
+## Contexts (src/contexts/)
 
-### Files by Type
-```
-TypeScript (.ts/.tsx):  20 files
-CSS (.css):            11 files
-Config (.json, .js):    6 files
-HTML (.html):           1 file
-Documentation (.md):    6 files
-─────────────────────
-Total:                 44 files
-```
+| File | Purpose |
+|------|---------|
+| `AuthContext.tsx` | User auth state, login/logout, Pro/Admin detection, Supabase integration |
+| `ToastContext.tsx` | Toast notification queue (addToast, removeToast) |
 
----
+## Hooks (src/hooks/)
 
-## 🎯 Feature Implementation Map
+| File | Purpose |
+|------|---------|
+| `useRealtimeHardware.ts` | Subscribes to `hardware:realtime` IPC events, typed payload |
 
-### Dashboard Page
-```
-Dashboard.tsx
-├── StatCard (CPU)
-├── StatCard (RAM)
-├── StatCard (Disk)
-├── StatCard (Temperature)
-├── Action Buttons
-└── Info Panel
-```
+## Data (src/data/)
 
-### Performance Page
-```
-Performance.tsx
-├── LineChart (Recharts)
-│   ├── CPU line
-│   ├── RAM line
-│   └── Disk line
-└── Statistics Grid
-    ├── Average CPU
-    ├── Average RAM
-    └── Average Disk
-```
+| File | Purpose |
+|------|---------|
+| `performanceTweaks.ts` | 17 tweak definitions with registry paths, keys, values |
+| `cleanerUtilities.ts` | 30 cleaner definitions with icons, descriptions, colors |
+| `gameRequirements.ts` | Hardware specs for 8 games (min/recommended, CPU/GPU benchmarks) |
+| `appCatalog.ts` | 40+ winget app catalog with categories and icons |
+| `obsPresets.ts` | OBS preset definitions (features, difficulty, metadata) |
+| `obsPresetConfigs/` | OBS config files for preset deployment |
+| `changelog.ts` | Version changelog entries |
+| `devUpdates.ts` | Developer update notes (markdown) |
 
-### Cleaner Page
-```
-Cleaner.tsx
-├── Summary Card
-├── Cleaner Items
-│   ├── Temporary Files
-│   ├── Cache Files
-│   ├── Recycle Bin
-│   ├── Browser Cache
-│   └── Log Files
-└── Clean Button
-```
+## Utils (src/utils/)
 
-### Game Optimizer
-```
-GameOptimizer.tsx
-├── Game Card (LoL)
-├── Game Card (Valorant)
-├── Game Card (Elden Ring)
-├── Game Card (Cyberpunk)
-└── Tips Panel
-```
+| File | Purpose |
+|------|---------|
+| `settings.ts` | Load/save settings to localStorage |
+| `hardwareCompare.ts` | Hardware benchmark comparison + FPS prediction |
 
-### Settings Page
-```
-Settings.tsx
-├── General Section
-│   ├── Auto Clean Toggle
-│   ├── Notifications Toggle
-│   ├── Auto Optimize Toggle
-│   └── Startup Launch Toggle
-├── Appearance Section
-│   └── Theme Selector
-└── About Section
-```
+## Services (src/services/)
 
----
+| File | Purpose |
+|------|---------|
+| `obsPresetsService.ts` | OBS preset apply/launch via IPC |
 
-## 🔄 File Dependencies
+## Styles (src/styles/)
 
-```
-App.tsx
-├── Sidebar.tsx
-├── Header.tsx
-├── Dashboard.tsx
-│   └── StatCard.tsx
-├── Performance.tsx
-│   └── Recharts
-├── Cleaner.tsx
-├── GameOptimizer.tsx
-├── Settings.tsx
-├── NotificationContext.tsx
-└── Styles:
-    ├── App.css
-    ├── Sidebar.css
-    ├── Header.css
-    ├── Dashboard.css
-    ├── Performance.css
-    ├── Cleaner.css
-    ├── GameOptimizer.css
-    ├── Settings.css
-    └── Notifications.css
+37 CSS files — one per page/component plus global styles. Uses Tailwind CSS utility classes with custom CSS for animations and component-specific styling.
 
-Services:
-├── systemMonitoring.ts (← used by all pages)
-├── optimization.ts (← used by GameOptimizer/Cleaner)
-└── settings.ts (← used by Settings/all pages)
+## Public (Electron HTML shells)
 
-Context:
-└── NotificationContext.tsx (← global provider)
-```
+| File | Purpose |
+|------|---------|
+| `public/index.html` | Main app HTML shell |
+| `public/overlay.html` | FPS HUD overlay window |
+| `public/overlay-preload.js` | Overlay IPC bridge |
+| `public/splash.html` | App splash screen |
+| `public/splash-preload.js` | Splash IPC bridge |
+| `public/repair-overlay.html` | Floating repair progress window |
+| `public/repair-overlay-preload.js` | Repair overlay IPC bridge |
+| `public/preload.js` | Main window IPC bridge |
+| `public/installer.nsh` | NSIS installer customization |
+| `public/app.manifest` | Windows app manifest |
 
----
+## Scripts
 
-## 🚀 Critical Files for Development
+| File | Purpose |
+|------|---------|
+| `scripts/enum_resolutions.ps1` | PowerShell display resolution enumeration |
+| `scripts/rename-output.js` | Build output renaming utility |
+| `scripts/WPFTweaksRevertStartMenu.ps1` | Start menu revert script |
+| `scripts/vivetool/` | Windows feature flag tool |
 
-### Must Know Files
-1. **App.tsx** - Main routing & state management
-2. **Sidebar.tsx** - Navigation logic
-3. **Dashboard.tsx** - Primary UI pattern
-4. **index.css** - Global variables & theme
-5. **package.json** - Dependencies & scripts
+## Database
 
-### Key Service Files
-1. **systemMonitoring.ts** - Windows integration
-2. **settings.ts** - Data persistence
-3. **optimization.ts** - Optimization logic
+| File | Purpose |
+|------|---------|
+| `supabase/schema.sql` | Database schema (users, profiles, subscriptions) |
 
-### Styling Foundation
-1. **index.css** - CSS variables
-2. **Sidebar.css** - Animation patterns
-3. **StatCard.css** - Component patterns
+## Game Configs
 
----
-
-## 📈 Project Growth Potential
-
-### Can Add New Pages
-- System Maintenance
-- Driver Updates
-- Malware Scanner
-- Backup Manager
-- Network Monitor
-
-### Can Enhance Components
-- Add more stat cards
-- Create custom charts
-- Build advanced filters
-- Implement settings presets
-
-### Can Extend Services
-- Add antivirus integration
-- Real-time threat detection
-- Cloud backup
-- System restore points
-
----
-
-## ✅ File Checklist for Development
-
-### Setup (Run Once)
-- [ ] Run: `npm install`
-- [ ] Copy: All dependencies
-- [ ] Build: TypeScript compilation
-
-### Development
-- [ ] Edit: `src/App.tsx` for routing
-- [ ] Edit: Component files for features
-- [ ] Edit: Styles for design
-- [ ] Test: `npm run dev`
-
-### Build
-- [ ] Run: `npm run build`
-- [ ] Test: Electron build
-- [ ] Package: `dist/` folder
-
----
-
-## 🎓 File Learning Path
-
-1. **Start Here**: README.md
-2. **Understand**: ARCHITECTURE.md
-3. **Learn**: UI_UX_GUIDE.md
-4. **Explore**: src/App.tsx
-5. **Deep Dive**: Component files
-6. **Reference**: DEVELOPMENT.md
-
----
-
-This file map provides complete visibility into the project structure and organization!
+| Path | Purpose |
+|------|---------|
+| `V-Config/apex-legends/` | Apex Legends configuration templates |
