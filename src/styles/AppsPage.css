@@ -298,22 +298,4 @@
 .apps-hdr-sw-btn--startup.apps-hdr-sw-btn--on .apps-hdr-sw-btn-sub { color: rgba(0, 242, 255, 0.45); }
 .apps-hdr-sw-btn--startup.apps-hdr-sw-btn--on::after { background: #00F2FF; }
 
-/* ════════════════════════════════
-   TAB CONTENT
-════════════════════════════════ */
-.apps-tab-content {
-  display: none;
-  flex: 1;
-  overflow: hidden;
-  min-height: 0;
-}
-.apps-tab-content--visible {
-  display: flex;
-  flex-direction: column;
-}
-.apps-tab-content--visible > * {
-  flex: 1;
-  min-height: 0;
-}
-
 

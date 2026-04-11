@@ -64,8 +64,6 @@
   white-space: nowrap;
 }
 
-.au-toolbar-r { display: flex; align-items: center; gap: 8px; }
-
 /* Stat badge */
 .au-stat {
   display: inline-flex;

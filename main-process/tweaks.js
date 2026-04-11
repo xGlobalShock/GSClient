@@ -1590,15 +1590,6 @@ If (Test-Path 'HKU:\\.Default\\Control Panel\\Keyboard') {
     } catch (e) { return { success: false, message: String(e) }; }
   });
 
-  // ── System Reboot ─────────────────────────────────────────────────────────
-  ipcMain.handle('system:reboot', async () => {
-    try {
-      const { exec } = require('child_process');
-      exec('shutdown /r /t 5 /c "GS Center: Restarting to apply changes"');
-      return { ok: true };
-    } catch (e) { return { ok: false, message: String(e) }; }
-  });
-
 } // end registerIPC
 
 module.exports = { init, registerIPC };

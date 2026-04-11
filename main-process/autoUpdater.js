@@ -8,6 +8,8 @@ let _downloadCancellationToken = null;
 let _updateDownloadedAt = null;
 let _updateLogPath = null;
 let _latestUpdateVersion = null;
+let _updateCheckTimer = null;
+let _initCalled = false;
 
 /**
  * Write a small marker to userData so the NEXT launch (immediately after NSIS
@@ -41,6 +43,9 @@ function sendUpdateStatus(data) {
 }
 
 function initAutoUpdater() {
+  if (_initCalled) return; // Prevent duplicate listeners on re-init
+  _initCalled = true;
+
   if (!app.isPackaged) {
     console.log('[AutoUpdater] Skipping — running in dev mode');
     return;
@@ -152,9 +157,10 @@ function initAutoUpdater() {
     console.warn('[AutoUpdater] Check failed:', err?.message);
   });
 
-  setInterval(() => {
+  // Check for updates every 4 hours (not 30 seconds)
+  _updateCheckTimer = setInterval(() => {
     autoUpdater.checkForUpdates().catch(() => {});
-  }, 30 * 1000); // Check every 30 seconds
+  }, 4 * 60 * 60 * 1000);
 }
 
 function registerIPC() {
@@ -418,4 +424,11 @@ function _checkGitHubRelease() {
   });
 }
 
-module.exports = { initAutoUpdater, registerIPC, checkForUpdateEarly };
+function cleanup() {
+  if (_updateCheckTimer) {
+    clearInterval(_updateCheckTimer);
+    _updateCheckTimer = null;
+  }
+}
+
+module.exports = { initAutoUpdater, registerIPC, checkForUpdateEarly, cleanup };

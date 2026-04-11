@@ -388,7 +388,7 @@ const SystemRepairPanel: React.FC = () => {
                       className="repair-confirm-btn repair-confirm-btn--confirm"
                       onClick={() => {
                         setShowRestartPrompt(false);
-                        window.electron?.ipcRenderer.invoke('system:reboot');
+                        window.electron?.ipcRenderer.invoke('system:restart');
                       }}
                     >
                       <RotateCcw size={13} /> Restart Now
