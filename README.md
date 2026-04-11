@@ -252,27 +252,6 @@ Customize the application experience.
 
 ---
 
-## Admin Panel (Owner/Admin Only)
-
-User management dashboard for GS Center team.
-
-- Role assignment: Free, Pro, Admin, Owner/Lifetime
-- Pro access grants with preset durations (5m → lifetime)
-- User search and profile viewing
-
----
-
-## Subscription Management (Pro)
-
-View and manage your Pro subscription.
-
-- Subscription status (Active, Expired, Cancelled, Lifetime)
-- Countdown timer to expiry
-- Cancel or upgrade options
-- PayPal checkout integration
-
----
-
 # Tech Stack
 
 | Layer | Technology |
