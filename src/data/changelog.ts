@@ -12,7 +12,7 @@ const changelog: ChangelogEntry[] = [
   {
     version: '2.1.7',
     date: '2026-04-13',
-    highlights: 'Hotfix for 2.1.6 - Fixed critical bugs and improved stability.',
+    highlights: 'Hotfix for 2.1.6 - Fixed Win Tweaks bug.',
     changes: [
       {
         type: 'fixed',
