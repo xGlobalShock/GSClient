@@ -12,7 +12,7 @@ const changelog: ChangelogEntry[] = [
   {
     version: '2.1.6',
     date: '2026-04-12',
-    highlights: 'Massive Anti-Cheat database expansion, performance stability fixes, and peripheral macro detection.',
+    highlights: 'Anti-Cheat database expansion, Enhanced Trace Route & Bug Fixes.',
     changes: [
       {
         type: 'new',
